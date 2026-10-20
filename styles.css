@@ -5,6 +5,7 @@
   --shadow:0 10px 30px rgba(23,32,43,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
 html{scroll-behavior:smooth}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink)}
 h1,h2,h3,h4,.logo{font-family:'Plus Jakarta Sans',sans-serif}
