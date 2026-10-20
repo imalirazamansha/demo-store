@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopNest — Demo Store | Quality Products, Honest Prices</title>
+<meta name="description" content="ShopNest demo store — fashion, electronics, home & beauty products with Cash on Delivery across Pakistan.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="announce">🚚 Free delivery on orders above Rs 5,000 &nbsp;•&nbsp; 💵 Cash on Delivery available across Pakistan</div>
+
+<header class="header">
+  <div class="header-in">
+    <a class="logo" href="#">🛍️ Shop<span>Nest</span></a>
+    <div class="search">
+      <input id="searchInput" type="text" placeholder="Search products… (e.g. headphones, watch)">
+      <button id="searchBtn" aria-label="Search">🔍</button>
+    </div>
+    <button class="cart-btn" id="cartBtn" aria-label="Open cart">🛒 Cart <span class="cart-count" id="cartCount">0</span></button>
+  </div>
+  <nav class="catnav" id="catNav"></nav>
+</header>
+
+<section class="hero">
+  <div class="hero-text">
+    <h1>Everything you love,<br>delivered to your door.</h1>
+    <p>Fashion, electronics, home &amp; beauty — quality products at honest prices, with Cash on Delivery.</p>
+    <a class="hero-cta" href="#shop">Shop Now ↓</a>
+  </div>
+  <img class="hero-img" src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1000&q=80" alt="ShopNest store">
+</section>
+
+<main id="shop" class="wrap">
+  <div class="toolbar">
+    <p class="results" id="resultsText"></p>
+    <label class="sort">Sort:
+      <select id="sortSelect">
+        <option value="popular">Most Popular</option>
+        <option value="price-low">Price: Low to High</option>
+        <option value="price-high">Price: High to Low</option>
+        <option value="rating">Top Rated</option>
+      </select>
+    </label>
+  </div>
+  <div class="grid" id="grid"></div>
+  <p class="empty" id="emptyMsg" hidden>No products found. Try a different search or category.</p>
+</main>
+
+<section class="features">
+  <div class="feature"><span>💵</span><h3>Cash on Delivery</h3><p>Pay when your order arrives at your doorstep.</p></div>
+  <div class="feature"><span>🚚</span><h3>Fast Delivery</h3><p>2–4 working days, all over Pakistan.</p></div>
+  <div class="feature"><span>↩️</span><h3>7-Day Easy Return</h3><p>Changed your mind? No questions asked.</p></div>
+  <div class="feature"><span>✅</span><h3>Quality Checked</h3><p>Every product is checked before dispatch.</p></div>
+</section>
+
+<footer class="footer">
+  <div class="footer-in">
+    <div>
+      <p class="logo light">🛍️ Shop<span>Nest</span></p>
+      <p>Demo e-commerce store. Replace the demo products, name and WhatsApp number with your own — see README.</p>
+    </div>
+    <div>
+      <h4>Contact</h4>
+      <p>WhatsApp: <span id="footerPhone"></span><br>Email: hello@shopnest.example</p>
+    </div>
+    <div>
+      <h4>Help</h4>
+      <p>Delivery: 2–4 working days<br>Returns: within 7 days<br>Payment: Cash on Delivery</p>
+    </div>
+  </div>
+  <p class="copy">© 2026 ShopNest (Demo). Built as a static store — hosted free on GitHub Pages.</p>
+</footer>
+
+<!-- Cart drawer -->
+<div class="overlay" id="overlay" hidden></div>
+<aside class="drawer" id="cartDrawer" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>Your Cart <span id="drawerCount"></span></h3>
+    <button class="icon-btn" id="closeCart" aria-label="Close cart">✕</button>
+  </div>
+  <div class="drawer-items" id="cartItems"></div>
+  <div class="drawer-foot">
+    <div class="row"><span>Subtotal</span><strong id="subTotal">Rs 0</strong></div>
+    <div class="row"><span>Delivery</span><strong id="deliveryFee">—</strong></div>
+    <div class="row total"><span>Total</span><strong id="grandTotal">Rs 0</strong></div>
+    <p class="free-note" id="freeNote"></p>
+    <button class="btn primary big" id="checkoutBtn">Checkout →</button>
+  </div>
+</aside>
+
+<!-- Quick view modal -->
+<div class="modal" id="quickModal" hidden>
+  <div class="modal-card">
+    <button class="icon-btn modal-x" data-close aria-label="Close">✕</button>
+    <img id="qvImg" alt="">
+    <div class="qv-body">
+      <p class="qv-cat" id="qvCat"></p>
+      <h3 id="qvName"></h3>
+      <p class="qv-rating" id="qvRating"></p>
+      <p class="qv-desc" id="qvDesc"></p>
+      <p class="qv-price" id="qvPrice"></p>
+      <div class="qty-row">
+        <button class="qty-btn" id="qvMinus">−</button>
+        <span id="qvQty">1</span>
+        <button class="qty-btn" id="qvPlus">+</button>
+      </div>
+      <button class="btn primary big" id="qvAdd">Add to Cart</button>
+    </div>
+  </div>
+</div>
+
+<!-- Checkout modal -->
+<div class="modal" id="checkoutModal" hidden>
+  <div class="modal-card small">
+    <button class="icon-btn modal-x" data-close aria-label="Close">✕</button>
+    <h3>Checkout</h3>
+    <p class="muted">Fill your details — your order will open in WhatsApp for confirmation. Payment is Cash on Delivery.</p>
+    <form id="checkoutForm">
+      <label>Full name<input required name="name" placeholder="e.g. Ali Raza"></label>
+      <label>Mobile number<input required name="phone" placeholder="03XX-XXXXXXX" pattern="[0-9+\- ]{10,15}"></label>
+      <label>City<input required name="city" placeholder="e.g. Lahore"></label>
+      <label>Complete address<textarea required name="address" rows="2" placeholder="House, street, area"></textarea></label>
+      <button class="btn whatsapp big" type="submit">📲 Place Order on WhatsApp</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="script.js"></script>
+</body>
+</html>
