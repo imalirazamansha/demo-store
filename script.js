@@ -182,13 +182,13 @@ $("#checkoutForm").onsubmit = async e => {
     const p = PRODUCTS.find(x => x.id === +id);
     return { id: p.id, name: p.name, price: p.price, qty: q };
   });
-  const { data, error } = await sb.from("orders").insert({
+  const { error } = await sb.from("orders").insert({
     customer_name: f.get("name").trim(),
     phone: f.get("phone").trim(),
     city: f.get("city").trim(),
     address: f.get("address").trim(),
     items, total, status: "Pending",
-  }).select("id").single();
+  });
   btn.disabled = false; btn.textContent = "✅ Place Order";
   if (error){
     console.error(error);
@@ -198,7 +198,8 @@ $("#checkoutForm").onsubmit = async e => {
   cart = {}; saveCart(); renderCart();
   e.target.reset();
   closeAll();
-  $("#successOrderId").textContent = "Order #" + data.id;
+  $("#successText").textContent = "Shukriya! Aapka order save ho gaya hai — hum jald call karke confirm karein ge.";
+  $("#successOrderId").textContent = "Total (COD): " + fmt(total);
   $("#successModal").classList.add("open");
 };
 
