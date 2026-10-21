@@ -3,175 +3,264 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ShopNest — Demo Store | Quality Products, Honest Prices</title>
-<meta name="description" content="ShopNest — fashion, electronics, home & beauty products with Cash on Delivery across Pakistan.">
+<title>ShopNest — Pakistan Ka Smart Store</title>
+<meta name="description" content="Smart gadgets and everyday essentials with Cash on Delivery across Pakistan.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<div class="announce">💵 Cash on Delivery — Pehle Product, Phir Payment &nbsp;•&nbsp; 🚚 Poore Pakistan Mein Fast Delivery</div>
+<div class="marquee" aria-label="Store announcements"><div class="marquee-track" id="announceTrack"></div></div>
 
-<header class="header">
-  <div class="header-in">
-    <a class="logo" href="#">🛍️ Shop<span>Nest</span></a>
-    <div class="search">
-      <input id="searchInput" type="text" placeholder="Search products… (e.g. headphones, watch)">
-      <button id="searchBtn" aria-label="Search">🔍</button>
+<header class="site-header">
+  <div class="header-pill">
+    <button class="icon-btn" id="searchToggle" type="button" aria-label="Search products">⌕</button>
+    <a class="logo" href="#" id="logoHome" aria-label="Store home"><span class="logo-bag">🛍️</span><span id="logoName">ShopNest</span></a>
+    <div class="header-actions">
+      <a class="icon-btn account-btn" href="admin.html" aria-label="Admin account">👤</a>
+      <button class="icon-btn cart-icon" id="cartBtn" type="button" aria-label="Open cart">🛒<span class="cart-count" id="cartCount">0</span></button>
     </div>
-    <button class="cart-btn" id="cartBtn" aria-label="Open cart">🛒 Cart <span class="cart-count" id="cartCount">0</span></button>
   </div>
-  <nav class="catnav" id="catNav"></nav>
+  <div class="search-bar" id="searchBar" hidden>
+    <input id="searchInput" type="search" placeholder="Search products" autocomplete="off">
+    <button id="searchBtn" type="button">Search</button>
+  </div>
+  <nav class="catnav" id="catNav" aria-label="Product categories"></nav>
 </header>
 
-<section class="hero">
-  <div class="hero-text">
-    <span class="hero-pill">🔥 MEGA SALE — 50% tak OFF</span>
-    <h1>Jo pasand aaye,<br>ghar baithe mangwayein!</h1>
-    <p>Fashion, electronics, home &amp; beauty — har product quality-checked. Payment tab, jab product aapke haath mein ho. <strong>Cash on Delivery, poore Pakistan mein.</strong></p>
-    <div class="hero-ctas">
-      <a class="hero-cta" href="#shop">🛒 Abhi Shopping Karein</a>
-      <button class="hero-cta ghost" id="topRatedBtn" type="button">⭐ Top Rated Dekhein</button>
-    </div>
-    <div class="hero-chips">
-      <span>💵 Cash on Delivery</span>
-      <span>🚚 2–4 Din Mein Delivery</span>
-      <span>↩️ 7-Day Easy Return</span>
-      <span>✅ Quality Checked</span>
-    </div>
-  </div>
-  <div class="hero-media">
-    <img class="hero-img" src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1000&q=80" alt="ShopNest store">
-    <span class="hero-sticker">−50%<small>tak OFF</small></span>
-    <span class="hero-price-tag">🏷️ Rs 1,299 se shuru</span>
-  </div>
-</section>
+<div id="homeView">
+  <section class="hero-slider" id="heroSection" aria-label="Featured offers">
+    <div class="hero-track" id="heroTrack"></div>
+    <div class="hero-dots" id="heroDots"></div>
+  </section>
 
-<main id="shop" class="wrap">
-  <div class="toolbar">
-    <p class="results" id="resultsText">Loading products…</p>
-    <label class="sort">Sort:
-      <select id="sortSelect">
-        <option value="popular">Most Popular</option>
-        <option value="price-low">Price: Low to High</option>
-        <option value="price-high">Price: High to Low</option>
-        <option value="rating">Top Rated</option>
-      </select>
-    </label>
-  </div>
-  <div class="grid" id="grid"></div>
-  <p class="empty" id="emptyMsg" hidden>No products found. Try a different search or category.</p>
-  <p class="empty" id="loadError" hidden>⚠️ Products load nahi ho sakay. Internet check karke page refresh karein.</p>
-</main>
-
-<section class="features">
-  <div class="feature"><span>💵</span><h3>Cash on Delivery</h3><p>Pehle product, phir payment — pay when your order arrives.</p></div>
-  <div class="feature"><span>🚚</span><h3>Fast Delivery</h3><p>2–4 working days, all over Pakistan.</p></div>
-  <div class="feature"><span>↩️</span><h3>7-Day Easy Return</h3><p>Changed your mind? No questions asked.</p></div>
-  <div class="feature"><span>✅</span><h3>Quality Checked</h3><p>Every product is checked before dispatch.</p></div>
-</section>
-
-<footer class="footer">
-  <div class="footer-in">
-    <div>
-      <p class="logo light">🛍️ Shop<span>Nest</span></p>
-      <p>Quality products at honest prices. Orders are confirmed by a phone call before dispatch.</p>
+  <section class="trust-strip" aria-label="Store benefits">
+    <div class="trust-grid">
+      <div><strong>💵 CASH ON DELIVERY</strong><span>Pay when it arrives</span></div>
+      <div><strong>🚚 FAST DELIVERY</strong><span>3–5 days, all Pakistan</span></div>
+      <div><strong>✅ QUALITY CHECKED</strong><span>Tested before dispatch</span></div>
+      <div><strong>🔁 EASY EXCHANGE</strong><span>On damaged items</span></div>
     </div>
-    <div>
-      <h4>Contact</h4>
-      <p>Email: hello@shopnest.example<br>Timings: 9am – 9pm (Mon–Sat)</p>
-    </div>
-    <div>
-      <h4>Help</h4>
-      <p>Delivery: 2–4 working days<br>Returns: within 7 days<br>Payment: Cash on Delivery<br><a class="admin-link" href="admin.html">Store Admin →</a></p>
-    </div>
-  </div>
-  <p class="copy">© 2026 ShopNest (Demo). Hosted on GitHub Pages with a Supabase backend.</p>
-</footer>
+  </section>
 
-<!-- Cart drawer -->
-<div class="overlay" id="overlay"></div>
-<aside class="drawer" id="cartDrawer" aria-hidden="true">
-  <div class="drawer-head">
-    <h3>Your Cart <span id="drawerCount"></span></h3>
-    <button class="icon-btn" id="closeCart" aria-label="Close cart">✕</button>
-  </div>
-  <div class="drawer-items" id="cartItems"></div>
-  <div class="drawer-foot">
-    <div class="row"><span>Subtotal</span><strong id="subTotal">Rs 0</strong></div>
-    <div class="row"><span>Delivery</span><strong id="deliveryFee">—</strong></div>
-    <div class="row total"><span>Total</span><strong id="grandTotal">Rs 0</strong></div>
-    <p class="free-note" id="freeNote"></p>
-    <button class="btn primary big" id="checkoutBtn">Checkout →</button>
-  </div>
-</aside>
+  <section class="section wrap" id="categoriesSection">
+    <p class="eyebrow">Apni Pasand Chunein</p>
+    <h2 class="section-title">SHOP BY CATEGORY</h2>
+    <div class="cat-track" id="catTiles"></div>
+  </section>
 
-<!-- Quick view modal -->
-<div class="modal" id="quickModal">
-  <div class="modal-card">
-    <button class="icon-btn modal-x" data-close aria-label="Close">✕</button>
-    <img id="qvImg" alt="">
-    <div class="qv-body">
-      <p class="qv-cat" id="qvCat"></p>
-      <h3 id="qvName"></h3>
-      <p class="qv-rating" id="qvRating"></p>
-      <p class="qv-desc" id="qvDesc"></p>
-      <p class="qv-deliv" id="qvDeliv"></p>
-      <p class="qv-price" id="qvPrice"></p>
-      <div class="qty-row">
-        <button class="qty-btn" id="qvMinus">−</button>
-        <span id="qvQty">1</span>
-        <button class="qty-btn" id="qvPlus">+</button>
+  <section class="section section-alt" id="bestSection">
+    <div class="wrap">
+      <p class="eyebrow">SAB SE ZYADA ORDER HONE WALE PRODUCTS</p>
+      <h2 class="section-title">BEST SELLERS</h2>
+      <div class="grid" id="bestGrid"></div>
+      <div class="center-action"><button class="btn outline wide" id="viewAllBtn" type="button">VIEW ALL PRODUCTS</button></div>
+    </div>
+  </section>
+
+  <main class="section wrap" id="shop">
+    <div class="shop-heading">
+      <div><p class="eyebrow">Complete Collection</p><h2 class="section-title left" id="shopTitle">ALL PRODUCTS</h2></div>
+      <p class="results" id="resultsText">Loading products…</p>
+    </div>
+    <div class="toolbar">
+      <span class="filter-note" id="filterNote">Saari categories aur prices</span>
+      <label class="sort">Sort:
+        <select id="sortSelect">
+          <option value="popular">Most Popular</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="rating">Top Rated</option>
+        </select>
+      </label>
+    </div>
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="emptyMsg" hidden>No products found. Search, category ya budget filter change karke dobara dekhein.</p>
+    <p class="empty error" id="loadError" hidden>⚠️ Products load nahi ho sakay. Internet check karke page refresh karein.</p>
+  </main>
+
+  <section class="section wrap" id="promoSection"><div class="promo-grid" id="promoGrid"></div></section>
+
+  <section class="section section-alt" id="hotSection">
+    <div class="wrap">
+      <div class="section-head-row">
+        <div><p class="eyebrow">Trending Now</p><h2 class="section-title left">HOT SELLING THIS WEEK</h2></div>
+        <div class="carousel-arrows"><button class="arrow-btn" id="hotPrev" type="button" aria-label="Previous hot products">‹</button><button class="arrow-btn" id="hotNext" type="button" aria-label="Next hot products">›</button></div>
       </div>
-      <div class="qv-actions">
-        <button class="btn cart-add" id="qvAdd">Add to Cart 🛒</button>
-        <button class="btn order-now" id="qvOrder">Order Now ⚡</button>
-      </div>
+      <div class="h-track" id="hotTrack"></div>
+      <div class="center-action"><button class="btn primary wide" id="hotOrderBtn" type="button">ORDER NOW</button></div>
+      <p class="trust-checklist">⚡ SMART PRODUCTS &nbsp; ✔ QUALITY CHECKED &nbsp; 💵 CASH ON DELIVERY &nbsp; 🚚 FAST DELIVERY &nbsp; 🔁 EASY EXCHANGE</p>
     </div>
-  </div>
+  </section>
+
+  <section class="section wrap" id="newSection">
+    <p class="eyebrow">JUST LAUNCHED</p>
+    <h2 class="section-title">NEW ARRIVALS</h2>
+    <div class="grid" id="newGrid"></div>
+    <div class="center-action"><button class="btn outline wide" id="viewNewBtn" type="button">VIEW ALL NEW ARRIVALS</button></div>
+  </section>
+
+  <section class="section deals-section" id="dealsSection">
+    <div class="wrap">
+      <p class="eyebrow light">LIMITED TIME</p>
+      <h2 class="section-title light">MEGA DEALS — HAR GHAR KI ZAROORAT</h2>
+      <div class="grid" id="dealGrid"></div>
+      <div class="center-action"><button class="btn white wide" id="shopDealsBtn" type="button">SHOP DEALS</button></div>
+    </div>
+  </section>
+
+  <section class="section wrap" id="budgetSection">
+    <p class="eyebrow">Har Budget Ke Liye</p>
+    <h2 class="section-title">SHOP BY BUDGET</h2>
+    <div class="budget-grid">
+      <button class="budget-tile" type="button" data-budget="1499"><span>UNDER</span><strong>Rs.1,499</strong><small>Choti price, smart choice</small></button>
+      <button class="budget-tile" type="button" data-budget="1999"><span>UNDER</span><strong>Rs.1,999</strong><small>Roz-marra ki essentials</small></button>
+      <button class="budget-tile" type="button" data-budget="2999"><span>UNDER</span><strong>Rs.2,999</strong><small>Value picks, zyada faida</small></button>
+      <button class="budget-tile top-pick" type="button" data-budget="top"><span>★ TOP PICKS</span><strong>HIGHEST RATED</strong><small>Customers ki pehli pasand</small></button>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="aboutSection">
+    <div class="wrap about-grid">
+      <div><p class="eyebrow">ABOUT</p><h2 class="section-title left" id="aboutHeading">PAKISTAN KA SMART STORE</h2><p class="about-text" id="aboutText"></p></div>
+      <div class="about-checks"><div>✅ <strong>Quality Checked</strong><span>Har product dispatch se pehle test hota hai.</span></div><div>💵 <strong>Cash on Delivery</strong><span>Payment product milne ke baad.</span></div><div>🚚 <strong>Fast Dispatch</strong><span>Poore Pakistan mein jaldi delivery.</span></div></div>
+    </div>
+  </section>
+
+  <section class="section wrap" id="howSection">
+    <p class="eyebrow">Asaan Tareeqa</p><h2 class="section-title">HOW TO ORDER</h2>
+    <div class="steps-grid">
+      <div><span>01</span><h3>PRODUCT CHUNEIN</h3><p>Apni pasand ka product select karein aur details achi tarah parhein.</p></div>
+      <div><span>02</span><h3>ORDER FORM BHAREIN</h3><p>Naam, mobile number, city aur mukammal address likhein.</p></div>
+      <div><span>03</span><h3>CONFIRMATION CALL</h3><p>Humari team call karke order aur address confirm karegi.</p></div>
+      <div><span>04</span><h3>DELIVERY PE PAYMENT</h3><p>Product milne par Cash on Delivery mein payment karein.</p></div>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="faqSection">
+    <div class="wrap narrow"><p class="eyebrow">Aksar Sawalat</p><h2 class="section-title">FAQ</h2><div id="faqWrap"></div></div>
+  </section>
+
+  <section class="section wrap" id="reviewsSection">
+    <div class="section-head-row"><div><p class="eyebrow">Customer Love</p><h2 class="section-title left">HAPPY CUSTOMERS</h2></div><div class="carousel-arrows"><button class="arrow-btn" id="revPrev" type="button" aria-label="Previous reviews">‹</button><button class="arrow-btn" id="revNext" type="button" aria-label="Next reviews">›</button></div></div>
+    <div class="review-track" id="reviewTrack"></div>
+  </section>
 </div>
 
-<!-- Checkout PAGE (full view — Order Now / Checkout yahin laata hai) -->
-<section id="checkoutPage" class="co-page" hidden>
-  <button class="back-btn" id="backToShop" type="button">← Shopping jaari rakhein</button>
-  <h2 class="co-title">Checkout 🧾</h2>
-  <p class="muted">Apni details dein — hum call karke order confirm karein ge. 💵 Payment <strong>Cash on Delivery</strong> hai: pehle product, phir payment.</p>
-  <div class="co-grid">
-    <div class="co-box">
-      <h3>🧾 Order Summary</h3>
-      <div id="coItems"></div>
-      <div class="co-row"><span>Subtotal</span><strong id="coSubtotal">Rs 0</strong></div>
-      <div class="co-row"><span>Delivery</span><strong id="coDelivery">—</strong></div>
-      <div class="co-row total"><span>Total (Cash on Delivery)</span><strong id="coTotal">Rs 0</strong></div>
-      <p class="co-note">✅ Har product dispatch se pehle quality-check hota hai. Order confirm karne ke liye humari call aayegi.</p>
+<!-- PRODUCT PAGE -->
+<section id="productPage" class="page wrap" hidden>
+  <button class="back-btn" id="pdpBack" type="button">← Back to Shop</button>
+  <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" id="crumbHome">Home</button><span>›</span><button type="button" id="pdpCrumbCat">Category</button><span>›</span><strong id="pdpCrumbName">Product</strong></nav>
+  <div class="pdp-grid">
+    <div class="pdp-media"><img id="pdpImg" alt=""><div class="pdp-thumbs"><img id="pdpThumb" alt=""></div></div>
+    <div class="pdp-info">
+      <p class="verified-line">✓ Verified Brand <span>|</span> 100,000+ Happy Customers</p>
+      <h1 id="pdpTitle">Product</h1>
+      <p class="pdp-rating" id="pdpRating"></p>
+      <div class="pdp-price" id="pdpPrice"></div>
+      <p class="live-line"><span class="live-dot"></span> LIVE / <strong id="pdpSold">0</strong> items sold &nbsp; • &nbsp; 👁 <strong id="pdpVisiting">0</strong> people visiting now</p>
+      <p class="pdp-fee" id="pdpFee"></p>
+      <div class="qty-row"><span>Quantity</span><button class="qty-btn" id="pdpMinus" type="button">−</button><strong id="pdpQty">1</strong><button class="qty-btn" id="pdpPlus" type="button">+</button></div>
+      <button class="btn outline big" id="pdpAdd" type="button">ADD TO CART</button>
+      <button class="btn primary big" id="pdpOrder" type="button">🔒 ORDER NOW</button>
+      <div class="delivery-widget">
+        <p><strong id="pdpEtaText">Get it by —</strong><span>Delivery estimate</span></p>
+        <div class="delivery-track"><i class="done"></i><i class="done mid"></i><i></i></div>
+        <div class="delivery-dates"><span>Ordered<br><strong id="pdpD1">—</strong></span><span>Shipped<br><strong id="pdpD2">—</strong></span><span>Delivered<br><strong id="pdpD3">—</strong></span></div>
+      </div>
+      <div class="pdp-trust"><div>💵<strong>COD</strong><span>Cash on Delivery</span></div><div>🔒<strong>SECURE PAYMENT</strong><span>Safe & protected</span></div><div>🚚<strong>FAST DELIVERY</strong><span>3–5 days</span></div><div>🔁<strong>EASY EXCHANGE</strong><span>Damaged items</span></div></div>
+      <div class="pdp-desc"><h2>Product Details</h2><p id="pdpDesc"></p></div>
     </div>
+  </div>
+  <div class="related"><h2 class="section-title left">YOU MIGHT ALSO LIKE</h2><div class="grid related-grid" id="relatedWrap"></div></div>
+</section>
+
+<!-- CART PAGE -->
+<section id="cartPage" class="page wrap" hidden>
+  <button class="back-btn" id="backFromCart" type="button">← Shopping jaari rakhein</button>
+  <h1 class="page-title">SHOPPING CART</h1>
+  <div class="cart-layout">
+    <div><div id="cartRows"></div><p class="empty" id="cartEmptyMsg" hidden>🛒 Your cart is empty. Kuch pasand karein aur shopping shuru karein!</p></div>
+    <aside class="summary-card">
+      <h2>ORDER SUMMARY</h2>
+      <div class="summary-row"><span>Subtotal</span><strong id="cpSubtotal">Rs.0</strong></div>
+      <div class="summary-row"><span>Delivery</span><strong id="cpDelivery">—</strong></div>
+      <div class="summary-row total"><span>Total</span><strong id="cpTotal">Rs.0</strong></div>
+      <button class="btn primary big" id="cpCheckoutBtn" type="button">CHECK OUT</button>
+      <p class="summary-note">Delivery charges product ke hisaab se checkout par final hongi.</p>
+    </aside>
+  </div>
+</section>
+
+<!-- CHECKOUT PAGE -->
+<section id="checkoutPage" class="page wrap" hidden>
+  <button class="back-btn" id="backToShop" type="button">← Shopping jaari rakhein</button>
+  <h1 class="page-title">CHECKOUT</h1>
+  <p class="page-intro">Apni details dein — hum call karke order confirm karein ge. Payment Cash on Delivery hai: pehle product, phir payment.</p>
+  <div class="co-grid">
     <form id="checkoutForm" class="co-box">
-      <h3>📦 Delivery Details</h3>
+      <h2>📦 Delivery Details</h2>
       <label>Full name<input required name="name" placeholder="e.g. Ali Raza" autocomplete="name"></label>
       <label>Mobile number<input required name="phone" placeholder="03XX-XXXXXXX" pattern="[0-9+\- ]{10,15}" autocomplete="tel"></label>
       <label>City<input required name="city" placeholder="e.g. Lahore" autocomplete="address-level2"></label>
       <label>Complete address<textarea required name="address" rows="2" placeholder="House, street, area" autocomplete="street-address"></textarea></label>
-      <button class="btn order-now big" type="submit" id="placeOrderBtn">✅ Order Place Karein</button>
+      <fieldset class="payment-box"><legend>Payment Method</legend>
+        <label class="radio-row"><input type="radio" name="pay" value="cod" checked> <span><strong>Cash on Delivery (COD)</strong><small>Product milne par payment karein.</small></span></label>
+        <label class="radio-row disabled"><input type="radio" name="pay" value="advance" disabled> <span><strong>Pay Advance Payment</strong><small>Jald aa raha hai</small></span></label>
+      </fieldset>
+      <button class="btn primary big" type="submit" id="placeOrderBtn">✅ ORDER PLACE KAREIN</button>
       <p class="form-error" id="checkoutError"></p>
-      <p class="muted" style="text-align:center">🔒 Aapki details sirf delivery ke liye istemal hongi.</p>
+      <p class="muted center">🔒 Aapki details sirf delivery ke liye istemal hongi.</p>
     </form>
+    <aside class="co-box summary-panel">
+      <h2>🧾 Order Summary</h2>
+      <div id="coItems"></div>
+      <div class="co-row"><span>Subtotal</span><strong id="coSubtotal">Rs.0</strong></div>
+      <div class="co-row"><span>Delivery</span><strong id="coDelivery">—</strong></div>
+      <div class="co-row total"><span>Total (Cash on Delivery)</span><strong id="coTotal">Rs.0</strong></div>
+      <p class="co-note">✅ Har product dispatch se pehle quality-check hota hai. Order confirm karne ke liye humari call aayegi.</p>
+    </aside>
   </div>
 </section>
 
-<!-- Order success PAGE -->
-<section id="successPage" class="co-page" hidden>
-  <div class="co-box center">
+<!-- SUCCESS PAGE -->
+<section id="successPage" class="page wrap" hidden>
+  <div class="success-box">
     <div class="success-icon">✅</div>
-    <h3>Order mil gaya!</h3>
-    <p class="muted" id="successText">Shukriya! Aapka order save ho gaya hai.</p>
+    <h1>Order mil gaya!</h1>
+    <p id="successText">Shukriya! Aapka order save ho gaya hai.</p>
     <p class="order-id" id="successOrderId"></p>
-    <p class="muted">Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai — pehle product, phir payment. 💵</p>
-    <button class="btn primary big" id="continueBtn" type="button">🛒 Shopping Jaari Rakhein</button>
+    <p>Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai — pehle product, phir payment. 💵</p>
+    <button class="btn primary big" id="continueBtn" type="button">🛒 SHOPPING JAARI RAKHEIN</button>
   </div>
 </section>
 
+<div class="footer-wave" aria-hidden="true"><svg viewBox="0 0 1440 90" preserveAspectRatio="none"><path d="M0,48 C240,90 420,5 720,38 C1020,70 1200,18 1440,52 L1440,90 L0,90 Z"></path></svg></div>
+<footer class="footer">
+  <div class="footer-in">
+    <div><p class="footer-logo">🛍️ <span id="footerLogoName">ShopNest</span></p><p class="footer-about" id="footerAbout"></p></div>
+    <div><h3>Categories</h3><div class="footer-links" id="footerCats"></div></div>
+    <div><h3>Help & Policies</h3><div class="footer-links">
+      <button type="button" data-policy="contact">Contact Us</button>
+      <button type="button" data-policy="shipping">Shipping Policy</button>
+      <button type="button" data-policy="refund">Refund Policy</button>
+      <button type="button" data-policy="privacy">Privacy Policy</button>
+      <button type="button" data-policy="terms">Terms of Service</button>
+      <a href="admin.html">Store Admin →</a>
+    </div></div>
+    <div><h3>Let's Get In Touch</h3><p>New deals aur smart products ki updates sab se pehle paayein.</p><form class="subscribe" id="subForm"><input type="email" id="subEmail" placeholder="Your email address" required><button class="btn primary" type="submit">SUBSCRIBE</button></form><p class="sub-msg" id="subMsg"></p></div>
+  </div>
+  <p class="copy">© <span id="copyStoreName">ShopNest</span> — All Rights Reserved</p>
+</footer>
+
+<div class="float-stack">
+  <a class="float-btn whatsapp" id="waFloat" href="#" target="_blank" rel="noopener" aria-label="WhatsApp" hidden>✆</a>
+  <button class="float-btn back-top" id="backTop" type="button" aria-label="Back to top" hidden>↑</button>
+</div>
+
+<div class="modal" id="policyModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" data-close type="button" aria-label="Close">✕</button><h2 id="policyTitle">Policy</h2><div class="policy-body" id="policyBody"></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
