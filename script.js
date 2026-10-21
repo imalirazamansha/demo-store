@@ -4,12 +4,6 @@
 const SUPABASE_URL = "https://vyiwiqcbituttdjgsuwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aXdpcWNiaXR1dHRkamdzdXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MTQ0MTYsImV4cCI6MjEwODA5MDQxNn0.fQDW8_b27GzTpu5XBi_Nqw12mmJlJodE0yB3Ei1KLNo";
 
-const STORE = {
-  name: "ShopNest",
-  deliveryFee: 250,
-  freeDeliveryAbove: 5000,
-};
-
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const fmt = n => "Rs " + Number(n).toLocaleString("en-PK");
@@ -20,8 +14,21 @@ let CATEGORIES = ["All"];
 let activeCat = "All";
 let cart = JSON.parse(localStorage.getItem("shopnest_cart") || "{}");
 let qvId = null, qvQty = 1;
+/* Checkout state: { source: 'cart' | 'buynow', entries: [[productId, qty], ...] } */
+let checkoutState = null;
 
 function stars(r){ const f = Math.round(Number(r) || 0); return "★".repeat(f) + "☆".repeat(5 - f); }
+function findP(id){ return PRODUCTS.find(x => x.id === +id); }
+/* Har product ki apni delivery fee (admin se set hoti hai). 0 = FREE delivery.
+   Fee product par EK dafa lagti hai — quantity jitni bhi ho. */
+function feeOf(p){ return Math.max(0, Number(p && p.delivery_fee) || 0); }
+function deliveryTotal(entries){
+  return entries.reduce((sum, [id]) => sum + feeOf(findP(id)), 0);
+}
+function delivText(p){
+  const f = feeOf(p);
+  return f === 0 ? "🚚 FREE Delivery" : "🚚 Delivery: " + fmt(f);
+}
 
 /* ---------- Load products from database ---------- */
 async function loadProducts(){
@@ -60,21 +67,27 @@ function renderGrid(){
   $("#emptyMsg").hidden = !(PRODUCTS.length && list.length === 0);
   $("#grid").innerHTML = list.map(p => {
     const off = p.old ? Math.round((1 - p.price / p.old) * 100) : 0;
+    const f = feeOf(p);
     return `<article class="card">
       <div class="imgwrap" data-view="${p.id}">
         <img src="${p.img || ''}" alt="${p.name}" loading="lazy">
-        ${off > 0 ? `<span class="badge">-${off}%</span>` : ""}
+        ${off > 0 ? `<span class="badge">-${off}% OFF</span>` : ""}
       </div>
       <div class="card-body">
         <p class="card-cat">${p.cat}</p>
         <h3 data-view="${p.id}">${p.name}</h3>
         <p class="stars">${stars(p.rating)} <small>${p.rating} (${p.reviews})</small></p>
         <div class="price"><strong>${fmt(p.price)}</strong>${p.old ? `<del>${fmt(p.old)}</del>` : ""}</div>
-        <button class="btn primary" data-add="${p.id}">Add to Cart 🛒</button>
+        <p class="deliv ${f === 0 ? '' : 'paid'}">${delivText(p)}</p>
+        <div class="card-actions">
+          <button class="btn cart-add" data-add="${p.id}">Add to Cart 🛒</button>
+          <button class="btn order-now" data-order="${p.id}">Order Now ⚡</button>
+        </div>
       </div>
     </article>`;
   }).join("");
   document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => addToCart(+b.dataset.add, 1));
+  document.querySelectorAll("[data-order]").forEach(b => b.onclick = () => buyNow(+b.dataset.order, 1));
   document.querySelectorAll("[data-view]").forEach(el => el.onclick = () => openQuick(+el.dataset.view));
 }
 
@@ -82,13 +95,12 @@ function renderGrid(){
 function saveCart(){ localStorage.setItem("shopnest_cart", JSON.stringify(cart)); }
 function cartCount(){ return Object.values(cart).reduce((a,b) => a + b, 0); }
 function cartSubtotal(){ return Object.entries(cart).reduce((sum,[id,q]) => {
-  const p = PRODUCTS.find(x => x.id === +id); return p ? sum + p.price * q : sum; }, 0); }
-function deliveryFor(sub){ return sub === 0 ? 0 : (sub >= STORE.freeDeliveryAbove ? 0 : STORE.deliveryFee); }
+  const p = findP(id); return p ? sum + p.price * q : sum; }, 0); }
 
 function addToCart(id, qty){
   cart[id] = (cart[id] || 0) + qty;
   saveCart(); renderCart();
-  const p = PRODUCTS.find(x => x.id === id);
+  const p = findP(id);
   if (p) toast(`Added: ${p.name}`);
 }
 function setQty(id, q){
@@ -104,12 +116,13 @@ function renderCart(){
     box.innerHTML = `<p class="cart-empty">🛒 Your cart is empty.<br>Add something you like!</p>`;
   } else {
     box.innerHTML = Object.entries(cart).map(([id, q]) => {
-      const p = PRODUCTS.find(x => x.id === +id);
+      const p = findP(id);
       if (!p) return "";
       return `<div class="cart-item">
         <img src="${p.img || ''}" alt="${p.name}">
         <div class="ci-info">
           <h4>${p.name}</h4><p>${fmt(p.price)} × ${q} = <strong>${fmt(p.price*q)}</strong></p>
+          <p class="ci-deliv">${delivText(p)}</p>
           <div class="ci-row">
             <button class="qty-btn" data-dec="${p.id}">−</button><span>${q}</span>
             <button class="qty-btn" data-inc="${p.id}">+</button>
@@ -122,12 +135,12 @@ function renderCart(){
     document.querySelectorAll("[data-rem]").forEach(b => b.onclick = () => setQty(+b.dataset.rem, 0));
   }
   const sub = cartSubtotal();
-  const fee = deliveryFor(sub);
+  const fee = deliveryTotal(Object.entries(cart));
   $("#subTotal").textContent = fmt(sub);
-  $("#deliveryFee").textContent = sub === 0 ? "—" : (fee === 0 ? "FREE" : fmt(fee));
+  $("#deliveryFee").textContent = sub === 0 ? "—" : (fee === 0 ? "FREE 🎉" : fmt(fee));
   $("#grandTotal").textContent = fmt(sub + fee);
-  $("#freeNote").textContent = sub > 0 && fee > 0
-    ? `Add ${fmt(STORE.freeDeliveryAbove - sub)} more for FREE delivery 🚚` : "";
+  $("#freeNote").textContent = sub > 0 && fee === 0
+    ? "🎉 Is order par delivery bilkul FREE hai!" : "";
   $("#checkoutBtn").disabled = !n;
   $("#checkoutBtn").style.opacity = n ? 1 : .5;
 }
@@ -146,13 +159,14 @@ document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeAll);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
 
 function openQuick(id){
-  const p = PRODUCTS.find(x => x.id === id); if (!p) return;
+  const p = findP(id); if (!p) return;
   qvId = id; qvQty = 1;
   $("#qvImg").src = p.img || ""; $("#qvImg").alt = p.name;
   $("#qvCat").textContent = p.cat;
   $("#qvName").textContent = p.name;
   $("#qvRating").textContent = `${stars(p.rating)} ${p.rating} (${p.reviews} reviews)`;
   $("#qvDesc").textContent = p.desc || "";
+  $("#qvDeliv").textContent = delivText(p);
   $("#qvPrice").innerHTML = `${fmt(p.price)}${p.old ? `<del>${fmt(p.old)}</del>` : ""}`;
   $("#qvQty").textContent = "1";
   $("#quickModal").classList.add("open");
@@ -160,27 +174,81 @@ function openQuick(id){
 $("#qvMinus").onclick = () => { qvQty = Math.max(1, qvQty - 1); $("#qvQty").textContent = qvQty; };
 $("#qvPlus").onclick  = () => { qvQty++; $("#qvQty").textContent = qvQty; };
 $("#qvAdd").onclick = () => { addToCart(qvId, qvQty); closeAll(); openCart(); };
+$("#qvOrder").onclick = () => buyNow(qvId, qvQty);
 
-/* ---------- Checkout → order save hota hai database mein ---------- */
-$("#checkoutBtn").onclick = () => {
+/* ---------- Checkout PAGE ---------- */
+const SHOP_SECTIONS = [".hero", "#shop", ".features", ".footer"];
+function setShopVisible(v){
+  SHOP_SECTIONS.forEach(sel => { const el = document.querySelector(sel); if (el) el.style.display = v ? "" : "none"; });
+}
+function showCheckoutPage(){
   closeAll();
-  const sub = cartSubtotal();
-  $("#checkoutTotal").textContent = "Total (COD): " + fmt(sub + deliveryFor(sub));
+  renderCheckoutSummary();
+  setShopVisible(false);
+  $("#successPage").hidden = true;
+  $("#checkoutPage").hidden = false;
+  window.scrollTo({ top: 0 });
+}
+function hidePages(){
+  $("#checkoutPage").hidden = true;
+  $("#successPage").hidden = true;
+  setShopVisible(true);
+}
+$("#backToShop").onclick = hidePages;
+$("#continueBtn").onclick = hidePages;
+
+function checkoutTotals(){
+  const entries = checkoutState ? checkoutState.entries : [];
+  const sub = entries.reduce((sum,[id,q]) => { const p = findP(id); return p ? sum + p.price * q : sum; }, 0);
+  const fee = deliveryTotal(entries);
+  return { sub, fee, total: sub + fee };
+}
+function renderCheckoutSummary(){
+  const entries = checkoutState ? checkoutState.entries : [];
+  $("#coItems").innerHTML = entries.map(([id, q]) => {
+    const p = findP(id); if (!p) return "";
+    return `<div class="co-item">
+      <img src="${p.img || ''}" alt="">
+      <div class="co-item-info">
+        <h4>${p.name}</h4>
+        <p>${fmt(p.price)} × ${q} &nbsp;•&nbsp; ${delivText(p)}</p>
+      </div>
+      <strong>${fmt(p.price * q)}</strong>
+    </div>`;
+  }).join("");
+  const { sub, fee, total } = checkoutTotals();
+  $("#coSubtotal").textContent = fmt(sub);
+  $("#coDelivery").textContent = fee === 0 ? "FREE 🎉" : fmt(fee);
+  $("#coTotal").textContent = fmt(total);
   $("#checkoutError").textContent = "";
-  $("#checkoutModal").classList.add("open");
+}
+
+/* Cart se checkout */
+$("#checkoutBtn").onclick = () => {
+  if (!cartCount()) return;
+  checkoutState = { source: "cart", entries: Object.entries(cart).map(([id,q]) => [+id, q]) };
+  showCheckoutPage();
 };
+/* Order Now — seedha checkout page, sirf yehi product */
+function buyNow(id, qty){
+  const p = findP(id); if (!p) return;
+  checkoutState = { source: "buynow", entries: [[id, qty]] };
+  showCheckoutPage();
+}
+
+/* Order place → database mein save */
 $("#checkoutForm").onsubmit = async e => {
   e.preventDefault();
+  if (!checkoutState || !checkoutState.entries.length) return;
   const btn = $("#placeOrderBtn");
   const err = $("#checkoutError");
   err.textContent = "";
-  btn.disabled = true; btn.textContent = "Saving order…";
+  btn.disabled = true; btn.textContent = "Order save ho raha hai…";
   const f = new FormData(e.target);
-  const sub = cartSubtotal();
-  const total = sub + deliveryFor(sub);
-  const items = Object.entries(cart).map(([id, q]) => {
-    const p = PRODUCTS.find(x => x.id === +id);
-    return { id: p.id, name: p.name, price: p.price, qty: q };
+  const { total } = checkoutTotals();
+  const items = checkoutState.entries.map(([id, q]) => {
+    const p = findP(id);
+    return { id: p.id, name: p.name, price: p.price, qty: q, delivery_fee: feeOf(p) };
   });
   const { error } = await sb.from("orders").insert({
     customer_name: f.get("name").trim(),
@@ -189,24 +257,31 @@ $("#checkoutForm").onsubmit = async e => {
     address: f.get("address").trim(),
     items, total, status: "Pending",
   });
-  btn.disabled = false; btn.textContent = "✅ Place Order";
+  btn.disabled = false; btn.textContent = "✅ Order Place Karein";
   if (error){
     console.error(error);
     err.textContent = "Order save nahi ho saka — internet check karke dobara try karein.";
     return;
   }
-  cart = {}; saveCart(); renderCart();
+  if (checkoutState.source === "cart"){ cart = {}; saveCart(); renderCart(); }
+  checkoutState = null;
   e.target.reset();
-  closeAll();
+  $("#checkoutPage").hidden = true;
   $("#successText").textContent = "Shukriya! Aapka order save ho gaya hai — hum jald call karke confirm karein ge.";
   $("#successOrderId").textContent = "Total (COD): " + fmt(total);
-  $("#successModal").classList.add("open");
+  $("#successPage").hidden = false;
+  window.scrollTo({ top: 0 });
 };
 
 /* ---------- Search / sort / toast ---------- */
 $("#searchBtn").onclick = renderGrid;
 $("#searchInput").addEventListener("input", renderGrid);
 $("#sortSelect").onchange = renderGrid;
+$("#topRatedBtn").onclick = () => {
+  $("#sortSelect").value = "rating";
+  activeCat = "All"; renderCats(); renderGrid();
+  document.querySelector("#shop").scrollIntoView({ behavior: "smooth" });
+};
 
 let toastTimer;
 function toast(text){

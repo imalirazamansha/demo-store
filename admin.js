@@ -51,7 +51,7 @@ async function loadOrders(){
       <td><strong>${esc(o.customer_name)}</strong></td>
       <td>${esc(o.phone)}<br><small style="color:var(--muted)">${esc(o.city)}</small></td>
       <td style="max-width:170px">${esc(o.address)}</td>
-      <td class="order-items">${(o.items||[]).map(i => `${esc(i.name)} × ${i.qty}`).join("<br>")}</td>
+      <td class="order-items">${(o.items||[]).map(i => `${esc(i.name)} × ${i.qty}`).join("<br>")}${(o.items||[]).some(i => i.delivery_fee !== undefined) ? `<br><small>Delivery: ${(() => { const d = (o.items||[]).reduce((s,i) => s + (Number(i.delivery_fee)||0), 0); return d === 0 ? "FREE" : fmt(d); })()}</small>` : ""}</td>
       <td><strong>${fmt(o.total)}</strong></td>
       <td><select class="status" data-status="${o.id}">${STATUSES.map(s => `<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select></td>
       <td><button class="btn small danger" data-del-order="${o.id}">Delete</button></td>
@@ -73,6 +73,8 @@ async function loadProducts(){
   const wrap = $("#productsWrap");
   if (error){ wrap.innerHTML = `<p class="empty-note">Products load nahi ho sakay: ${error.message}</p>`; return; }
   $("#statProducts").textContent = data.length;
+  const cats = [...new Set(data.map(p => p.cat).filter(Boolean))];
+  $("#catList").innerHTML = cats.map(c => `<option value="${esc(c)}">`).join("");
   wrap.innerHTML = data.map(p => prodCard(p)).join("");
   bindProdCards(wrap);
 }
@@ -85,9 +87,15 @@ function prodCard(p){
       <div><label>Old price (Rs, optional)</label><input data-f="old" type="number" value="${p.old||""}"></div>
     </div>
     <div class="row2">
-      <div><label>Category</label><input data-f="cat" value="${esc(p.cat||"")}"></div>
+      <div><label>Category (choose ya nayi type karein)</label><input data-f="cat" list="catList" value="${esc(p.cat||"")}"></div>
       <div><label>Show on store?</label><select data-f="active"><option value="true" ${p.active?"selected":""}>Yes — live</option><option value="false" ${!p.active?"selected":""}>No — hidden</option></select></div>
     </div>
+    <div class="row2">
+      <div><label>⭐ Rating (0 – 5)</label><input data-f="rating" type="number" step="0.1" min="0" max="5" value="${p.rating ?? 4.5}"></div>
+      <div><label>Reviews (number)</label><input data-f="reviews" type="number" min="0" value="${p.reviews||0}"></div>
+    </div>
+    <label>🚚 Delivery fee (Rs) — is product par</label><input data-f="delivery_fee" type="number" min="0" value="${p.delivery_fee||0}">
+    <p class="hint">0 likhein to is product par <strong>FREE delivery</strong> lagegi. Fee product par ek dafa lagti hai, quantity par nahi.</p>
     <label>Image URL</label><input data-f="img" value="${esc(p.img||"")}">
     <label>Description</label><textarea data-f="desc" rows="2">${esc(p.desc||"")}</textarea>
     <div class="actions">
@@ -105,6 +113,9 @@ function bindProdCards(wrap){
       price: parseInt(get("price")) || 0,
       old: get("old") ? parseInt(get("old")) : null,
       cat: get("cat").trim() || "General",
+      rating: Math.min(5, Math.max(0, parseFloat(get("rating")) || 0)),
+      reviews: Math.max(0, parseInt(get("reviews")) || 0),
+      delivery_fee: Math.max(0, parseInt(get("delivery_fee")) || 0),
       active: get("active") === "true",
       img: get("img").trim(),
       desc: get("desc").trim(),
@@ -121,7 +132,7 @@ function bindProdCards(wrap){
 }
 $("#addProductBtn").onclick = async () => {
   const { error } = await sb.from("products").insert({
-    name: "New Product", cat: "General", price: 999, img: "", desc: "", active: false,
+    name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, img: "", desc: "", active: false,
   });
   if (error) alert("Add fail: " + error.message);
   else { loadProducts(); alert("Naya product add ho gaya hai (abhi hidden hai) — details bhar kar 'Show on store' = Yes karke Save karein."); }

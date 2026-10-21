@@ -12,7 +12,7 @@
 </head>
 <body>
 
-<div class="announce">🚚 Free delivery on orders above Rs 5,000 &nbsp;•&nbsp; 💵 Cash on Delivery available across Pakistan</div>
+<div class="announce">💵 Cash on Delivery — Pehle Product, Phir Payment &nbsp;•&nbsp; 🚚 Poore Pakistan Mein Fast Delivery</div>
 
 <header class="header">
   <div class="header-in">
@@ -28,11 +28,25 @@
 
 <section class="hero">
   <div class="hero-text">
-    <h1>Everything you love,<br>delivered to your door.</h1>
-    <p>Fashion, electronics, home &amp; beauty — quality products at honest prices, with Cash on Delivery.</p>
-    <a class="hero-cta" href="#shop">Shop Now ↓</a>
+    <span class="hero-pill">🔥 MEGA SALE — 50% tak OFF</span>
+    <h1>Jo pasand aaye,<br>ghar baithe mangwayein!</h1>
+    <p>Fashion, electronics, home &amp; beauty — har product quality-checked. Payment tab, jab product aapke haath mein ho. <strong>Cash on Delivery, poore Pakistan mein.</strong></p>
+    <div class="hero-ctas">
+      <a class="hero-cta" href="#shop">🛒 Abhi Shopping Karein</a>
+      <button class="hero-cta ghost" id="topRatedBtn" type="button">⭐ Top Rated Dekhein</button>
+    </div>
+    <div class="hero-chips">
+      <span>💵 Cash on Delivery</span>
+      <span>🚚 2–4 Din Mein Delivery</span>
+      <span>↩️ 7-Day Easy Return</span>
+      <span>✅ Quality Checked</span>
+    </div>
   </div>
-  <img class="hero-img" src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1000&q=80" alt="ShopNest store">
+  <div class="hero-media">
+    <img class="hero-img" src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1000&q=80" alt="ShopNest store">
+    <span class="hero-sticker">−50%<small>tak OFF</small></span>
+    <span class="hero-price-tag">🏷️ Rs 1,299 se shuru</span>
+  </div>
 </section>
 
 <main id="shop" class="wrap">
@@ -53,7 +67,7 @@
 </main>
 
 <section class="features">
-  <div class="feature"><span>💵</span><h3>Cash on Delivery</h3><p>Pay when your order arrives at your doorstep.</p></div>
+  <div class="feature"><span>💵</span><h3>Cash on Delivery</h3><p>Pehle product, phir payment — pay when your order arrives.</p></div>
   <div class="feature"><span>🚚</span><h3>Fast Delivery</h3><p>2–4 working days, all over Pakistan.</p></div>
   <div class="feature"><span>↩️</span><h3>7-Day Easy Return</h3><p>Changed your mind? No questions asked.</p></div>
   <div class="feature"><span>✅</span><h3>Quality Checked</h3><p>Every product is checked before dispatch.</p></div>
@@ -104,46 +118,59 @@
       <h3 id="qvName"></h3>
       <p class="qv-rating" id="qvRating"></p>
       <p class="qv-desc" id="qvDesc"></p>
+      <p class="qv-deliv" id="qvDeliv"></p>
       <p class="qv-price" id="qvPrice"></p>
       <div class="qty-row">
         <button class="qty-btn" id="qvMinus">−</button>
         <span id="qvQty">1</span>
         <button class="qty-btn" id="qvPlus">+</button>
       </div>
-      <button class="btn primary big" id="qvAdd">Add to Cart</button>
+      <div class="qv-actions">
+        <button class="btn cart-add" id="qvAdd">Add to Cart 🛒</button>
+        <button class="btn order-now" id="qvOrder">Order Now ⚡</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Checkout modal -->
-<div class="modal" id="checkoutModal">
-  <div class="modal-card small">
-    <button class="icon-btn modal-x" data-close aria-label="Close">✕</button>
-    <h3>Checkout</h3>
-    <p class="muted">Apni details dein — hum call karke order confirm karein ge. Payment Cash on Delivery hai.</p>
-    <form id="checkoutForm">
+<!-- Checkout PAGE (full view — Order Now / Checkout yahin laata hai) -->
+<section id="checkoutPage" class="co-page" hidden>
+  <button class="back-btn" id="backToShop" type="button">← Shopping jaari rakhein</button>
+  <h2 class="co-title">Checkout 🧾</h2>
+  <p class="muted">Apni details dein — hum call karke order confirm karein ge. 💵 Payment <strong>Cash on Delivery</strong> hai: pehle product, phir payment.</p>
+  <div class="co-grid">
+    <div class="co-box">
+      <h3>🧾 Order Summary</h3>
+      <div id="coItems"></div>
+      <div class="co-row"><span>Subtotal</span><strong id="coSubtotal">Rs 0</strong></div>
+      <div class="co-row"><span>Delivery</span><strong id="coDelivery">—</strong></div>
+      <div class="co-row total"><span>Total (Cash on Delivery)</span><strong id="coTotal">Rs 0</strong></div>
+      <p class="co-note">✅ Har product dispatch se pehle quality-check hota hai. Order confirm karne ke liye humari call aayegi.</p>
+    </div>
+    <form id="checkoutForm" class="co-box">
+      <h3>📦 Delivery Details</h3>
       <label>Full name<input required name="name" placeholder="e.g. Ali Raza" autocomplete="name"></label>
       <label>Mobile number<input required name="phone" placeholder="03XX-XXXXXXX" pattern="[0-9+\- ]{10,15}" autocomplete="tel"></label>
       <label>City<input required name="city" placeholder="e.g. Lahore" autocomplete="address-level2"></label>
       <label>Complete address<textarea required name="address" rows="2" placeholder="House, street, area" autocomplete="street-address"></textarea></label>
-      <p class="form-total" id="checkoutTotal"></p>
-      <button class="btn primary big" type="submit" id="placeOrderBtn">✅ Place Order</button>
+      <button class="btn order-now big" type="submit" id="placeOrderBtn">✅ Order Place Karein</button>
       <p class="form-error" id="checkoutError"></p>
+      <p class="muted" style="text-align:center">🔒 Aapki details sirf delivery ke liye istemal hongi.</p>
     </form>
   </div>
-</div>
+</section>
 
-<!-- Order success modal -->
-<div class="modal" id="successModal">
-  <div class="modal-card small center">
+<!-- Order success PAGE -->
+<section id="successPage" class="co-page" hidden>
+  <div class="co-box center">
     <div class="success-icon">✅</div>
     <h3>Order mil gaya!</h3>
     <p class="muted" id="successText">Shukriya! Aapka order save ho gaya hai.</p>
     <p class="order-id" id="successOrderId"></p>
-    <p class="muted">Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai.</p>
-    <button class="btn primary big" data-close>Continue Shopping</button>
+    <p class="muted">Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai — pehle product, phir payment. 💵</p>
+    <button class="btn primary big" id="continueBtn" type="button">🛒 Shopping Jaari Rakhein</button>
   </div>
-</div>
+</section>
 
 <div class="toast" id="toast"></div>
 
