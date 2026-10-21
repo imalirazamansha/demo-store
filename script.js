@@ -66,6 +66,9 @@ let pdpId = null;
 let pdpQty = 1;
 let heroIndex = 0;
 let heroTimer = null;
+let liveTimer = null;
+let liveSold = 0;
+let liveVisiting = 0;
 
 function stars(r){
   const f = Math.max(0, Math.min(5, Math.round(Number(r) || 0)));
@@ -76,6 +79,20 @@ function ratingOf(p){ return Number(p && p.rating) || 0; }
 function reviewsOf(p){ return Number(p && p.reviews) || 0; }
 function discountOf(p){
   return p && Number(p.old) > Number(p.price) ? Math.round((1 - Number(p.price) / Number(p.old)) * 100) : 0;
+}
+/* Card/PDP par nazar aane wala discount %: admin ne discount_pct set kiya ho to wohi,
+   warna price/old_price se auto hisaab. */
+function effectivePct(p){
+  const custom = p ? Number(p.discount_pct) : NaN;
+  if (Number.isFinite(custom) && custom > 0) return Math.min(90, Math.round(custom));
+  return discountOf(p);
+}
+/* Description text ko paragraphs mein render karna: khali line = naya paragraph,
+   single line break = <br>. Pehle HTML escape hota hai (XSS safe). */
+function descHtml(text){
+  const t = String(text || "").trim();
+  if (!t) return "<p>Quality checked product — dispatch se pehle test kiya jata hai.</p>";
+  return t.split(/\n\s*\n/).map(block => `<p>${esc(block.trim()).replace(/\n/g, "<br>")}</p>`).join("");
 }
 /* Har product ki apni delivery fee (admin se set hoti hai). 0 = FREE delivery.
    Fee product par EK dafa lagti hai — quantity jitni bhi ho. */
@@ -129,9 +146,10 @@ function applySettings(){
   $("#heroDots").innerHTML = SETTINGS.hero.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join("");
   $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot));
   $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget));
+  setHero(heroIndex);
   startHero();
   $("#promoGrid").innerHTML = SETTINGS.promo.map((p, i) => `
-    <article class="promo-card"><small>${esc(p.kicker)}</small><h3>${esc(p.heading)}</h3><p>${esc(p.text)}</p><button class="btn white" type="button" data-promo-cat="${esc(p.category)}">SHOP NOW</button></article>`).join("");
+    <article class="promo-card reveal"><small>${esc(p.kicker)}</small><h3>${esc(p.heading)}</h3><p>${esc(p.text)}</p><button class="btn white" type="button" data-promo-cat="${esc(p.category)}">SHOP NOW</button></article>`).join("");
   $$("[data-promo-cat]").forEach(b => b.onclick = () => {
     const cat = CAT_LIST.includes(b.dataset.promoCat) ? b.dataset.promoCat : "All";
     setFilter({ cat, maxPrice: null, sort: "popular" });
@@ -142,10 +160,12 @@ function applySettings(){
   const wa = $("#waFloat");
   const digits = String(SETTINGS.whatsapp_number || "").replace(/\D/g, "");
   if (digits){ wa.href = "https://wa.me/" + digits; wa.hidden = false; } else { wa.hidden = true; wa.removeAttribute("href"); }
+  watchReveals();
 }
 function setHero(i){
   heroIndex = (i + SETTINGS.hero.length) % SETTINGS.hero.length;
   $("#heroTrack").style.transform = `translateX(-${heroIndex * 100}%)`;
+  $$(".hero-slide").forEach((s, j) => s.classList.toggle("active-slide", j === heroIndex));
   $$("[data-hero-dot]").forEach((b, j) => b.classList.toggle("active", j === heroIndex));
 }
 function startHero(){
@@ -172,21 +192,22 @@ function renderCats(){
   $$("[data-nav-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.navCat, maxPrice: null }));
   $("#catTiles").innerHTML = CAT_LIST.map(c => {
     const p = PRODUCTS.find(x => x.cat === c);
-    return `<button class="cat-tile ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${esc(p ? p.img : "")}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
+    return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${esc(p ? p.img : "")}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
   }).join("");
   $$("[data-tile-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.tileCat, maxPrice: null }));
+  watchReveals();
   $("#footerCats").innerHTML = CAT_LIST.map(c => `<button type="button" data-footer-cat="${esc(c)}">${esc(c)}</button>`).join("");
   $$("[data-footer-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.footerCat, maxPrice: null }));
 }
 
 /* ---------- Product cards & sections ---------- */
 function cardHTML(p, opts = {}){
-  const off = discountOf(p);
+  const off = effectivePct(p);
   const badge = opts.newBadge ? `<span class="new-badge">NEW</span>` : (off > 0 ? `<span class="discount-badge">-${off}%</span>` : "");
   const actions = opts.buyOnly
     ? `<button class="mini-btn order" type="button" data-order="${p.id}">BUY NOW</button>`
     : `<button class="mini-btn add" type="button" data-add="${p.id}">Add to Cart</button><button class="mini-btn order" type="button" data-order="${p.id}">Order Now</button>`;
-  return `<article class="card">
+  return `<article class="card reveal">
     <div class="card-imgwrap" data-view="${p.id}"><img src="${esc(p.img || "")}" alt="${esc(p.name)}" loading="lazy">${badge}</div>
     <div class="card-body">
       <h3 class="card-title" data-view="${p.id}">${esc(p.name)}</h3>
@@ -211,11 +232,12 @@ function renderProductSections(){
   renderInto("bestGrid", [...PRODUCTS].sort((a,b) => reviewsOf(b) - reviewsOf(a)).slice(0, 8));
   renderInto("hotTrack", [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 10));
   renderInto("newGrid", [...PRODUCTS].sort((a,b) => b.id - a.id).slice(0, 8), { newBadge: true });
-  renderInto("dealGrid", PRODUCTS.filter(p => discountOf(p) >= 20).sort((a,b) => discountOf(b) - discountOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 8));
+  renderInto("dealGrid", PRODUCTS.filter(p => effectivePct(p) >= 20).sort((a,b) => effectivePct(b) - effectivePct(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 8));
   renderReviews();
   const hot = [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a))[0];
   $("#hotOrderBtn").disabled = !hot;
   $("#hotOrderBtn").onclick = () => { if (hot) openProduct(hot.id); };
+  watchReveals();
 }
 function currentList(){
   const q = $("#searchInput").value.trim().toLowerCase();
@@ -239,6 +261,7 @@ function renderGrid(){
   const grid = $("#grid");
   grid.innerHTML = list.map(p => cardHTML(p)).join("");
   bindCards(grid);
+  watchReveals();
 }
 function setFilter({ cat = activeCat, maxPrice: nextMax = maxPrice, sort } = {}){
   activeCat = cat; maxPrice = nextMax;
@@ -266,13 +289,34 @@ const DEMO_REVIEWS = [
 const DEMO_NAMES = ["Ahmed Raza — Lahore", "Fatima Khan — Karachi", "Usman Ali — Islamabad", "Ayesha Noor — Faisalabad", "Bilal Ahmed — Rawalpindi", "Hira Shahid — Multan"];
 function renderReviews(){
   const top = [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 6);
-  $("#reviewTrack").innerHTML = top.map((p, i) => `<article class="review-card">
+  $("#reviewTrack").innerHTML = top.map((p, i) => `<article class="review-card reveal">
     <div class="review-product"><img src="${esc(p.img || "")}" alt="${esc(p.name)}"><strong>${esc(p.name)}</strong></div>
     <p class="stars">${stars(p.rating)} <small>${ratingOf(p).toFixed(1)}</small></p>
     <p>${esc(DEMO_REVIEWS[i % DEMO_REVIEWS.length])}</p>
     <p class="verified">✓ Verified Purchase</p><p class="reviewer">${esc(DEMO_NAMES[i % DEMO_NAMES.length])}</p>
   </article>`).join("");
 }
+
+/* ---------- Scroll-reveal animations ----------
+   body par "anim" class sirf tab lagti hai jab motion allowed ho aur
+   IntersectionObserver available ho — warna sab content foran visible rehta hai. */
+const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+let revealObs = null;
+if (!REDUCED_MOTION && "IntersectionObserver" in window){
+  document.body.classList.add("anim");
+  revealObs = new IntersectionObserver(entries => entries.forEach(e => {
+    if (e.isIntersecting){ e.target.classList.add("in"); revealObs.unobserve(e.target); }
+  }), { threshold: 0.08, rootMargin: "0px 0px -4% 0px" });
+}
+function watchReveals(){
+  $$(".reveal").forEach(el => {
+    if (el.dataset.rv) return;
+    el.dataset.rv = "1";
+    if (revealObs) revealObs.observe(el); else el.classList.add("in");
+  });
+}
+/* Static homepage sections ko bhi reveal mein shamil karein. */
+$$("#homeView > section, #homeView > main").forEach(s => s.classList.add("reveal"));
 
 /* ---------- FAQ ---------- */
 const FAQS = [
@@ -293,6 +337,7 @@ function renderFaq(){
 /* ---------- Pages ---------- */
 const PAGE_IDS = ["homeView", "productPage", "cartPage", "checkoutPage", "successPage"];
 function showPage(id){
+  if (id !== "productPage") stopLiveTicker();
   PAGE_IDS.forEach(pid => { document.getElementById(pid).hidden = pid !== id; });
   if (id !== "homeView") window.scrollTo({ top: 0 });
 }
@@ -312,23 +357,60 @@ function openProduct(id){
   $("#pdpCrumbName").textContent = p.name;
   $("#pdpTitle").textContent = p.name;
   $("#pdpRating").innerHTML = `${stars(p.rating)} <small>${ratingOf(p).toFixed(1)} (${reviewsOf(p)}+ Reviews)</small>`;
-  const off = discountOf(p);
+  const pct = effectivePct(p);
   const save = Number(p.old) > Number(p.price) ? Number(p.old) - Number(p.price) : 0;
-  $("#pdpPrice").innerHTML = `<strong>${fmt(p.price)}</strong>${save ? `<del>${fmt(p.old)}</del><span class="save-pill">Save ${fmt(save)}${off ? ` (-${off}%)` : ""}</span>` : ""}`;
-  $("#pdpSold").textContent = ((Number(p.id) * 137) % 900 + 120).toLocaleString("en-PK");
-  $("#pdpVisiting").textContent = ((Number(p.id) * 53) % 40 + 8);
+  let pill = "";
+  if (save) pill = `<span class="save-pill">Save ${fmt(save)}${pct ? ` (-${pct}%)` : ""}</span>`;
+  else if (pct) pill = `<span class="save-pill">-${pct}% OFF</span>`;
+  $("#pdpPrice").innerHTML = `<strong>${fmt(p.price)}</strong>${save ? `<del>${fmt(p.old)}</del>` : ""}${pill}`;
+  liveSold = (Number(p.id) * 137) % 900 + 120;
+  liveVisiting = Math.min(240, Math.max(12, (Number(p.id) * 53) % 40 + 8));
+  $("#pdpSold").textContent = liveSold.toLocaleString("en-PK");
+  $("#pdpVisiting").textContent = liveVisiting;
   $("#pdpFee").textContent = delivText(p);
   $("#pdpQty").textContent = "1";
   $("#pdpEtaText").textContent = `Get it by ${dateText(3)} – ${dateText(4)}`;
   $("#pdpD1").textContent = dateText(0);
   $("#pdpD2").textContent = dateText(1);
   $("#pdpD3").textContent = `${dateText(3)} – ${dateText(4)}`;
-  $("#pdpDesc").textContent = p.desc || "Quality checked product — dispatch se pehle test kiya jata hai.";
+  $("#pdpDesc").innerHTML = descHtml(p.desc);
   const related = PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id).slice(0, 4);
   const wrap = $("#relatedWrap");
   wrap.innerHTML = related.map(x => cardHTML(x, { buyOnly: true })).join("");
   bindCards(wrap);
   showPage("productPage");
+  watchReveals();
+  startLiveTicker();
+}
+/* LIVE counters ko zinda feel dena: har ~2.5s visiting count halka sa random-walk
+   hota hai (12–240 ke andar), sold kabhi kabhi +1 barhta hai (kabhi kam nahi hota).
+   Product page se hat-te hi showPage() is timer ko band kar deta hai. */
+function flashNum(el){
+  if (!el) return;
+  el.classList.remove("tick");
+  void el.offsetWidth;
+  el.classList.add("tick");
+}
+function startLiveTicker(){
+  stopLiveTicker();
+  liveTimer = setInterval(() => {
+    const visEl = $("#pdpVisiting");
+    const soldEl = $("#pdpSold");
+    if (!visEl || !soldEl || $("#productPage").hidden){ stopLiveTicker(); return; }
+    let dv = Math.floor(Math.random() * 9) - 4;
+    if (dv === 0) dv = Math.random() < 0.5 ? -1 : 1;
+    liveVisiting = Math.min(240, Math.max(12, liveVisiting + dv));
+    visEl.textContent = liveVisiting;
+    flashNum(visEl);
+    if (Math.random() < 0.25){
+      liveSold += 1;
+      soldEl.textContent = liveSold.toLocaleString("en-PK");
+      flashNum(soldEl);
+    }
+  }, 2500);
+}
+function stopLiveTicker(){
+  if (liveTimer){ clearInterval(liveTimer); liveTimer = null; }
 }
 $("#pdpBack").onclick = showHome;
 $("#crumbHome").onclick = showHome;
@@ -489,7 +571,7 @@ $("#subForm").onsubmit = e => {
   e.target.reset();
 };
 $("#backTop").onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
-window.addEventListener("scroll", () => { $("#backTop").hidden = window.scrollY < 500; }, { passive: true });
+window.addEventListener("scroll", () => { $("#backTop").classList.toggle("show", window.scrollY >= 500); }, { passive: true });
 
 let toastTimer;
 function toast(text){

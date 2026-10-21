@@ -154,12 +154,17 @@ function prodCard(p){
       <div><label>⭐ Rating (0 – 5)</label><input data-f="rating" type="number" step="0.1" min="0" max="5" value="${p.rating ?? 4.5}"></div>
       <div><label>Reviews (number)</label><input data-f="reviews" type="number" min="0" value="${p.reviews||0}"></div>
     </div>
-    <label>🚚 Delivery fee (Rs) — is product par</label><input data-f="delivery_fee" type="number" min="0" value="${p.delivery_fee||0}">
-    <p class="hint">0 likhein to is product par <strong>FREE delivery</strong> lagegi. Fee product par ek dafa lagti hai, quantity par nahi.</p>
+    <div class="row2">
+      <div><label>🚚 Delivery fee (Rs) — is product par</label><input data-f="delivery_fee" type="number" min="0" value="${p.delivery_fee||0}"></div>
+      <div><label>🏷️ Discount % badge (0–90)</label><input data-f="discount_pct" type="number" min="0" max="90" value="${p.discount_pct ?? ""}" placeholder="Auto (price se)"></div>
+    </div>
+    <p class="hint">Delivery fee: 0 = is product par <strong>FREE delivery</strong>; fee product par ek dafa lagti hai, quantity par nahi.</p>
+    <p class="hint">Discount badge: khali/0 chor dein to badge price/old price se <strong>auto hisaab</strong> hoga; koi number likhein to card aur product page par <strong>wohi % badge</strong> nazar aayega.</p>
     <label>📷 Product image upload</label><input data-file="imgfile" type="file" accept="image/*">
     <p class="upload-msg" data-upload-msg>File select karein to Save dabane par image upload hogi. Koi file na ho to neeche wala URL use hoga.</p>
     <label>Ya image URL paste karein</label><input data-f="img" value="${esc(p.img||"")}" placeholder="https://…">
-    <label>Description</label><textarea data-f="desc" rows="2">${esc(p.desc||"")}</textarea>
+    <label>Description</label><textarea data-f="desc" rows="6">${esc(p.desc||"")}</textarea>
+    <p class="hint">Ye text product page par 'Product Details' mein nazar aayega — khaali line chorne se naya paragraph banta hai.</p>
     <div class="actions">
       <button class="btn small" data-save="${p.id}">💾 Save</button>
       <button class="btn small danger" data-del="${p.id}">Delete</button>
@@ -203,6 +208,8 @@ function bindProdCards(wrap){
         return;
       }
     }
+    const discountRaw = get("discount_pct").trim();
+    const discountNum = discountRaw === "" ? 0 : parseInt(discountRaw);
     const payload = {
       name: get("name").trim(),
       price: parseInt(get("price")) || 0,
@@ -211,6 +218,7 @@ function bindProdCards(wrap){
       rating: Math.min(5, Math.max(0, parseFloat(get("rating")) || 0)),
       reviews: Math.max(0, parseInt(get("reviews")) || 0),
       delivery_fee: Math.max(0, parseInt(get("delivery_fee")) || 0),
+      discount_pct: (!discountNum || discountNum <= 0) ? null : Math.min(90, Math.round(discountNum)),
       active: get("active") === "true",
       img: imageUrl,
       desc: get("desc").trim(),
@@ -234,7 +242,7 @@ function bindProdCards(wrap){
 }
 $("#addProductBtn").onclick = async () => {
   const { error } = await sb.from("products").insert({
-    name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, img: "", desc: "", active: false,
+    name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, discount_pct: null, img: "", desc: "", active: false,
   });
   if (error) alert("Add fail: " + error.message);
   else { loadProducts(); alert("Naya product add ho gaya hai (abhi hidden hai) — usi product card mein details aur image file upload karke, 'Show on store' = Yes karke Save karein."); }
