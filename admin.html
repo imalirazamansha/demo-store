@@ -29,8 +29,8 @@
   .login-box input{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
   .msg{font-size:14px;min-height:20px;margin-top:10px}
   .msg.ok{color:var(--accent-dark)} .msg.err{color:var(--red)}
-  .tabs{display:flex;gap:8px;margin-bottom:18px}
-  .tabs button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:9px 20px;font-weight:700}
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tabs button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;font-weight:700}
   .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
   .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center}
@@ -42,6 +42,8 @@
   .order-items{color:var(--muted);font-size:13px;line-height:1.5}
   .status{border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font-weight:600}
   .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#fef3c7;color:#92400e}
+  .pill.grey{background:#e2e8f0;color:#475569}
+  .pill.green{background:#dcfce7;color:#166534}
   .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
   .prod{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff}
   .prod img{width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px}
@@ -64,7 +66,42 @@
   .upload-msg.err{color:var(--red)} .upload-msg.ok{color:var(--accent-dark)}
   .prod input[type=file]{padding:7px;background:#fbfdff}
   .img-preview{width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px;background:#eef6fa}
-  @media (max-width:700px){.stats{grid-template-columns:repeat(2,1fr)} .settings-grid{grid-template-columns:1fr} table{font-size:13px} th:nth-child(4),td:nth-child(4){display:none}}
+  /* --- Shopify-level additions --- */
+  .acards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .acard{background:#fbfdff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
+  .acard strong{display:block;font-size:21px}
+  .acard span{color:var(--muted);font-size:12.5px}
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .dash-box{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fbfdff}
+  .dash-box h4{margin-bottom:12px}
+  .bars{display:flex;align-items:flex-end;gap:8px;height:132px}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;min-width:0}
+  .bar-val{font-size:10.5px;font-weight:700;white-space:nowrap}
+  .bar{width:68%;background:var(--accent);border-radius:6px 6px 0 0;min-height:3px}
+  .bar.sales{background:var(--ink)}
+  .bar-lab{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .tsrc-row{display:grid;grid-template-columns:104px 1fr 58px;gap:10px;align-items:center;margin:8px 0;font-size:13.5px}
+  .tsrc-track{background:#e8f2ee;border-radius:99px;height:10px;overflow:hidden}
+  .tsrc-fill{background:var(--accent);height:100%;border-radius:99px}
+  .tsrc-num{text-align:right;font-weight:700;font-size:12.5px}
+  .searchrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .searchrow input,.searchrow select{border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;background:#fff}
+  .searchrow input{flex:1;min-width:200px}
+  .thumb-sm{width:52px;height:52px;object-fit:cover;border-radius:9px;background:#eef6fa}
+  .addform{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;margin-bottom:16px}
+  .addform label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px}
+  .addform input,.addform select{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff}
+  .toggle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:7px 18px;margin-top:6px}
+  .checkline{display:flex;gap:9px;align-items:center;font-size:14px;font-weight:600;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}
+  .checkline input{width:17px;height:17px;accent-color:var(--accent-dark)}
+  td input[type=checkbox],.checkline input[type=checkbox]{accent-color:var(--accent-dark)}
+  td input[type=text],td input[type=number]{border:1.5px solid var(--line);border-radius:7px;padding:6px 8px;width:100%;background:#fff}
+  td input[type=file]{max-width:175px;font-size:12px}
+  td select.status{max-width:100%}
+  .role-badge{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+  .badges-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .hero-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  @media (max-width:700px){.stats,.acards{grid-template-columns:repeat(2,1fr)} .settings-grid,.dash-grid{grid-template-columns:1fr} table{font-size:13px} th:nth-child(4),td:nth-child(4){display:none}}
 </style>
 </head>
 <body>
@@ -81,32 +118,91 @@
 <div class="wrap" id="loginView">
   <div class="card login-box">
     <h2>Admin Login 🔐</h2>
-    <p>Apna admin email dein — aapko ek <strong>login link</strong> email par bheja jayega. Us link par click karte hi dashboard khul jayega. (Sirf registered admin email chalega.)</p>
-    <input type="email" id="loginEmail" placeholder="admin email">
+    <p>Apna team email dein — aapko ek <strong>login link</strong> email par bheja jayega. Us link par click karte hi dashboard khul jayega. (Sirf team mein shamil email chalega.)</p>
+    <input type="email" id="loginEmail" placeholder="team email">
     <button class="btn" id="sendLinkBtn" style="width:100%">Send Login Link</button>
     <p class="msg" id="loginMsg"></p>
   </div>
 </div>
 
+<!-- NO ACCESS -->
+<div class="wrap hidden" id="noAccessView">
+  <div class="card login-box">
+    <h2>⛔ Access nahi hai</h2>
+    <p>Aap <strong id="noAccessEmail"></strong> se login hain, lekin yeh email store ki team mein shamil nahi hai. Dashboard dekhne ke liye <strong>owner se rabta karein</strong> — woh Team tab se aapka email add kar dein ge.</p>
+    <button class="btn danger" id="noAccessLogout" style="width:100%">Logout</button>
+  </div>
+</div>
+
 <!-- DASHBOARD -->
 <div class="wrap hidden" id="dashView">
-  <div class="stats">
-    <div class="stat"><strong id="statOrders">–</strong><span>Total Orders</span></div>
-    <div class="stat"><strong id="statPending">–</strong><span>Pending</span></div>
-    <div class="stat"><strong id="statRevenue">–</strong><span>Revenue (Delivered)</span></div>
-    <div class="stat"><strong id="statProducts">–</strong><span>Products</span></div>
-  </div>
-
   <div class="tabs">
-    <button id="tabOrders" class="active">📦 Orders</button>
-    <button id="tabProducts">🏷️ Products</button>
-    <button id="tabSettings">⚙️ Store Settings</button>
+    <button id="tabDashboard" class="active">📊 Dashboard</button>
+    <button id="tabOrders">🧾 Orders</button>
+    <button id="tabProducts">📦 Products</button>
+    <button id="tabCategories">🗂️ Categories</button>
+    <button id="tabCoupons">🎟️ Coupons</button>
+    <button id="tabTeam">👥 Team</button>
+    <button id="tabSettings">⚙️ Settings</button>
     <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
   </div>
 
+  <!-- DASHBOARD / ANALYTICS -->
+  <div id="dashboardPanel">
+    <div class="stats">
+      <div class="stat"><strong id="statOrders">–</strong><span>Total Orders</span></div>
+      <div class="stat"><strong id="statPending">–</strong><span>Pending</span></div>
+      <div class="stat"><strong id="statRevenue">–</strong><span>Revenue (Delivered)</span></div>
+      <div class="stat"><strong id="statProducts">–</strong><span>Products</span></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:4px">👥 Visitors <small style="color:var(--muted);font-weight:400">(pageviews — har session mein har page ek dafa count hota hai)</small></h3>
+      <p class="msg" id="dashMsg"></p>
+      <div class="acards">
+        <div class="acard"><strong id="avToday">–</strong><span>Aaj ke visitors</span></div>
+        <div class="acard"><strong id="avYesterday">–</strong><span>Kal ke visitors</span></div>
+        <div class="acard"><strong id="av7">–</strong><span>Pichle 7 din (visits)</span></div>
+        <div class="acard"><strong id="avUnique7">–</strong><span>Unique sessions (7 din)</span></div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-box"><h4>📈 Visitors — pichle 7 din</h4><div id="chartVisitors"></div></div>
+        <div class="dash-box"><h4>🧭 Traffic Sources</h4><div id="trafficWrap"><p class="empty-note">Loading…</p></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:12px">💰 Sales <small style="color:var(--muted);font-weight:400">(Cancelled orders shamil nahi)</small></h3>
+      <div class="acards">
+        <div class="acard"><strong id="asToday">–</strong><span>Aaj ki sales</span></div>
+        <div class="acard"><strong id="asYesterday">–</strong><span>Kal ki sales</span></div>
+        <div class="acard"><strong id="as7">–</strong><span>Pichle 7 din</span></div>
+        <div class="acard"><strong id="as30">–</strong><span>Pichle 30 din</span></div>
+      </div>
+      <div class="acards">
+        <div class="acard"><strong id="asAll">–</strong><span>Kul sales (all time)</span></div>
+        <div class="acard"><strong id="asAov">–</strong><span>Average order value</span></div>
+        <div class="acard"><strong id="asConv">–</strong><span>Conversion (7 din)</span></div>
+        <div class="acard"><strong id="asOrders7">–</strong><span>Orders (7 din)</span></div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-box"><h4>💵 Sales (Rs) — pichle 7 din</h4><div id="chartSales"></div></div>
+        <div class="dash-box"><h4>🏆 Top Products</h4><div id="topProductsWrap"><p class="empty-note">Loading…</p></div></div>
+      </div>
+      <div class="dash-box" style="margin-top:14px"><h4>🧾 Recent Orders</h4><div id="recentOrdersWrap"><p class="empty-note">Loading…</p></div></div>
+    </div>
+  </div>
+
   <!-- ORDERS -->
-  <div class="card" id="ordersPanel">
+  <div class="card hidden" id="ordersPanel">
     <h3 style="margin-bottom:12px">Orders</h3>
+    <div class="searchrow">
+      <input type="search" id="orderSearch" placeholder="🔍 Naam ya phone number se search karein…">
+      <select id="orderStatusFilter">
+        <option value="">Saare status</option>
+        <option>Pending</option><option>Confirmed</option><option>Shipped</option><option>Delivered</option><option>Cancelled</option>
+      </select>
+    </div>
     <p class="msg" id="ordersMsg"></p>
     <div id="ordersWrap"><p class="empty-note">Loading…</p></div>
   </div>
@@ -114,20 +210,77 @@
   <!-- PRODUCTS -->
   <div class="card hidden" id="productsPanel">
     <h3 style="margin-bottom:6px">Products</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Koi bhi change karke <strong>Save</strong> dabayein — store par foran live ho jayega. Har cheez yahin se editable hai: naam, price, <strong>category</strong> (list se choose karein ya nayi type karein), <strong>rating + reviews</strong>, <strong>har product ki apni delivery fee</strong> (0 = FREE delivery), aur card par nazar aane wala <strong>🏷️ discount % badge</strong> (khali = price se auto). Product photo ke liye apni image file <strong>upload</strong> karein ya image URL paste karein — dono options available hain. Naya product add karne ke liye neeche wala button use karein.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Koi bhi change karke <strong>Save</strong> dabayein — store par foran live ho jayega. Har cheez yahin se editable hai: naam, price, <strong>category</strong>, <strong>stock</strong>, <strong>featured</strong>, <strong>rating + reviews</strong>, <strong>har product ki apni delivery fee</strong> (0 = FREE delivery), aur card par nazar aane wala <strong>🏷️ discount % badge</strong> (khali = price se auto). Product photo ke liye apni image file <strong>upload</strong> karein ya image URL paste karein.</p>
     <button class="btn" id="addProductBtn" style="margin-bottom:16px">＋ Add New Product</button>
     <datalist id="catList"></datalist>
     <div class="prod-grid" id="productsWrap"></div>
   </div>
 
+  <!-- CATEGORIES -->
+  <div class="card hidden" id="categoriesPanel">
+    <h3 style="margin-bottom:6px">Categories</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Categories store ke nav, tiles aur footer mein nazar aati hain. <strong>Visible off</strong> karne se category wahan se gayab ho jati hai, lekin us ke products All Products mein rehte hain. Category delete karne se <strong>products delete NAHI hote</strong> — un par category ka text waisa hi rehta hai.</p>
+    <div class="addform">
+      <div><label>Nayi category ka naam</label><input id="catNewName" placeholder="e.g. Kitchen"></div>
+      <div><label>Image URL (optional)</label><input id="catNewImage" placeholder="https://…"></div>
+      <div><label>Ya image upload karein</label><input type="file" id="catNewImageFile" accept="image/*"></div>
+      <div><button class="btn" id="addCategoryBtn" style="width:100%">＋ Add Category</button></div>
+    </div>
+    <p class="msg" id="catMsg"></p>
+    <div id="categoriesWrap"><p class="empty-note">Loading…</p></div>
+  </div>
+
+  <!-- COUPONS -->
+  <div class="card hidden" id="couponsPanel">
+    <h3 style="margin-bottom:6px">Coupons</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Coupon codes checkout par lagte hain. Discount sirf products ki subtotal par milta hai (delivery par nahi). Codes customers ko list ki surat mein nazar nahi aate — sirf sahi code enter karne par discount milta hai.</p>
+    <div class="addform">
+      <div><label>Coupon code</label><input id="cpnCode" placeholder="e.g. WELCOME10" style="text-transform:uppercase"></div>
+      <div><label>Discount % (1–90)</label><input id="cpnPct" type="number" min="1" max="90" placeholder="10"></div>
+      <div><button class="btn" id="addCouponBtn" style="width:100%">＋ Add Coupon</button></div>
+    </div>
+    <p class="msg" id="couponsMsg"></p>
+    <div id="couponsWrap"><p class="empty-note">Loading…</p></div>
+  </div>
+
+  <!-- TEAM -->
+  <div class="card hidden" id="teamPanel">
+    <h3 style="margin-bottom:6px">Team</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Jis email ko yahan add karein ge, woh magic link se login karke dashboard istemal kar sakta hai. <strong>Owner</strong> sab kuch kar sakta hai; <strong>Admin</strong> Team ke ilawa sab; <strong>Staff</strong> sirf Dashboard, Orders aur Products. Note: naye member ko pehle Supabase dashboard se Auth user banana pare to owner karega; yahan email add karne se unhein access mil jata hai jab woh magic link se login karein.</p>
+    <div class="addform">
+      <div><label>Member email</label><input id="teamEmail" type="email" placeholder="member@example.com"></div>
+      <div><label>Role</label><select id="teamRole"><option value="staff">Staff</option><option value="admin">Admin</option><option value="owner">Owner</option></select></div>
+      <div><button class="btn" id="addTeamBtn" style="width:100%">＋ Add Member</button></div>
+    </div>
+    <p class="msg" id="teamMsg"></p>
+    <div id="teamWrap"><p class="empty-note">Loading…</p></div>
+  </div>
+
   <!-- STORE SETTINGS -->
   <div class="card hidden" id="settingsPanel">
     <h3 style="margin-bottom:6px">Store Settings</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Storefront ka naam, announcement bar, hero slides, promo banners, About text aur WhatsApp button yahin se change karein. <strong>Save Settings</strong> ke baad store page reload karne par changes live nazar aayenge.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Storefront ka naam, logo, announcement bar, hero slides, section on/off, promo banners, policies, About text aur WhatsApp button yahin se change karein. <strong>Save Settings</strong> ke baad store page reload karne par changes live nazar aayenge.</p>
 
     <div class="settings-full" style="margin-top:0">
       <label>Store name</label><input id="setStoreName" placeholder="ShopNest">
       <label>WhatsApp number (optional — khaali ho to floating WhatsApp button hide rahega; country code ke saath, e.g. 923001234567)</label><input id="setWhatsapp" placeholder="923XXXXXXXXX">
+    </div>
+
+    <div class="settings-box" style="margin-top:14px">
+      <h4>🏪 Store Profile</h4>
+      <div class="settings-grid">
+        <div>
+          <label>Logo image URL (header mein text ki jagah logo)</label><input id="profLogo" placeholder="https://…">
+          <label>Ya logo upload karein</label>
+          <div class="upload-row"><input type="file" id="profLogoFile" accept="image/*"></div>
+          <p class="upload-msg" id="profLogoMsg"></p>
+        </div>
+        <div>
+          <label>Contact email (footer)</label><input id="profEmail" placeholder="hello@store.com">
+          <label>Phone (footer)</label><input id="profPhone" placeholder="03XX-XXXXXXX">
+          <label>Address (footer)</label><input id="profAddress" placeholder="City, Pakistan">
+        </div>
+      </div>
     </div>
 
     <div class="settings-grid" style="margin-top:14px">
@@ -146,28 +299,24 @@
       </div>
     </div>
 
-    <div class="settings-grid" style="margin-top:14px">
-      <div class="settings-box">
-        <h4>🖼️ Hero Slide 1</h4>
-        <label>Pill label</label><input id="setH1Pill">
-        <label>Big title</label><input id="setH1Title">
-        <label>Subtitle</label><textarea id="setH1Subtitle" rows="3"></textarea>
-        <label>Button text</label><input id="setH1Button">
-        <label>Image URL</label><input id="setH1Image">
-        <label>Ya apni hero image upload karein</label>
-        <div class="upload-row"><input type="file" id="setH1ImageFile" accept="image/*"></div>
-        <p class="upload-msg" id="setH1UploadMsg"></p>
-      </div>
-      <div class="settings-box">
-        <h4>🖼️ Hero Slide 2</h4>
-        <label>Pill label</label><input id="setH2Pill">
-        <label>Big title</label><input id="setH2Title">
-        <label>Subtitle</label><textarea id="setH2Subtitle" rows="3"></textarea>
-        <label>Button text</label><input id="setH2Button">
-        <label>Image URL</label><input id="setH2Image">
-        <label>Ya apni hero image upload karein</label>
-        <div class="upload-row"><input type="file" id="setH2ImageFile" accept="image/*"></div>
-        <p class="upload-msg" id="setH2UploadMsg"></p>
+    <div class="settings-box" style="margin-top:14px">
+      <div class="hero-head"><h4>🖼️ Hero Slides <small style="color:var(--muted);font-weight:400">(1–4 slides; jo slide "Show" off hai woh store par nahi aayegi)</small></h4><button class="btn small" id="addSlideBtn" type="button">＋ Slide add karein</button></div>
+      <div id="heroSlidesWrap"></div>
+    </div>
+
+    <div class="settings-box" style="margin-top:14px">
+      <h4>🧩 Homepage Sections — on/off</h4>
+      <div class="toggle-grid">
+        <label class="checkline"><input type="checkbox" data-sec="best"> Best Sellers</label>
+        <label class="checkline"><input type="checkbox" data-sec="promos"> Promo Banners</label>
+        <label class="checkline"><input type="checkbox" data-sec="hot"> Hot Selling</label>
+        <label class="checkline"><input type="checkbox" data-sec="arrivals"> New Arrivals</label>
+        <label class="checkline"><input type="checkbox" data-sec="deals"> Mega Deals</label>
+        <label class="checkline"><input type="checkbox" data-sec="budget"> Shop by Budget</label>
+        <label class="checkline"><input type="checkbox" data-sec="about"> About</label>
+        <label class="checkline"><input type="checkbox" data-sec="howto"> How to Order</label>
+        <label class="checkline"><input type="checkbox" data-sec="faq"> FAQ</label>
+        <label class="checkline"><input type="checkbox" data-sec="reviews"> Happy Customers</label>
       </div>
     </div>
 
@@ -186,6 +335,17 @@
         <label>Text</label><textarea id="setP2Text" rows="3"></textarea>
         <label>SHOP NOW category</label><input id="setP2Category" list="catList">
       </div>
+    </div>
+
+    <div class="settings-box" style="margin-top:14px">
+      <h4>📜 Policies <small style="color:var(--muted);font-weight:400">(khaali chor dein to default text chalega; khaali line = naya paragraph)</small></h4>
+      <div class="settings-grid">
+        <div><label>Shipping Policy</label><textarea data-pol="shipping" rows="4"></textarea></div>
+        <div><label>Refund Policy</label><textarea data-pol="refund" rows="4"></textarea></div>
+        <div><label>Privacy Policy</label><textarea data-pol="privacy" rows="4"></textarea></div>
+        <div><label>Terms of Service</label><textarea data-pol="terms" rows="4"></textarea></div>
+      </div>
+      <label>Contact Us text</label><textarea data-pol="contact" rows="3"></textarea>
     </div>
 
     <button class="btn" id="saveSettingsBtn" style="margin-top:16px">💾 Save Settings</button>

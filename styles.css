@@ -23,6 +23,25 @@ img{display:block;max-width:100%} a{color:inherit}
 .btn.outline:hover{background:var(--navy);color:#fff}.btn.white{background:#fff;color:var(--navy)}
 .btn.big{width:100%;padding:15px 20px;font-size:15px;margin-top:10px}.btn.wide{min-width:min(330px,100%)}
 .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.btn.small{padding:9px 16px;font-size:12px}
+/* hidden attribute hamesha jeetay — section toggles isi par chalte hain */
+[hidden]{display:none!important}
+/* Header logo image (Settings → Profile se set hoti hai) */
+.logo-img{height:34px;width:auto;max-width:170px;object-fit:contain;border-radius:8px}
+.logo.has-logo .logo-bag,.logo.has-logo #logoName{display:none}
+/* Out of stock */
+.oos-badge{position:absolute;top:10px;right:10px;background:#475569;color:#fff;font-size:11.5px;font-weight:900;padding:5px 9px;border-radius:999px;letter-spacing:.03em}
+.card.is-oos .card-imgwrap img{filter:grayscale(.65);opacity:.75}
+.mini-btn.oos{background:#e2e8f0;border:0;color:#64748b;cursor:not-allowed}
+.save-pill.oos-pill{background:#475569}
+/* Checkout coupon */
+.coupon-box{border:1.5px dashed var(--line);border-radius:13px;padding:12px;margin:12px 0 4px;background:#fff}
+.coupon-row{display:flex;gap:8px}.coupon-row input{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:999px;padding:10px 14px;text-transform:uppercase}
+.coupon-msg{font-size:13px;min-height:17px;margin-top:7px;color:var(--muted)}.coupon-msg.err{color:var(--red)}.coupon-msg.ok{color:var(--green-dark);font-weight:700}
+.coupon-applied{font-size:13.5px;color:var(--green-dark);font-weight:700;margin-top:5px}
+.co-row.discount{color:var(--green-dark)}
+/* Footer contact lines (profile) */
+.footer-contact{margin-bottom:10px}.footer-contact p{margin:3px 0}.footer-contact a{color:#a7f3d0;text-decoration:none}.footer-contact a:hover{color:#fff}
 
 /* Announcement marquee — jaan boojh kar NON-sticky: scroll par page ke saath upar chala jata hai.
    Sticky sirf .site-header hai (mobile par bhi sirf header chipka rehta hai). */

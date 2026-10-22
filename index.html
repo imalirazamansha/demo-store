@@ -17,7 +17,7 @@
 <header class="site-header">
   <div class="header-pill">
     <button class="icon-btn" id="searchToggle" type="button" aria-label="Search products">⌕</button>
-    <a class="logo" href="#" id="logoHome" aria-label="Store home"><span class="logo-bag">🛍️</span><span id="logoName">ShopNest</span></a>
+    <a class="logo" href="#" id="logoHome" aria-label="Store home"><img id="logoImg" class="logo-img" alt="" hidden><span class="logo-bag">🛍️</span><span id="logoName">ShopNest</span></a>
     <div class="header-actions">
       <a class="icon-btn account-btn" href="admin.html" aria-label="Admin account">👤</a>
       <button class="icon-btn cart-icon" id="cartBtn" type="button" aria-label="Open cart">🛒<span class="cart-count" id="cartCount">0</span></button>
@@ -220,8 +220,17 @@
     <aside class="co-box summary-panel">
       <h2>🧾 Order Summary</h2>
       <div id="coItems"></div>
+      <div class="coupon-box">
+        <div class="coupon-row">
+          <input id="couponInput" type="text" placeholder="Coupon code (agar hai to)" autocomplete="off">
+          <button class="btn outline small" id="couponApplyBtn" type="button">APPLY</button>
+        </div>
+        <p class="coupon-msg" id="couponMsg"></p>
+        <p class="coupon-applied" id="couponApplied" hidden>🎟️ <span id="couponAppliedText"></span> <button type="button" id="couponRemoveBtn" class="remove-link">Remove</button></p>
+      </div>
       <div class="co-row"><span>Subtotal</span><strong id="coSubtotal">Rs.0</strong></div>
       <div class="co-row"><span>Delivery</span><strong id="coDelivery">—</strong></div>
+      <div class="co-row discount" id="coDiscountRow" hidden><span>Discount (<span id="coCouponCode"></span>)</span><strong id="coDiscount">−Rs.0</strong></div>
       <div class="co-row total"><span>Total (Cash on Delivery)</span><strong id="coTotal">Rs.0</strong></div>
       <p class="co-note">✅ Har product dispatch se pehle quality-check hota hai. Order confirm karne ke liye humari call aayegi.</p>
     </aside>
@@ -253,7 +262,7 @@
       <button type="button" data-policy="terms">Terms of Service</button>
       <a href="admin.html">Store Admin →</a>
     </div></div>
-    <div><h3>Let's Get In Touch</h3><p>New deals aur smart products ki updates sab se pehle paayein.</p><form class="subscribe" id="subForm"><input type="email" id="subEmail" placeholder="Your email address" required><button class="btn primary" type="submit">SUBSCRIBE</button></form><p class="sub-msg" id="subMsg"></p></div>
+    <div><h3>Let's Get In Touch</h3><div class="footer-contact" id="footerContact" hidden></div><p>New deals aur smart products ki updates sab se pehle paayein.</p><form class="subscribe" id="subForm"><input type="email" id="subEmail" placeholder="Your email address" required><button class="btn primary" type="submit">SUBSCRIBE</button></form><p class="sub-msg" id="subMsg"></p></div>
   </div>
   <p class="copy">© <span id="copyStoreName">ShopNest</span> — All Rights Reserved</p>
 </footer>

@@ -26,16 +26,24 @@ const DEFAULT_SETTINGS = {
       title: "SMART GADGETS, SMART LIFE!",
       subtitle: "Pakistan ke best smart gadgets — quality checked, Cash on Delivery ke saath, seedha aapke ghar tak.",
       button: "SHOP BEST SELLERS",
-      image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&w=1200&q=80"
+      image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&w=1200&q=80",
+      visible: true
     },
     {
       pill: "🎧 AUDIO, WEARABLES & MORE",
       title: "HAR GHAR KI ZAROORAT!",
       subtitle: "Headphones, smart watches aur roz-marra ke useful products — honest prices aur fast dispatch.",
       button: "SHOP DEALS",
-      image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80"
+      image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80",
+      visible: true
     }
   ],
+  /* Homepage sections on/off — admin Settings se toggle hote hain. */
+  sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
+  /* Footer policy pages — admin Settings se text edit hota hai; khaali ho to built-in default text. */
+  policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
+  /* Store profile — logo image + footer contact lines. */
+  profile: { logo_url: "", email: "", phone: "", address: "" },
   promo: [
     {
       kicker: "HOME ESSENTIALS",
@@ -57,7 +65,10 @@ const DEFAULT_SETTINGS = {
 let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
 let PRODUCTS = [];
+let CATEGORIES = []; /* categories table ki rows (name/image/visible/sort); fail ho to [] = products se derive */
 let CAT_LIST = [];
+let HERO_SLIDES = []; /* applySettings mein visible hero slides */
+let appliedCoupon = null; /* { code, pct } — checkout par ek waqt mein ek hi coupon */
 let activeCat = "All";
 let maxPrice = null;
 let cart = JSON.parse(localStorage.getItem("shopnest_cart") || "{}");
@@ -109,11 +120,30 @@ function mergeSettings(raw){
   if (!raw || typeof raw !== "object") return out;
   if (typeof raw.store_name === "string" && raw.store_name.trim()) out.store_name = raw.store_name.trim();
   if (Array.isArray(raw.announcements)) out.announcements = out.announcements.map((d, i) => typeof raw.announcements[i] === "string" && raw.announcements[i].trim() ? raw.announcements[i] : d);
-  if (Array.isArray(raw.hero)) out.hero = out.hero.map((d, i) => ({ ...d, ...(raw.hero[i] && typeof raw.hero[i] === "object" ? raw.hero[i] : {}) }));
+  /* Hero ab dynamic ARRAY hai (1–4 slides, har slide par visible flag).
+     Purana fixed 2-slide shape bhi isi branch se theek render ho jata hai. */
+  if (Array.isArray(raw.hero) && raw.hero.length){
+    out.hero = raw.hero.slice(0, 4).map(s => {
+      const d = { pill: "", title: "", subtitle: "", button: "", image: "", visible: true };
+      if (!s || typeof s !== "object") return d;
+      ["pill", "title", "subtitle", "button", "image"].forEach(k => { if (typeof s[k] === "string") d[k] = s[k]; });
+      d.visible = s.visible !== false;
+      return d;
+    });
+  }
   if (Array.isArray(raw.promo)) out.promo = out.promo.map((d, i) => ({ ...d, ...(raw.promo[i] && typeof raw.promo[i] === "object" ? raw.promo[i] : {}) }));
   if (typeof raw.about_heading === "string" && raw.about_heading.trim()) out.about_heading = raw.about_heading.trim();
   if (typeof raw.about_text === "string" && raw.about_text.trim()) out.about_text = raw.about_text.trim();
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
+  /* Deep merge: sections toggles */
+  if (raw.sections && typeof raw.sections === "object")
+    Object.keys(out.sections).forEach(k => { if (typeof raw.sections[k] === "boolean") out.sections[k] = raw.sections[k]; });
+  /* Deep merge: policy texts */
+  if (raw.policies && typeof raw.policies === "object")
+    Object.keys(out.policies).forEach(k => { if (typeof raw.policies[k] === "string") out.policies[k] = raw.policies[k]; });
+  /* Deep merge: store profile */
+  if (raw.profile && typeof raw.profile === "object")
+    Object.keys(out.profile).forEach(k => { if (typeof raw.profile[k] === "string") out.profile[k] = raw.profile[k].trim(); });
   return out;
 }
 async function loadSettings(){
@@ -133,21 +163,30 @@ function applySettings(){
   $("#logoName").textContent = name;
   $("#footerLogoName").textContent = name;
   $("#copyStoreName").textContent = name;
+  /* Profile logo: image set ho to header mein text ki jagah logo image. */
+  const logoUrl = (SETTINGS.profile && SETTINGS.profile.logo_url) || "";
+  const logoImg = $("#logoImg");
+  if (logoImg){
+    if (logoUrl){ logoImg.src = logoUrl; logoImg.alt = name; logoImg.hidden = false; $("#logoHome").classList.add("has-logo"); }
+    else { logoImg.hidden = true; logoImg.removeAttribute("src"); $("#logoHome").classList.remove("has-logo"); }
+  }
   const messages = SETTINGS.announcements.map(t => esc(String(t).replaceAll("{STORE}", name).replaceAll("{Store}", name)));
   const group = `<div class="marquee-group">${messages.map(m => `<span>${m}</span>`).join("")}</div>`;
   $("#announceTrack").innerHTML = group + group;
-  $("#heroTrack").innerHTML = SETTINGS.hero.map((s, i) => `
-    <article class="hero-slide ${i === 1 ? "alt" : ""}">
+  /* Sirf visible slides render hoti hain; koi slide na ho to hero section hide. */
+  HERO_SLIDES = SETTINGS.hero.filter(s => s.visible !== false);
+  $("#heroSection").hidden = HERO_SLIDES.length === 0;
+  $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `
+    <article class="hero-slide ${i % 2 === 1 ? "alt" : ""}">
       <div class="hero-inner">
         <div class="hero-content"><span class="hero-pill">${esc(s.pill)}</span><h1>${esc(s.title)}</h1><p>${esc(s.subtitle)}</p><button class="btn primary" type="button" data-hero-target="${i === 0 ? "bestSection" : "dealsSection"}">${esc(s.button)}</button></div>
         <img class="hero-img" src="${esc(s.image)}" alt="${esc(s.title)}">
       </div>
     </article>`).join("");
-  $("#heroDots").innerHTML = SETTINGS.hero.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join("");
+  $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join("");
   $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot));
   $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget));
-  setHero(heroIndex);
-  startHero();
+  if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); }
   $("#promoGrid").innerHTML = SETTINGS.promo.map((p, i) => `
     <article class="promo-card reveal"><small>${esc(p.kicker)}</small><h3>${esc(p.heading)}</h3><p>${esc(p.text)}</p><button class="btn white" type="button" data-promo-cat="${esc(p.category)}">SHOP NOW</button></article>`).join("");
   $$("[data-promo-cat]").forEach(b => b.onclick = () => {
@@ -160,10 +199,28 @@ function applySettings(){
   const wa = $("#waFloat");
   const digits = String(SETTINGS.whatsapp_number || "").replace(/\D/g, "");
   if (digits){ wa.href = "https://wa.me/" + digits; wa.hidden = false; } else { wa.hidden = true; wa.removeAttribute("href"); }
+  /* Section toggles: flag false ho to poora section hide. */
+  const SECTION_IDS = { best: "bestSection", hot: "hotSection", arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", howto: "howSection", faq: "faqSection", reviews: "reviewsSection", promos: "promoSection" };
+  Object.entries(SECTION_IDS).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = SETTINGS.sections[key] === false;
+  });
+  /* Footer contact lines (profile se) — jo field bhara ho sirf wohi line. */
+  const fc = $("#footerContact");
+  if (fc){
+    const prof = SETTINGS.profile || {};
+    const lines = [];
+    if (prof.email) lines.push(`<p>✉️ <a href="mailto:${esc(prof.email)}">${esc(prof.email)}</a></p>`);
+    if (prof.phone) lines.push(`<p>📞 ${esc(prof.phone)}</p>`);
+    if (prof.address) lines.push(`<p>📍 ${esc(prof.address)}</p>`);
+    fc.innerHTML = lines.join("");
+    fc.hidden = lines.length === 0;
+  }
   watchReveals();
 }
 function setHero(i){
-  heroIndex = (i + SETTINGS.hero.length) % SETTINGS.hero.length;
+  if (!HERO_SLIDES.length) return;
+  heroIndex = (i + HERO_SLIDES.length) % HERO_SLIDES.length;
   $("#heroTrack").style.transform = `translateX(-${heroIndex * 100}%)`;
   $$(".hero-slide").forEach((s, j) => s.classList.toggle("active-slide", j === heroIndex));
   $$("[data-hero-dot]").forEach((b, j) => b.classList.toggle("active", j === heroIndex));
@@ -173,7 +230,19 @@ function startHero(){
   heroTimer = setInterval(() => setHero(heroIndex + 1), 5200);
 }
 
-/* ---------- Load products ---------- */
+/* ---------- Load products + categories ---------- */
+let categoriesReady = null;
+async function loadCategories(){
+  try {
+    const { data, error } = await sb.from("categories").select("*").order("sort", { ascending: true }).order("id", { ascending: true });
+    if (error) throw error;
+    CATEGORIES = data || [];
+  } catch (e) {
+    /* Table na ho / fail ho to purana behaviour: products se categories derive. */
+    console.warn("Categories table load nahi hui; products se derive hoga.", e);
+    CATEGORIES = [];
+  }
+}
 async function loadProducts(){
   const { data, error } = await sb.from("products").select("*").eq("active", true).order("id", { ascending: true });
   if (error){
@@ -183,7 +252,12 @@ async function loadProducts(){
     return;
   }
   PRODUCTS = data || [];
-  CAT_LIST = [...new Set(PRODUCTS.map(p => p.cat).filter(Boolean))];
+  if (!categoriesReady) categoriesReady = loadCategories();
+  await categoriesReady;
+  /* Visible categories table se; hidden categories nav/tiles/footer se gayab
+     (un ke products All Products grid mein phir bhi aate hain). */
+  const visibleCats = CATEGORIES.filter(c => c.visible !== false).map(c => c.name).filter(Boolean);
+  CAT_LIST = visibleCats.length ? visibleCats : [...new Set(PRODUCTS.map(p => p.cat).filter(Boolean))];
   renderCats(); renderProductSections(); renderGrid(); renderCart();
 }
 function renderCats(){
@@ -191,8 +265,10 @@ function renderCats(){
   $("#catNav").innerHTML = cats.map(c => `<button type="button" class="${c === activeCat ? "active" : ""}" data-nav-cat="${esc(c)}">${esc(c)}</button>`).join("");
   $$("[data-nav-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.navCat, maxPrice: null }));
   $("#catTiles").innerHTML = CAT_LIST.map(c => {
+    const row = CATEGORIES.find(x => x.name === c);
     const p = PRODUCTS.find(x => x.cat === c);
-    return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${esc(p ? p.img : "")}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
+    const tileImg = (row && row.image) || (p ? p.img : "");
+    return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${esc(tileImg)}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
   }).join("");
   $$("[data-tile-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.tileCat, maxPrice: null }));
   watchReveals();
@@ -203,12 +279,16 @@ function renderCats(){
 /* ---------- Product cards & sections ---------- */
 function cardHTML(p, opts = {}){
   const off = effectivePct(p);
+  const out = p.stock === "out";
   const badge = opts.newBadge ? `<span class="new-badge">NEW</span>` : (off > 0 ? `<span class="discount-badge">-${off}%</span>` : "");
-  const actions = opts.buyOnly
-    ? `<button class="mini-btn order" type="button" data-order="${p.id}">BUY NOW</button>`
-    : `<button class="mini-btn add" type="button" data-add="${p.id}">Add to Cart</button><button class="mini-btn order" type="button" data-order="${p.id}">Order Now</button>`;
-  return `<article class="card reveal">
-    <div class="card-imgwrap" data-view="${p.id}"><img src="${esc(p.img || "")}" alt="${esc(p.name)}" loading="lazy">${badge}</div>
+  const oosBadge = out ? `<span class="oos-badge">OUT OF STOCK</span>` : "";
+  const actions = out
+    ? `<button class="mini-btn oos" type="button" disabled>OUT OF STOCK</button>`
+    : (opts.buyOnly
+      ? `<button class="mini-btn order" type="button" data-order="${p.id}">BUY NOW</button>`
+      : `<button class="mini-btn add" type="button" data-add="${p.id}">Add to Cart</button><button class="mini-btn order" type="button" data-order="${p.id}">Order Now</button>`);
+  return `<article class="card reveal ${out ? "is-oos" : ""}">
+    <div class="card-imgwrap" data-view="${p.id}"><img src="${esc(p.img || "")}" alt="${esc(p.name)}" loading="lazy">${badge}${oosBadge}</div>
     <div class="card-body">
       <h3 class="card-title" data-view="${p.id}">${esc(p.name)}</h3>
       <p class="stars">${stars(p.rating)} <small>${ratingOf(p).toFixed(1)} (${reviewsOf(p)})</small></p>
@@ -229,7 +309,8 @@ function renderInto(id, list, opts){
   bindCards(el);
 }
 function renderProductSections(){
-  renderInto("bestGrid", [...PRODUCTS].sort((a,b) => reviewsOf(b) - reviewsOf(a)).slice(0, 8));
+  /* Best Sellers: featured products pehle, phir reviews ke hisaab se. */
+  renderInto("bestGrid", [...PRODUCTS].sort((a,b) => ((b.featured ? 1 : 0) - (a.featured ? 1 : 0)) || reviewsOf(b) - reviewsOf(a)).slice(0, 8));
   renderInto("hotTrack", [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 10));
   renderInto("newGrid", [...PRODUCTS].sort((a,b) => b.id - a.id).slice(0, 8), { newBadge: true });
   renderInto("dealGrid", PRODUCTS.filter(p => effectivePct(p) >= 20).sort((a,b) => effectivePct(b) - effectivePct(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 8));
@@ -334,12 +415,45 @@ function renderFaq(){
   });
 }
 
+/* ---------- Analytics: visits tracking ----------
+   Har session mein har page (home/product/cart/checkout) sirf EK dafa count
+   hota hai (sessionStorage flag). Insert fire-and-forget hai — fail ho jaye
+   to store par koi asar nahi parta, kabhi render block nahi hota. */
+function visitSessionId(){
+  try {
+    let sid = sessionStorage.getItem("sn_sid");
+    if (!sid){
+      sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem("sn_sid", sid);
+    }
+    return sid;
+  } catch (e) { return null; }
+}
+function trackPage(page){
+  try {
+    const flag = "sn_v_" + page;
+    if (sessionStorage.getItem(flag)) return;
+    sessionStorage.setItem(flag, "1");
+    let refHost = "direct";
+    try { if (document.referrer) refHost = new URL(document.referrer).hostname || "direct"; } catch (e) {}
+    let utm = null;
+    try { utm = new URLSearchParams(window.location.search).get("utm_source"); } catch (e) {}
+    const ua = navigator.userAgent || "";
+    const device = (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(ua)) ? "mobile" : "desktop";
+    const row = { page, referrer_host: refHost, utm_source: utm, device, session_id: visitSessionId() };
+    /* await nahi — result/error dono ignore; tracking kabhi store ko nahi rok sakti. */
+    sb.from("visits").insert(row).then(() => {}, () => {});
+  } catch (e) { /* tracking fail = silent */ }
+}
+
 /* ---------- Pages ---------- */
 const PAGE_IDS = ["homeView", "productPage", "cartPage", "checkoutPage", "successPage"];
+const PAGE_TRACK = { homeView: "home", productPage: "product", cartPage: "cart", checkoutPage: "checkout" };
 function showPage(id){
   if (id !== "productPage") stopLiveTicker();
   PAGE_IDS.forEach(pid => { document.getElementById(pid).hidden = pid !== id; });
   if (id !== "homeView") window.scrollTo({ top: 0 });
+  if (PAGE_TRACK[id]) trackPage(PAGE_TRACK[id]);
 }
 function showHome(){ showPage("homeView"); window.scrollTo({ top: 0 }); }
 
@@ -362,7 +476,11 @@ function openProduct(id){
   let pill = "";
   if (save) pill = `<span class="save-pill">Save ${fmt(save)}${pct ? ` (-${pct}%)` : ""}</span>`;
   else if (pct) pill = `<span class="save-pill">-${pct}% OFF</span>`;
-  $("#pdpPrice").innerHTML = `<strong>${fmt(p.price)}</strong>${save ? `<del>${fmt(p.old)}</del>` : ""}${pill}`;
+  const isOut = p.stock === "out";
+  $("#pdpPrice").innerHTML = `<strong>${fmt(p.price)}</strong>${save ? `<del>${fmt(p.old)}</del>` : ""}${pill}${isOut ? `<span class="save-pill oos-pill">OUT OF STOCK</span>` : ""}`;
+  const pdpAddBtn = $("#pdpAdd"), pdpOrderBtn = $("#pdpOrder");
+  pdpAddBtn.disabled = isOut; pdpAddBtn.textContent = isOut ? "OUT OF STOCK" : "ADD TO CART";
+  pdpOrderBtn.disabled = isOut; pdpOrderBtn.textContent = isOut ? "OUT OF STOCK" : "🔒 ORDER NOW";
   liveSold = (Number(p.id) * 137) % 900 + 120;
   liveVisiting = Math.min(240, Math.max(12, (Number(p.id) * 53) % 40 + 8));
   $("#pdpSold").textContent = liveSold.toLocaleString("en-PK");
@@ -471,7 +589,9 @@ function checkoutTotals(){
   const entries = checkoutState ? checkoutState.entries : [];
   const sub = entries.reduce((sum,[id,q]) => { const p = findP(id); return p ? sum + Number(p.price) * q : sum; }, 0);
   const fee = deliveryTotal(entries);
-  return { sub, fee, total: sub + fee };
+  /* Coupon discount sirf products subtotal par — delivery par nahi. */
+  const discount = appliedCoupon ? Math.round(sub * Math.min(90, Math.max(0, appliedCoupon.pct)) / 100) : 0;
+  return { sub, fee, discount, total: sub + fee - discount };
 }
 function renderCheckoutSummary(){
   const entries = checkoutState ? checkoutState.entries : [];
@@ -479,11 +599,61 @@ function renderCheckoutSummary(){
     const p = findP(id); if (!p) return "";
     return `<div class="co-item"><img src="${esc(p.img || "")}" alt=""><div class="co-item-info"><h4>${esc(p.name)}</h4><p>${fmt(p.price)} × ${q} • ${delivText(p)}</p></div><strong>${fmt(Number(p.price) * q)}</strong></div>`;
   }).join("");
-  const { sub, fee, total } = checkoutTotals();
+  const { sub, fee, discount, total } = checkoutTotals();
   $("#coSubtotal").textContent = fmt(sub);
   $("#coDelivery").textContent = fee === 0 ? "FREE 🎉" : fmt(fee);
+  const dRow = $("#coDiscountRow");
+  if (dRow){
+    dRow.hidden = !(appliedCoupon && discount > 0);
+    if (appliedCoupon) $("#coCouponCode").textContent = appliedCoupon.code;
+    $("#coDiscount").textContent = "−" + fmt(discount);
+  }
   $("#coTotal").textContent = fmt(total);
   $("#checkoutError").textContent = "";
+}
+/* ---------- Coupon (checkout) ---------- */
+function renderCouponUI(){
+  const applied = $("#couponApplied");
+  if (!applied) return;
+  applied.hidden = !appliedCoupon;
+  if (appliedCoupon) $("#couponAppliedText").textContent = `${appliedCoupon.code} — ${appliedCoupon.pct}% OFF laga diya gaya hai 🎉`;
+  $("#couponInput").disabled = !!appliedCoupon;
+  $("#couponApplyBtn").disabled = !!appliedCoupon;
+}
+async function applyCoupon(){
+  const msg = $("#couponMsg");
+  const code = $("#couponInput").value.trim().toUpperCase();
+  msg.className = "coupon-msg"; msg.textContent = "";
+  if (!code){ msg.textContent = "Pehle coupon code likhein."; msg.classList.add("err"); return; }
+  const btn = $("#couponApplyBtn");
+  btn.disabled = true; btn.textContent = "Check ho raha hai…";
+  try {
+    /* check_coupon RPC — codes ki list public nahi hoti, sirf yahi verify hota hai. */
+    const { data, error } = await sb.rpc("check_coupon", { p_code: code });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    const pct = row ? Number(row.pct) : NaN;
+    if (!Number.isFinite(pct) || pct <= 0) throw new Error("invalid");
+    appliedCoupon = { code, pct };
+    msg.textContent = `✅ Coupon ${code} lag gaya — ${pct}% discount!`;
+    msg.classList.add("ok");
+  } catch (e) {
+    appliedCoupon = null;
+    msg.textContent = "Coupon valid nahi hai";
+    msg.classList.add("err");
+  } finally {
+    btn.disabled = false; btn.textContent = "APPLY";
+    renderCouponUI();
+    renderCheckoutSummary();
+  }
+}
+function removeCoupon(){
+  appliedCoupon = null;
+  $("#couponInput").value = "";
+  const msg = $("#couponMsg");
+  msg.className = "coupon-msg"; msg.textContent = "";
+  renderCouponUI();
+  renderCheckoutSummary();
 }
 function showCheckoutPage(){ renderCheckoutSummary(); showPage("checkoutPage"); }
 function buyNow(id, qty){
@@ -493,6 +663,9 @@ function buyNow(id, qty){
 }
 $("#backToShop").onclick = showHome;
 $("#continueBtn").onclick = showHome;
+$("#couponApplyBtn").onclick = applyCoupon;
+$("#couponRemoveBtn").onclick = removeCoupon;
+$("#couponInput").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); applyCoupon(); } });
 $("#checkoutForm").onsubmit = async e => {
   e.preventDefault();
   if (!checkoutState || !checkoutState.entries.length) return;
@@ -501,11 +674,15 @@ $("#checkoutForm").onsubmit = async e => {
   err.textContent = "";
   btn.disabled = true; btn.textContent = "Order save ho raha hai…";
   const f = new FormData(e.target);
-  const { total } = checkoutTotals();
-  const items = checkoutState.entries.map(([id,q]) => {
+  const { total, discount } = checkoutTotals();
+  const lines = checkoutState.entries.map(([id,q]) => {
     const p = findP(id);
     return { id: p.id, name: p.name, price: p.price, qty: q, delivery_fee: feeOf(p) };
   });
+  /* items jsonb ab ek object hai: { lines, coupon, discount } — line items ke
+     saath coupon meta bhi save hota hai. Purane orders plain array thay;
+     admin dono shapes ko parh leta hai. */
+  const items = { lines, coupon: appliedCoupon ? appliedCoupon.code : null, discount };
   const { error } = await sb.from("orders").insert({
     customer_name: String(f.get("name") || "").trim(),
     phone: String(f.get("phone") || "").trim(),
@@ -521,6 +698,10 @@ $("#checkoutForm").onsubmit = async e => {
   }
   if (checkoutState.source === "cart"){ cart = {}; saveCart(); renderCart(); }
   checkoutState = null;
+  appliedCoupon = null;
+  const ci = $("#couponInput"); if (ci) ci.value = "";
+  const cm = $("#couponMsg"); if (cm) cm.textContent = "";
+  renderCouponUI();
   e.target.reset();
   $("#successText").textContent = "Shukriya! Aapka order save ho gaya hai — hum jald call karke confirm karein ge.";
   $("#successOrderId").textContent = "Total (COD): " + fmt(total);
@@ -557,9 +738,12 @@ const POLICIES = {
   terms: ["Terms of Service", "<p>Order place karke aap product details, price aur delivery terms se ittefaq karte hain. Confirmation call par order verify hone ke baad hi parcel dispatch kiya jata hai.</p><p>Prices aur stock baghair notice change ho sakte hain.</p>"]
 };
 $$("[data-policy]").forEach(b => b.onclick = () => {
-  const p = POLICIES[b.dataset.policy]; if (!p) return;
+  const key = b.dataset.policy;
+  const p = POLICIES[key]; if (!p) return;
   $("#policyTitle").textContent = p[0];
-  $("#policyBody").innerHTML = p[1];
+  /* Admin Settings mein policy text likha ho to wohi; warna built-in default. */
+  const custom = SETTINGS.policies && SETTINGS.policies[key];
+  $("#policyBody").innerHTML = (typeof custom === "string" && custom.trim()) ? descHtml(custom) : p[1];
   $("#policyModal").classList.add("open");
 });
 $$("[data-close]").forEach(b => b.onclick = () => $("#policyModal").classList.remove("open"));
@@ -583,5 +767,6 @@ function toast(text){
 
 applySettings();
 renderFaq();
+trackPage("home"); /* pehla pageview — showPage init par nahi chalta */
 loadSettings();
 loadProducts();
