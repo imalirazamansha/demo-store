@@ -12,6 +12,16 @@
 </head>
 <body>
 
+<!-- Multi-tenant notice: store suspended / na milne par sirf ye nazar aata hai
+     (body.store-closed baaki saara page chhupa deta hai). -->
+<div class="store-notice" id="storeNotice" hidden>
+  <div class="store-notice-card">
+    <div class="store-notice-icon">🛍️</div>
+    <h1 id="noticeTitle">Store</h1>
+    <p id="noticeText"></p>
+  </div>
+</div>
+
 <div class="marquee" aria-label="Store announcements"><div class="marquee-track" id="announceTrack"></div></div>
 
 <header class="site-header">

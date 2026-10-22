@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopNest Platform — Super Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#0A2B4E;--muted:#64748b;--bg:#f4faf7;--accent:#22C55E;--accent-dark:#15803d;--line:#dce8ee;--red:#EF4444;--amber:#f59e0b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  h1,h2,h3{font-family:'Plus Jakarta Sans',sans-serif}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:15px}
+  .topbar{background:var(--ink);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+  .topbar .brand{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:19px}
+  .topbar .brand span{color:#34d399}
+  .topbar a{color:#a7f3d0;font-size:14px;text-decoration:none;margin-right:16px}
+  .btn{border:0;border-radius:10px;padding:10px 18px;font-weight:700;font-size:14px;background:var(--accent);color:#fff}
+  .btn:hover{background:var(--accent-dark)}
+  .btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+  .btn.danger{background:var(--red)}
+  .btn.amber{background:var(--amber)}
+  .btn.small{padding:7px 12px;font-size:13px}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:18px}
+  .login-box{max-width:420px;margin:60px auto;text-align:center}
+  .login-box p{color:var(--muted);margin:10px 0 18px;line-height:1.55}
+  .login-box input{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+  .msg{font-size:14px;min-height:20px;margin-top:10px}
+  .msg.ok{color:var(--accent-dark)} .msg.err{color:var(--red)}
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tabs button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;font-weight:700}
+  .tabs button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#fef3c7;color:#92400e}
+  .pill.grey{background:#e2e8f0;color:#475569}
+  .pill.green{background:#dcfce7;color:#166534}
+  .pill.red{background:#fee2e2;color:#991b1b}
+  .empty-note{color:var(--muted);text-align:center;padding:26px 0}
+  .hint{font-size:12px;color:var(--muted);margin-top:3px}
+  .hidden{display:none!important}
+  .acards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .acard{background:#fbfdff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
+  .acard strong{display:block;font-size:21px}
+  .acard span{color:var(--muted);font-size:12.5px}
+  .addform{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;margin-bottom:16px}
+  .addform label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px}
+  .addform input,.addform select{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff}
+  .checkline{display:flex;gap:9px;align-items:center;font-size:14px;font-weight:600;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}
+  .checkline input{width:17px;height:17px;accent-color:var(--accent-dark)}
+  .radioline{display:flex;gap:9px;align-items:center;font-size:14px;font-weight:600;padding:7px 4px}
+  .radioline input{width:17px;height:17px;accent-color:var(--accent-dark)}
+  /* --- Super admin: store cards --- */
+  .store-card{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fbfdff;margin-bottom:14px}
+  .store-card.suspended{opacity:.75;border-style:dashed}
+  .store-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .store-head h4{font-size:17px}
+  .store-meta{color:var(--muted);font-size:13px;line-height:1.65;margin-top:4px}
+  .store-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .store-edit{margin-top:14px;border-top:1px dashed var(--line);padding-top:14px}
+  .domain-help{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.6;margin-top:12px}
+  .linkrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:13.5px}
+  .linkrow a{color:var(--accent-dark);font-weight:700;text-decoration:none}
+  tr.overdue td{background:#fef2f2}
+  @media (max-width:700px){.acards{grid-template-columns:repeat(2,1fr)} table{font-size:13px}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">👑 Shop<span>Nest</span> Platform — Super Admin</div>
+  <div>
+    <a href="admin.html">Store Admin</a>
+    <button class="btn small ghost hidden" id="logoutBtn">Logout</button>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="wrap" id="loginView">
+  <div class="card login-box">
+    <h2>Super Admin Login 🔐</h2>
+    <p>Yeh panel <strong>sirf platform owner</strong> ke liye hai. Apna email dein — login link email par bheja jayega.</p>
+    <input type="email" id="loginEmail" placeholder="platform owner email">
+    <button class="btn" id="sendLinkBtn" style="width:100%">Send Login Link</button>
+    <p class="msg" id="loginMsg"></p>
+  </div>
+</div>
+
+<!-- NO ACCESS -->
+<div class="wrap hidden" id="noAccessView">
+  <div class="card login-box">
+    <h2>⛔ Sirf platform owner ke liye</h2>
+    <p>Aap <strong id="noAccessEmail"></strong> se login hain, lekin yeh email platform admins mein shamil nahi hai. Yeh panel sirf platform owner istemal kar sakta hai.</p>
+    <button class="btn danger" id="noAccessLogout" style="width:100%">Logout</button>
+  </div>
+</div>
+
+<!-- PANEL -->
+<div class="wrap hidden" id="dashView">
+  <div class="tabs">
+    <button id="tabStores" class="active">🏪 Stores</button>
+    <button id="tabBilling">💰 Billing</button>
+    <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
+  </div>
+
+  <!-- STORES -->
+  <div id="storesPanel">
+    <div class="acards">
+      <div class="acard"><strong id="psStores">–</strong><span>🏪 Kul stores</span></div>
+      <div class="acard"><strong id="psOrders">–</strong><span>🧾 Kul orders (saari stores)</span></div>
+      <div class="acard"><strong id="psRevenue">–</strong><span>💵 Kul revenue (Cancelled ke ilawa)</span></div>
+      <div class="acard"><strong id="psVisits7">–</strong><span>👥 Visits — pichle 7 din</span></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:6px">➕ Nayi Store Banayein</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Store bante hi owner ko team mein <strong>Owner</strong> role mil jata hai. Owner email par magic link se login hoga — agar woh Supabase Auth mein pehle se user nahi, to pehle Dashboard → Authentication → Users se banana parega.</p>
+      <div class="addform">
+        <div><label>Store name *</label><input id="csName" placeholder="e.g. Karachi Shoes"></div>
+        <div><label>Slug (URL) *</label><input id="csSlug" placeholder="karachi-shoes" style="text-transform:lowercase"></div>
+        <div><label>Owner email *</label><input id="csOwnerEmail" type="email" placeholder="owner@example.com"></div>
+        <div><label>Plan</label><select id="csPlan"><option>Basic</option><option>Pro</option><option>Custom</option></select></div>
+        <div><label>Monthly fee (Rs)</label><input id="csFee" type="number" min="0" placeholder="2000"></div>
+        <div><label>Pehli due date</label><input id="csDue" type="date"></div>
+      </div>
+      <label class="radioline"><input type="radio" name="csMode" value="blank" checked> 🆕 Blank store — khaali catalog, owner khud products dalega</label>
+      <label class="radioline"><input type="radio" name="csMode" value="template"> 📋 Template copy — kisi mojooda store ki settings/products copy karein</label>
+      <div id="csTemplateOpts" class="hidden" style="margin:6px 0 4px 26px">
+        <div class="addform" style="margin-bottom:8px">
+          <div><label>Template store</label><select id="csSourceStore"></select></div>
+        </div>
+        <label class="checkline" style="max-width:320px;margin-bottom:7px"><input type="checkbox" id="csCopyProducts" checked> Products bhi copy karein</label>
+        <label class="checkline" style="max-width:320px"><input type="checkbox" id="csCopyCategories" checked> Categories bhi copy karein</label>
+      </div>
+      <button class="btn" id="csCreateBtn" style="margin-top:12px">🏪 Store Banayein</button>
+      <p class="msg" id="csMsg"></p>
+      <div id="csResult"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:12px">Saari Stores</h3>
+      <div id="storesWrap"><p class="empty-note">Loading…</p></div>
+    </div>
+  </div>
+
+  <!-- BILLING -->
+  <div id="billingPanel" class="hidden">
+    <div class="acards">
+      <div class="acard"><strong id="bTotal">–</strong><span>🏪 Kul stores (deleted ke ilawa)</span></div>
+      <div class="acard"><strong id="bActive">–</strong><span>✅ Active stores</span></div>
+      <div class="acard"><strong id="bMrr">–</strong><span>💰 MRR (active stores ki monthly fees)</span></div>
+      <div class="acard"><strong id="bOverdue">–</strong><span>🔴 Overdue stores</span></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:6px">Fees — due date ke hisaab se</h3>
+      <p class="msg" id="billingMsg"></p>
+      <div id="billingWrap"><p class="empty-note">Loading…</p></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="super.js"></script>
+</body>
+</html>

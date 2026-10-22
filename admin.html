@@ -99,6 +99,12 @@
   td input[type=file]{max-width:175px;font-size:12px}
   td select.status{max-width:100%}
   .role-badge{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+  /* --- Multi-tenant: store switcher + picker --- */
+  .storebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+  .storebar .ctx-label{font-size:14px}
+  .storebar select{border:0;border-radius:8px;padding:7px 9px;font-weight:700;color:var(--ink);max-width:210px}
+  .store-pick{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;margin-top:10px}
+  .store-pick small{color:var(--muted);font-weight:600}
   .badges-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
   .hero-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
   @media (max-width:700px){.stats,.acards{grid-template-columns:repeat(2,1fr)} .settings-grid,.dash-grid{grid-template-columns:1fr} table{font-size:13px} th:nth-child(4),td:nth-child(4){display:none}}
@@ -108,8 +114,13 @@
 
 <div class="topbar">
   <div class="brand">🛍️ Shop<span>Nest</span> Admin</div>
-  <div>
-    <a href="index.html" target="_blank">View Store ↗</a>
+  <div class="storebar">
+    <span id="storeContext" class="hidden">
+      <span class="ctx-label">🏪 <strong id="curStoreName"></strong> <span class="pill green" id="curStoreRole"></span></span>
+      <select id="storeSwitcher" title="Store badlein"></select>
+      <a id="viewStoreLink" href="index.html" target="_blank">Storefront ↗</a>
+      <a id="superAdminLink" href="super.html" class="hidden">👑 Super Admin</a>
+    </span>
     <button class="btn small ghost hidden" id="logoutBtn">Logout</button>
   </div>
 </div>
@@ -131,6 +142,15 @@
     <h2>⛔ Access nahi hai</h2>
     <p>Aap <strong id="noAccessEmail"></strong> se login hain, lekin yeh email store ki team mein shamil nahi hai. Dashboard dekhne ke liye <strong>owner se rabta karein</strong> — woh Team tab se aapka email add kar dein ge.</p>
     <button class="btn danger" id="noAccessLogout" style="width:100%">Logout</button>
+  </div>
+</div>
+
+<!-- STORE PICKER (kai stores ki team mein hon to) -->
+<div class="wrap hidden" id="storePickerView">
+  <div class="card login-box" style="max-width:560px;text-align:left">
+    <h2 style="text-align:center">🏪 Apni store chunein</h2>
+    <p style="text-align:center">Aap (<strong id="pickerEmail"></strong>) in stores ki team mein hain — kis store ka dashboard kholna hai? Baad mein upar wale store switcher se kabhi bhi store badal sakte hain.</p>
+    <div id="pickerList"></div>
   </div>
 </div>
 
@@ -246,7 +266,7 @@
   <!-- TEAM -->
   <div class="card hidden" id="teamPanel">
     <h3 style="margin-bottom:6px">Team</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Jis email ko yahan add karein ge, woh magic link se login karke dashboard istemal kar sakta hai. <strong>Owner</strong> sab kuch kar sakta hai; <strong>Admin</strong> Team ke ilawa sab; <strong>Staff</strong> sirf Dashboard, Orders aur Products. Note: naye member ko pehle Supabase dashboard se Auth user banana pare to owner karega; yahan email add karne se unhein access mil jata hai jab woh magic link se login karein.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Jis email ko yahan add karein ge, woh magic link se login karke <strong>isi store</strong> ka dashboard istemal kar sakta hai (dusri stores ka access alag se milta hai). <strong>Owner</strong> sab kuch kar sakta hai; <strong>Admin</strong> Team ke ilawa sab; <strong>Staff</strong> sirf Dashboard, Orders aur Products. Note: naye member ko pehle Supabase dashboard se Auth user banana pare to owner karega; yahan email add karne se unhein access mil jata hai jab woh magic link se login karein.</p>
     <div class="addform">
       <div><label>Member email</label><input id="teamEmail" type="email" placeholder="member@example.com"></div>
       <div><label>Role</label><select id="teamRole"><option value="staff">Staff</option><option value="admin">Admin</option><option value="owner">Owner</option></select></div>

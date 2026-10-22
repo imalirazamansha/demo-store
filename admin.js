@@ -1,6 +1,10 @@
-/* ================= ShopNest Admin (Shopify-level) =================
-   Access model: login (magic link) ke baad email public.team mein check
-   hota hai. owner = sab kuch, admin = Team ke ilawa sab,
+/* ================= ShopNest Admin (Shopify-level, MULTI-TENANT) =================
+   Access model: login (magic link) ke baad email ki public.team rows
+   (har store ki alag role) + public.platform_admins check hote hain.
+   Store context: ?store=slug → sessionStorage → ek hi entitled store →
+   store picker. Platform admin har store mein owner-level hai.
+   Har query/mutation CURRENT store_id se scoped hai.
+   Per-store roles: owner = sab kuch, admin = Team ke ilawa sab,
    staff = sirf Dashboard / Orders / Products. */
 const SUPABASE_URL = "https://vyiwiqcbituttdjgsuwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aXdpcWNiaXR1dHRkamdzdXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MTQ0MTYsImV4cCI6MjEwODA5MDQxNn0.fQDW8_b27GzTpu5XBi_Nqw12mmJlJodE0yB3Ei1KLNo";
@@ -14,13 +18,21 @@ function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","
 
 let settingsLoaded = false;
 let MY_EMAIL = null;
-let MY_ROLE = null;
+let MY_ROLE = null;          // CURRENT store mein is user ki team role (platform-only ho to null)
+/* ---------- Multi-tenant store context ---------- */
+let IS_PLATFORM = false;     // platform_admins mein hai? (super admin)
+let MY_STORES = [];          // entitled stores: stores row + { role } (role null = sirf platform access)
+let STORE_ID = null;         // current store ki uuid — SAARI queries isi se scope hoti hain
+let STORE_SLUG = null;
+let STORE_NAME = null;
+/* Effective role: platform admin har store mein owner-level mana jata hai. */
+const effRole = () => MY_ROLE || (IS_PLATFORM ? "owner" : null);
 let ORDERS_CACHE = [];
 let PRODUCTS_CACHE = [];
 let CATEGORIES_CACHE = [];
 let heroState = [];
 
-const isAdminPlus = () => MY_ROLE === "owner" || MY_ROLE === "admin";
+const isAdminPlus = () => effRole() === "owner" || effRole() === "admin";
 
 /* Storefront defaults — script.js ke DEFAULT_SETTINGS se match. */
 const ADMIN_DEFAULT_SETTINGS = {
@@ -70,29 +82,121 @@ let accessCheckedFor = null;
 async function checkAccess(session){
   const email = session && session.user && session.user.email;
   if (!email) return;
-  if (accessCheckedFor === email && MY_ROLE) return;
+  if (accessCheckedFor === email) return;
   accessCheckedFor = email;
   MY_EMAIL = email;
-  /* Team table ki RLS: member na ho to row hi nahi milta (empty result). */
-  const { data, error } = await sb.from("team").select("role").eq("email", email).maybeSingle();
-  if (error || !data || !data.role){ showNoAccess(email); return; }
-  MY_ROLE = data.role;
+  try {
+    /* Is email ki SAARI team rows (har store ki) + platform admin check.
+       Dono queries RLS-scoped hain: team rows sirf entitled stores ki
+       milti hain; platform_admins mein apni row sirf platform admin ko
+       nazar aati hai. "team by email" wali ye lookup jaan boojh kar
+       store-unscoped hai — yahi login ka entry point hai. */
+    const [teamRes, platRes] = await Promise.all([
+      sb.from("team").select("email, store_id, role").eq("email", email),
+      sb.from("platform_admins").select("email").eq("email", email).maybeSingle()
+    ]);
+    if (teamRes.error) throw teamRes.error;
+    IS_PLATFORM = !!(platRes && platRes.data);
+    const teamRows = teamRes.data || [];
+    /* Stores ki list bhi RLS-scoped hai: team member ko sirf apni stores,
+       platform admin ko SAARI stores milti hain. */
+    const { data: storeRows, error: storeErr } = await sb.from("stores").select("id, slug, name, status");
+    if (storeErr) throw storeErr;
+    const byId = {};
+    (storeRows || []).forEach(s => { byId[s.id] = s; });
+    MY_STORES = teamRows.filter(r => byId[r.store_id]).map(r => ({ ...byId[r.store_id], role: r.role }));
+    if (IS_PLATFORM){
+      (storeRows || []).forEach(s => { if (!MY_STORES.some(m => m.id === s.id)) MY_STORES.push({ ...s, role: null }); });
+    }
+    MY_STORES = MY_STORES.filter(s => s.status !== "deleted");
+    if (!MY_STORES.length){ showNoAccess(email); return; }
+
+    /* Store resolution: ?store= param → sessionStorage → ek hi store → picker */
+    const paramSlug = (new URLSearchParams(location.search).get("store") || "").trim().toLowerCase();
+    let chosen = null;
+    if (paramSlug){
+      chosen = MY_STORES.find(s => s.slug === paramSlug) || null;
+      if (!chosen){
+        /* Store mojood hai lekin is user ki entitled list mein nahi? */
+        const { data: pub } = await sb.from("storefront_stores").select("slug, name").eq("slug", paramSlug).maybeSingle();
+        if (pub){ showNoAccess(email, pub.name || paramSlug); return; }
+      }
+    }
+    if (!chosen){
+      let saved = null;
+      try { saved = sessionStorage.getItem("sn_admin_store"); } catch (e) {}
+      if (saved) chosen = MY_STORES.find(s => s.id === saved) || null;
+    }
+    if (!chosen && MY_STORES.length === 1) chosen = MY_STORES[0];
+    if (chosen) enterStore(chosen);
+    else showStorePicker();
+  } catch (e) {
+    console.error("Store context resolve fail:", e);
+    showNoAccess(email);
+  }
+}
+function enterStore(store){
+  STORE_ID = store.id;
+  STORE_SLUG = store.slug;
+  STORE_NAME = store.name;
+  MY_ROLE = store.role || null;
+  try { sessionStorage.setItem("sn_admin_store", store.id); } catch (e) {}
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.get("store") !== store.slug){ u.searchParams.set("store", store.slug); history.replaceState(null, "", u); }
+  } catch (e) {}
+  settingsLoaded = false;
+  updateStoreHeader();
   showDash();
 }
-function showNoAccess(email){
+function updateStoreHeader(){
+  const sel = $("#storeSwitcher");
+  sel.innerHTML = MY_STORES.map(s => `<option value="${esc(s.id)}" ${s.id === STORE_ID ? "selected" : ""}>${esc(s.name)}</option>`).join("");
+  $("#storeContext").classList.remove("hidden");
+  $("#curStoreName").textContent = STORE_NAME || "";
+  const roleEl = $("#curStoreRole");
+  roleEl.textContent = MY_ROLE ? (MY_ROLE === "owner" ? "Owner" : MY_ROLE === "admin" ? "Admin" : "Staff") : "👑 Platform";
+  roleEl.className = "pill " + (effRole() === "owner" ? "green" : "");
+  $("#viewStoreLink").href = "index.html?store=" + encodeURIComponent(STORE_SLUG || "shopnest");
+  $("#superAdminLink").classList.toggle("hidden", !IS_PLATFORM);
+}
+$("#storeSwitcher").addEventListener("change", e => {
+  const store = MY_STORES.find(s => s.id === e.target.value);
+  if (store && store.id !== STORE_ID) enterStore(store);
+});
+function showStorePicker(){
   $("#loginView").classList.add("hidden");
   $("#dashView").classList.add("hidden");
+  $("#noAccessView").classList.add("hidden");
+  $("#storePickerView").classList.remove("hidden");
+  $("#logoutBtn").classList.remove("hidden");
+  $("#pickerEmail").textContent = MY_EMAIL || "";
+  $("#pickerList").innerHTML = MY_STORES.map(s => `<button class="btn ghost store-pick" data-pick="${esc(s.id)}"><span>🏪 <strong>${esc(s.name)}</strong> <small>/${esc(s.slug)}${s.status === "suspended" ? " • ⏸ suspended" : ""}</small></span><span class="pill ${s.role ? "green" : ""}">${s.role ? esc(s.role) : "👑 platform"}</span></button>`).join("");
+  $("#pickerList").querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
+    const store = MY_STORES.find(s => s.id === b.dataset.pick);
+    if (store) enterStore(store);
+  });
+}
+function showNoAccess(email, storeName){
+  $("#loginView").classList.add("hidden");
+  $("#dashView").classList.add("hidden");
+  $("#storePickerView").classList.add("hidden");
   $("#noAccessView").classList.remove("hidden");
   $("#noAccessEmail").textContent = email || "";
   $("#logoutBtn").classList.remove("hidden");
+  if (storeName){
+    const p = $("#noAccessView").querySelector("p");
+    if (p) p.innerHTML = `Aap <strong>${esc(email || "")}</strong> se login hain, lekin <strong>${esc(storeName)}</strong> store ki team mein shamil nahi hain. Us store ke <strong>owner se rabta karein</strong> — woh Team tab se aapka email add kar dein ge.`;
+  }
 }
 function showDash(){
   $("#loginView").classList.add("hidden");
   $("#noAccessView").classList.add("hidden");
+  $("#storePickerView").classList.add("hidden");
   $("#dashView").classList.remove("hidden");
   $("#logoutBtn").classList.remove("hidden");
-  /* Role gating: staff ko Categories/Coupons/Team/Settings nahi; admin ko Team nahi. */
-  $("#tabTeam").classList.toggle("hidden", MY_ROLE !== "owner");
+  /* Role gating (current store ki role par): staff ko Categories/Coupons/Team/Settings nahi; admin ko Team nahi. */
+  $("#tabTeam").classList.toggle("hidden", effRole() !== "owner");
   const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings"];
   adminOnlyTabs.forEach(id => document.getElementById(id).classList.toggle("hidden", !isAdminPlus()));
   switchTab("dashboard");
@@ -105,7 +209,7 @@ async function loadAll(){
   await Promise.all([loadOrders(), loadProducts(), loadCategories()]);
   await loadDashboard();
   if (isAdminPlus()) loadCoupons();
-  if (MY_ROLE === "owner") loadTeam();
+  if (effRole() === "owner") loadTeam();
 }
 
 /* ---------- Image upload (Supabase Storage: product-images) ---------- */
@@ -141,7 +245,7 @@ function orderMeta(o){
   return { coupon: null, discount: 0 };
 }
 async function loadOrders(){
-  const { data, error } = await sb.from("orders").select("*").order("id", { ascending: false });
+  const { data, error } = await sb.from("orders").select("*").eq("store_id", STORE_ID).order("id", { ascending: false });
   const wrap = $("#ordersWrap");
   if (error){ wrap.innerHTML = `<p class="empty-note">Orders load nahi ho sakay: ${esc(error.message)}</p>`; ORDERS_CACHE = []; return; }
   ORDERS_CACHE = data || [];
@@ -172,7 +276,7 @@ function renderOrders(){
       <td><button class="btn small danger" data-del-order="${o.id}">Delete</button></td>
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-status]").forEach(sel => sel.onchange = async () => {
-    const { error } = await sb.from("orders").update({ status: sel.value }).eq("id", +sel.dataset.status);
+    const { error } = await sb.from("orders").update({ status: sel.value }).eq("id", +sel.dataset.status).eq("store_id", STORE_ID);
     if (error) alert("Status update fail: " + error.message); else { await loadOrders(); loadDashboard(); }
   });
   wrap.querySelectorAll("[data-del-order]").forEach(b => b.onclick = async () => {
@@ -184,7 +288,7 @@ function renderOrders(){
     try {
       /* .select("id") forces PostgREST to return deleted rows — sirf request
          success par nahi, asal deleted row par bharosa karte hain. */
-      const { data: deleted, error } = await sb.from("orders").delete().eq("id", id).select("id");
+      const { data: deleted, error } = await sb.from("orders").delete().eq("id", id).eq("store_id", STORE_ID).select("id");
       if (error) throw error;
       if (!deleted || deleted.length === 0) throw new Error("Koi row delete nahi hui — Supabase ki orders delete RLS policy ya team access check karein.");
       msg.textContent = `✅ Order #${id} delete ho gaya.`; msg.className = "msg ok";
@@ -201,7 +305,7 @@ $("#orderStatusFilter").addEventListener("change", renderOrders);
 
 /* ---------- Products ---------- */
 async function loadProducts(){
-  const { data, error } = await sb.from("products").select("*").order("id", { ascending: true });
+  const { data, error } = await sb.from("products").select("*").eq("store_id", STORE_ID).order("id", { ascending: true });
   const wrap = $("#productsWrap");
   if (error){ wrap.innerHTML = `<p class="empty-note">Products load nahi ho sakay: ${esc(error.message)}</p>`; return; }
   PRODUCTS_CACHE = data || [];
@@ -309,7 +413,7 @@ function bindProdCards(wrap){
       img: imageUrl,
       desc: get("desc").trim(),
     };
-    const { error } = await sb.from("products").update(payload).eq("id", +b.dataset.save);
+    const { error } = await sb.from("products").update(payload).eq("id", +b.dataset.save).eq("store_id", STORE_ID);
     if (error) {
       setUploadMsg(msg, "Product save fail: " + error.message, "err");
       alert("Save fail: " + error.message);
@@ -322,12 +426,13 @@ function bindProdCards(wrap){
   });
   wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh product delete kar dein?")) return;
-    const { error } = await sb.from("products").delete().eq("id", +b.dataset.del);
+    const { error } = await sb.from("products").delete().eq("id", +b.dataset.del).eq("store_id", STORE_ID);
     if (error) alert("Delete fail: " + error.message); else loadProducts();
   });
 }
 $("#addProductBtn").onclick = async () => {
   const { error } = await sb.from("products").insert({
+    store_id: STORE_ID,
     name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, discount_pct: null, stock: "in", featured: false, img: "", desc: "", active: false,
   });
   if (error) alert("Add fail: " + error.message);
@@ -337,7 +442,7 @@ $("#addProductBtn").onclick = async () => {
 /* ---------- Categories ---------- */
 async function loadCategories(){
   const wrap = $("#categoriesWrap");
-  const { data, error } = await sb.from("categories").select("*").order("sort", { ascending: true }).order("id", { ascending: true });
+  const { data, error } = await sb.from("categories").select("*").eq("store_id", STORE_ID).order("sort", { ascending: true }).order("id", { ascending: true });
   if (error){ wrap.innerHTML = `<p class="empty-note">Categories load nahi ho sakein (shopify migration run hai?): ${esc(error.message)}</p>`; CATEGORIES_CACHE = []; return; }
   CATEGORIES_CACHE = data || [];
   refreshCatList();
@@ -355,7 +460,7 @@ async function loadCategories(){
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-cvis]").forEach(cb => cb.onchange = async () => {
     const id = +cb.closest("tr").dataset.cid;
-    const { error } = await sb.from("categories").update({ visible: cb.checked }).eq("id", id);
+    const { error } = await sb.from("categories").update({ visible: cb.checked }).eq("id", id).eq("store_id", STORE_ID);
     const msg = $("#catMsg");
     if (error){ msg.textContent = "Visible update fail: " + error.message; msg.className = "msg err"; cb.checked = !cb.checked; }
     else { msg.textContent = cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi (products phir bhi All Products mein rahenge)."; msg.className = "msg ok"; loadCategories(); }
@@ -370,7 +475,7 @@ async function loadCategories(){
     const old = b.textContent; b.disabled = true; b.textContent = "Saving…";
     try {
       if (file) image = await uploadImage(file, "categories");
-      const { error } = await sb.from("categories").update({ name, image, sort: parseInt(tr.querySelector("[data-csort]").value) || 0 }).eq("id", id);
+      const { error } = await sb.from("categories").update({ name, image, sort: parseInt(tr.querySelector("[data-csort]").value) || 0 }).eq("id", id).eq("store_id", STORE_ID);
       if (error) throw error;
       $("#catMsg").textContent = "✅ Category save ho gayi."; $("#catMsg").className = "msg ok";
       loadCategories(); loadProducts();
@@ -379,7 +484,7 @@ async function loadCategories(){
   });
   wrap.querySelectorAll("[data-cdel]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh category delete kar dein?\n\nNote: is category ke PRODUCTS delete NAHI honge — un par category ka text waisa hi rahega, sirf category nav/tiles/footer se gayab hogi.")) return;
-    const { error } = await sb.from("categories").delete().eq("id", +b.dataset.cdel);
+    const { error } = await sb.from("categories").delete().eq("id", +b.dataset.cdel).eq("store_id", STORE_ID);
     if (error) alert("Delete fail: " + error.message);
     else { $("#catMsg").textContent = "✅ Category delete ho gayi (products mehfooz hain)."; $("#catMsg").className = "msg ok"; loadCategories(); }
   });
@@ -395,7 +500,7 @@ $("#addCategoryBtn").onclick = async () => {
     const file = $("#catNewImageFile").files[0];
     if (file) image = await uploadImage(file, "categories");
     const maxSort = CATEGORIES_CACHE.reduce((m,c) => Math.max(m, Number(c.sort) || 0), 0);
-    const { error } = await sb.from("categories").insert({ name, image, visible: true, sort: maxSort + 1 });
+    const { error } = await sb.from("categories").insert({ store_id: STORE_ID, name, image, visible: true, sort: maxSort + 1 });
     if (error) throw error;
     $("#catNewName").value = ""; $("#catNewImage").value = ""; $("#catNewImageFile").value = "";
     msg.textContent = `✅ Category "${name}" add ho gayi.`; msg.className = "msg ok";
@@ -408,7 +513,7 @@ $("#addCategoryBtn").onclick = async () => {
 /* ---------- Coupons ---------- */
 async function loadCoupons(){
   const wrap = $("#couponsWrap");
-  const { data, error } = await sb.from("coupons").select("*").order("id", { ascending: true });
+  const { data, error } = await sb.from("coupons").select("*").eq("store_id", STORE_ID).order("id", { ascending: true });
   if (error){ wrap.innerHTML = `<p class="empty-note">Coupons load nahi ho sakay (shopify migration run hai?): ${esc(error.message)}</p>`; return; }
   if (!data.length){ wrap.innerHTML = `<p class="empty-note">Abhi koi coupon nahi hai — upar wale form se pehla coupon banayein.</p>`; return; }
   wrap.innerHTML = `<table>
@@ -421,12 +526,12 @@ async function loadCoupons(){
       <td><button class="btn small danger" data-cpn-del="${c.id}">Delete</button></td>
     </tr>`).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-cpn-active]").forEach(cb => cb.onchange = async () => {
-    const { error } = await sb.from("coupons").update({ active: cb.checked }).eq("id", +cb.dataset.cpnActive);
+    const { error } = await sb.from("coupons").update({ active: cb.checked }).eq("id", +cb.dataset.cpnActive).eq("store_id", STORE_ID);
     if (error){ alert("Coupon update fail: " + error.message); cb.checked = !cb.checked; }
   });
   wrap.querySelectorAll("[data-cpn-del]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh coupon delete kar dein?")) return;
-    const { error } = await sb.from("coupons").delete().eq("id", +b.dataset.cpnDel);
+    const { error } = await sb.from("coupons").delete().eq("id", +b.dataset.cpnDel).eq("store_id", STORE_ID);
     if (error) alert("Delete fail: " + error.message); else loadCoupons();
   });
 }
@@ -436,7 +541,7 @@ $("#addCouponBtn").onclick = async () => {
   const msg = $("#couponsMsg");
   if (!code){ msg.textContent = "Coupon code likhein."; msg.className = "msg err"; return; }
   if (!pct){ msg.textContent = "Discount % 1–90 ke darmiyan likhein."; msg.className = "msg err"; return; }
-  const { error } = await sb.from("coupons").insert({ code, pct, active: true });
+  const { error } = await sb.from("coupons").insert({ store_id: STORE_ID, code, pct, active: true });
   if (error){ msg.textContent = "Coupon add fail: " + error.message; msg.className = "msg err"; return; }
   $("#cpnCode").value = ""; $("#cpnPct").value = "";
   msg.textContent = `✅ Coupon ${code} (${pct}% OFF) ban gaya.`; msg.className = "msg ok";
@@ -446,7 +551,7 @@ $("#addCouponBtn").onclick = async () => {
 /* ---------- Team (owner only) ---------- */
 async function loadTeam(){
   const wrap = $("#teamWrap");
-  const { data, error } = await sb.from("team").select("*").order("created_at", { ascending: true });
+  const { data, error } = await sb.from("team").select("*").eq("store_id", STORE_ID).order("created_at", { ascending: true });
   if (error){ wrap.innerHTML = `<p class="empty-note">Team load nahi ho saki: ${esc(error.message)}</p>`; return; }
   wrap.innerHTML = `<table>
     <thead><tr><th>Email</th><th>Role</th><th></th></tr></thead>
@@ -456,13 +561,13 @@ async function loadTeam(){
       <td>${self ? '<small style="color:var(--muted)">Apna owner account remove nahi ho sakta</small>' : `<button class="btn small danger" data-tdel="${esc(m.email)}">Remove</button>`}</td>
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-trole]").forEach(sel => sel.onchange = async () => {
-    const { error } = await sb.from("team").update({ role: sel.value }).eq("email", sel.dataset.trole);
+    const { error } = await sb.from("team").update({ role: sel.value }).eq("store_id", STORE_ID).eq("email", sel.dataset.trole);
     if (error){ alert("Role update fail: " + error.message); loadTeam(); }
     else { $("#teamMsg").textContent = "✅ Role update ho gaya."; $("#teamMsg").className = "msg ok"; }
   });
   wrap.querySelectorAll("[data-tdel]").forEach(b => b.onclick = async () => {
     if (!confirm(`${b.dataset.tdel} ko team se remove kar dein? Unka dashboard access foran band ho jayega.`)) return;
-    const { error } = await sb.from("team").delete().eq("email", b.dataset.tdel);
+    const { error } = await sb.from("team").delete().eq("store_id", STORE_ID).eq("email", b.dataset.tdel);
     if (error) alert("Remove fail: " + error.message); else loadTeam();
   });
 }
@@ -471,7 +576,7 @@ $("#addTeamBtn").onclick = async () => {
   const role = $("#teamRole").value;
   const msg = $("#teamMsg");
   if (!email || !email.includes("@")){ msg.textContent = "Sahi email likhein."; msg.className = "msg err"; return; }
-  const { error } = await sb.from("team").insert({ email, role });
+  const { error } = await sb.from("team").insert({ store_id: STORE_ID, email, role });
   if (error){ msg.textContent = "Member add fail: " + error.message; msg.className = "msg err"; return; }
   $("#teamEmail").value = "";
   msg.textContent = `✅ ${email} team mein add ho gaya (${role}). Woh magic link se login kar sakte hain — agar link na aaye to pehle Supabase Auth mein unka user banana hoga.`; msg.className = "msg ok";
@@ -510,7 +615,7 @@ async function loadDashboard(){
   const msg = $("#dashMsg");
   try {
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-    const { data, error } = await sb.from("visits").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(5000);
+    const { data, error } = await sb.from("visits").select("*").eq("store_id", STORE_ID).gte("created_at", since).order("created_at", { ascending: false }).limit(5000);
     if (error) throw error;
     visits = data || [];
     msg.textContent = ""; msg.className = "msg";
@@ -698,7 +803,7 @@ async function loadSettings(){
   settingsLoaded = true;
   const msg = $("#settingsMsg");
   try {
-    const { data, error } = await sb.from("settings").select("data").eq("id", 1).maybeSingle();
+    const { data, error } = await sb.from("settings").select("data").eq("store_id", STORE_ID).maybeSingle();
     if (error) throw error;
     fillSettings(mergeAdminSettings(data && data.data));
   } catch (e) {
@@ -749,7 +854,10 @@ $("#saveSettingsBtn").onclick = async () => {
         address: $("#profAddress").value.trim()
       }
     };
-    const { error } = await sb.from("settings").upsert({ id: 1, data }, { onConflict: "id" });
+    /* Per-store settings: upsert store_id par hota hai (platform migration
+       mein settings.store_id par unique index hai; id sequence se auto
+       aata hai nayi row par). */
+    const { error } = await sb.from("settings").upsert({ store_id: STORE_ID, data }, { onConflict: "store_id" });
     if (error) throw error;
     renderHeroEditor();
     msg.textContent = "✅ Settings save ho gayi hain — store reload karke changes dekhein.";

@@ -64,6 +64,16 @@ const DEFAULT_SETTINGS = {
 };
 let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
+/* ---------- Multi-tenant state ----------
+   STORE = storefront_stores view se resolved row { id, slug, name, status }.
+   STORE_ID null ho to SINGLE-TENANT FALLBACK hai (platform migration abhi
+   nahi chali / stores lookup fail) — saari queries baghair store filter ke
+   chalti hain taa ke live shop kabhi band na ho. */
+const PLATFORM_HOSTS = ["localhost", "127.0.0.1", "imalirazamansha.github.io"];
+let STORE = null;
+let STORE_ID = null;
+let STORE_SLUG = "shopnest";
+
 let PRODUCTS = [];
 let CATEGORIES = []; /* categories table ki rows (name/image/visible/sort); fail ho to [] = products se derive */
 let CAT_LIST = [];
@@ -71,7 +81,10 @@ let HERO_SLIDES = []; /* applySettings mein visible hero slides */
 let appliedCoupon = null; /* { code, pct } — checkout par ek waqt mein ek hi coupon */
 let activeCat = "All";
 let maxPrice = null;
-let cart = JSON.parse(localStorage.getItem("shopnest_cart") || "{}");
+/* Cart har store ka alag: key boot mein resolve ke baad banti hai
+   ("shopnest_cart_<slug>"). Us se pehle cart khaali object hai. */
+let CART_KEY = "shopnest_cart";
+let cart = {};
 let checkoutState = null;
 let pdpId = null;
 let pdpQty = 1;
@@ -148,9 +161,16 @@ function mergeSettings(raw){
 }
 async function loadSettings(){
   try {
-    const { data, error } = await sb.from("settings").select("data").eq("id", 1).maybeSingle();
+    /* Tenant mode: is store ki apni settings row. Fallback: purani id=1 row. */
+    let q = sb.from("settings").select("data");
+    q = STORE_ID ? q.eq("store_id", STORE_ID) : q.eq("id", 1);
+    const { data, error } = await q.maybeSingle();
     if (error) throw error;
-    SETTINGS = mergeSettings(data && data.data);
+    const raw = data && data.data;
+    const isEmpty = !raw || (typeof raw === "object" && Object.keys(raw).length === 0);
+    /* Settings khaali hon to store ka naam stores table wale name se —
+       header/footer mein client ka asal naam nazar aaye. */
+    SETTINGS = mergeSettings(isEmpty && STORE && STORE.name ? { store_name: STORE.name } : raw);
   } catch (e) {
     console.warn("Settings load nahi huye; defaults use ho rahe hain.", e);
     SETTINGS = mergeSettings(null);
@@ -234,7 +254,9 @@ function startHero(){
 let categoriesReady = null;
 async function loadCategories(){
   try {
-    const { data, error } = await sb.from("categories").select("*").order("sort", { ascending: true }).order("id", { ascending: true });
+    let q = sb.from("categories").select("*");
+    if (STORE_ID) q = q.eq("store_id", STORE_ID);
+    const { data, error } = await q.order("sort", { ascending: true }).order("id", { ascending: true });
     if (error) throw error;
     CATEGORIES = data || [];
   } catch (e) {
@@ -244,7 +266,9 @@ async function loadCategories(){
   }
 }
 async function loadProducts(){
-  const { data, error } = await sb.from("products").select("*").eq("active", true).order("id", { ascending: true });
+  let q = sb.from("products").select("*").eq("active", true);
+  if (STORE_ID) q = q.eq("store_id", STORE_ID);
+  const { data, error } = await q.order("id", { ascending: true });
   if (error){
     console.error(error);
     $("#loadError").hidden = false;
@@ -441,6 +465,7 @@ function trackPage(page){
     const ua = navigator.userAgent || "";
     const device = (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(ua)) ? "mobile" : "desktop";
     const row = { page, referrer_host: refHost, utm_source: utm, device, session_id: visitSessionId() };
+    if (STORE_ID) row.store_id = STORE_ID;
     /* await nahi — result/error dono ignore; tracking kabhi store ko nahi rok sakti. */
     sb.from("visits").insert(row).then(() => {}, () => {});
   } catch (e) { /* tracking fail = silent */ }
@@ -539,7 +564,7 @@ $("#pdpAdd").onclick = () => { if (pdpId !== null) addToCart(pdpId, pdpQty); };
 $("#pdpOrder").onclick = () => { if (pdpId !== null) buyNow(pdpId, pdpQty); };
 
 /* ---------- Cart ---------- */
-function saveCart(){ localStorage.setItem("shopnest_cart", JSON.stringify(cart)); }
+function saveCart(){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
 function cartCount(){ return Object.values(cart).reduce((a,b) => a + Number(b || 0), 0); }
 function cartEntries(){ return Object.entries(cart).map(([id,q]) => [+id, Number(q)]).filter(([,q]) => q > 0); }
 function cartSubtotal(){ return cartEntries().reduce((sum,[id,q]) => { const p = findP(id); return p ? sum + Number(p.price) * q : sum; }, 0); }
@@ -628,8 +653,9 @@ async function applyCoupon(){
   const btn = $("#couponApplyBtn");
   btn.disabled = true; btn.textContent = "Check ho raha hai…";
   try {
-    /* check_coupon RPC — codes ki list public nahi hoti, sirf yahi verify hota hai. */
-    const { data, error } = await sb.rpc("check_coupon", { p_code: code });
+    /* check_coupon RPC — codes ki list public nahi hoti, sirf yahi verify hota hai.
+       Tenant mode mein RPC store-scoped hai (p_store lazmi); fallback mein purana signature. */
+    const { data, error } = await sb.rpc("check_coupon", STORE_ID ? { p_code: code, p_store: STORE_ID } : { p_code: code });
     if (error) throw error;
     const row = Array.isArray(data) ? data[0] : data;
     const pct = row ? Number(row.pct) : NaN;
@@ -683,13 +709,15 @@ $("#checkoutForm").onsubmit = async e => {
      saath coupon meta bhi save hota hai. Purane orders plain array thay;
      admin dono shapes ko parh leta hai. */
   const items = { lines, coupon: appliedCoupon ? appliedCoupon.code : null, discount };
-  const { error } = await sb.from("orders").insert({
+  const orderRow = {
     customer_name: String(f.get("name") || "").trim(),
     phone: String(f.get("phone") || "").trim(),
     city: String(f.get("city") || "").trim(),
     address: String(f.get("address") || "").trim(),
     items, total, status: "Pending"
-  });
+  };
+  if (STORE_ID) orderRow.store_id = STORE_ID;
+  const { error } = await sb.from("orders").insert(orderRow);
   btn.disabled = false; btn.textContent = "✅ ORDER PLACE KAREIN";
   if (error){
     console.error(error);
@@ -765,8 +793,105 @@ function toast(text){
   toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
 }
 
+/* ---------- Tenant resolution + boot ----------
+   Pehle ye tay hota hai ke visitor KIS store par hai, phir hi koi
+   products/settings load hote hain (saari queries usi store ki hoti hain).
+   Resolution order:
+     1) ?store=<slug> URL param  (explicit — na mile to "Store nahi mila")
+     2) sessionStorage 'sn_store_slug' (pehle visit se yaad)
+     3) custom domain: hostname platform ke apne hosts se alag ho to
+        storefront_stores mein custom_domain match
+     4) default 'shopnest'
+   Stores lookup hi fail ho jaye (migration abhi nahi chali) to
+   SINGLE-TENANT FALLBACK: baghair store filter purana render — live
+   shop kabhi is wajah se band nahi hogi. */
+async function fetchStorefrontRow(slug){
+  const { data, error } = await sb.from("storefront_stores").select("*").eq("slug", slug).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+async function resolveStore(){
+  const paramSlug = (new URLSearchParams(location.search).get("store") || "").trim().toLowerCase();
+  let slug = null;
+  let explicit = false;
+  if (paramSlug){
+    slug = paramSlug; explicit = true;
+    try { sessionStorage.setItem("sn_store_slug", slug); } catch (e) {}
+  } else {
+    try { slug = sessionStorage.getItem("sn_store_slug") || null; } catch (e) {}
+    if (!slug){
+      const host = (location.hostname || "").toLowerCase();
+      if (host && !PLATFORM_HOSTS.includes(host)){
+        const cands = [host, host.startsWith("www.") ? host.slice(4) : "www." + host];
+        try {
+          const { data, error } = await sb.from("storefront_stores").select("slug").in("custom_domain", cands).limit(1);
+          if (!error && data && data.length){
+            slug = data[0].slug;
+            try { sessionStorage.setItem("sn_store_slug", slug); } catch (e) {}
+          }
+        } catch (e) { /* view nahi mili — default/fallback neeche sambhal lega */ }
+      }
+    }
+    if (!slug) slug = "shopnest";
+  }
+  STORE_SLUG = slug;
+  let row = null;
+  try {
+    row = await fetchStorefrontRow(slug);
+  } catch (e) {
+    console.warn("Store resolution fail — single-tenant fallback render.", e);
+    STORE = null; STORE_ID = null;
+    return "fallback";
+  }
+  if (!row){
+    if (explicit) return "notfound";
+    if (slug !== "shopnest"){
+      /* Session ka purana slug ab mojood nahi — saaf karke default try karein. */
+      try { sessionStorage.removeItem("sn_store_slug"); } catch (e) {}
+      STORE_SLUG = "shopnest";
+      try { row = await fetchStorefrontRow("shopnest"); } catch (e) { row = null; }
+      if (!row){ STORE = null; STORE_ID = null; return "fallback"; }
+    } else {
+      /* View hai lekin default store bhi nahi — purana single-tenant render. */
+      STORE = null; STORE_ID = null;
+      return "fallback";
+    }
+  }
+  STORE = row;
+  STORE_SLUG = row.slug || STORE_SLUG;
+  if (row.status === "suspended") return "suspended";
+  STORE_ID = row.id || null;
+  return "ok";
+}
+function showStoreNotice(title, msg){
+  document.body.classList.add("store-closed");
+  const box = $("#storeNotice");
+  if (box){
+    $("#noticeTitle").textContent = title;
+    $("#noticeText").textContent = msg;
+    box.hidden = false;
+  }
+  document.title = title;
+}
+async function boot(){
+  const mode = await resolveStore();
+  if (mode === "suspended"){
+    showStoreNotice("Store band hai", "Ye store filhal band hai — jald wapis aayega.");
+    return;
+  }
+  if (mode === "notfound"){
+    showStoreNotice("Store nahi mila", "Ye store nahi mila — link check karke dobara try karein.");
+    return;
+  }
+  /* mode "ok" ya "fallback": cart is store ke slug se load karein. */
+  CART_KEY = "shopnest_cart_" + STORE_SLUG;
+  try { cart = JSON.parse(localStorage.getItem(CART_KEY) || "{}") || {}; } catch (e) { cart = {}; }
+  if (!cart || typeof cart !== "object" || Array.isArray(cart)) cart = {};
+  trackPage("home"); /* pehla pageview — showPage init par nahi chalta */
+  loadSettings();
+  loadProducts();
+}
+
 applySettings();
 renderFaq();
-trackPage("home"); /* pehla pageview — showPage init par nahi chalta */
-loadSettings();
-loadProducts();
+boot();
