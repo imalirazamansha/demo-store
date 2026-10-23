@@ -11,18 +11,41 @@ const $$ = s => [...document.querySelectorAll(s)];
 const fmt = n => "Rs." + Number(n || 0).toLocaleString("en-PK");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
+/* ---------- SVG icons (sprite index.html mein hai: #i-* stroke, #b-* brand) ---------- */
+const icon = (name, cls) => `<svg class="ic ${cls || ""}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const brandIcon = name => `<svg class="ic" aria-hidden="true"><use href="#b-${name}"/></svg>`;
+/* Admin (Part A) ke FONTS ka mirror — legacy string font_family resolve karne ke liye. */
+const STORE_FONTS = {
+  "": { name: "", stack: "", google: "" },
+  "Poppins": { name: "Poppins", stack: "'Poppins', system-ui, sans-serif", google: "Poppins:wght@400;500;600;700;800" },
+  "Inter": { name: "Inter", stack: "'Inter', system-ui, sans-serif", google: "Inter:wght@400;500;600;700;800" },
+  "Roboto": { name: "Roboto", stack: "'Roboto', system-ui, sans-serif", google: "Roboto:wght@400;500;700" },
+  "Montserrat": { name: "Montserrat", stack: "'Montserrat', system-ui, sans-serif", google: "Montserrat:wght@400;500;600;700;800" },
+  "Playfair Display": { name: "Playfair Display", stack: "'Playfair Display', Georgia, serif", google: "Playfair+Display:wght@500;600;700;800" },
+  "Rubik": { name: "Rubik", stack: "'Rubik', system-ui, sans-serif", google: "Rubik:wght@400;500;600;700" }
+};
+/* Hex color ko halka/gahra karna (theme hover shades ke liye). amt: -1..1 */
+function shade(hex, amt){
+  const n = parseInt(String(hex).slice(1), 16);
+  if (!Number.isFinite(n)) return hex;
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const t = amt < 0 ? 0 : 255, p = Math.abs(amt);
+  r = Math.round((t - r) * p) + r; g = Math.round((t - g) * p) + g; b = Math.round((t - b) * p) + b;
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
 /* Storefront defaults. Admin Settings in values ko settings table se override kar sakta hai. */
 const DEFAULT_SETTINGS = {
   store_name: "ShopNest",
   announcements: [
-    "⚡ {STORE} — PAKISTAN KA SMART STORE",
-    "💵 CASH ON DELIVERY ALL OVER PAKISTAN",
-    "🚚 FAST DELIVERY 3–5 DAYS",
-    "🔥 HOT DEALS — LIMITED STOCK"
+    "{STORE} — PAKISTAN KA SMART STORE",
+    "CASH ON DELIVERY ALL OVER PAKISTAN",
+    "FAST DELIVERY 3–5 DAYS",
+    "HOT DEALS — LIMITED STOCK"
   ],
   hero: [
     {
-      pill: "🔥 MEGA SALE — 50% TAK OFF",
+      pill: "MEGA SALE — 50% TAK OFF",
       title: "SMART GADGETS, SMART LIFE!",
       subtitle: "Pakistan ke best smart gadgets — quality checked, Cash on Delivery ke saath, seedha aapke ghar tak.",
       button: "SHOP BEST SELLERS",
@@ -30,7 +53,7 @@ const DEFAULT_SETTINGS = {
       visible: true
     },
     {
-      pill: "🎧 AUDIO, WEARABLES & MORE",
+      pill: "AUDIO, WEARABLES & MORE",
       title: "HAR GHAR KI ZAROORAT!",
       subtitle: "Headphones, smart watches aur roz-marra ke useful products — honest prices aur fast dispatch.",
       button: "SHOP DEALS",
@@ -60,7 +83,20 @@ const DEFAULT_SETTINGS = {
   ],
   about_heading: "PAKISTAN KA SMART STORE",
   about_text: "ShopNest par hum sirf wohi products rakhte hain jo pehle test kiye jayein. Har order dispatch se pehle quality-check hota hai aur payment Cash on Delivery hai — pehle product aapke haath mein, phir paisay. Poore Pakistan mein fast dispatch, aur damaged ya wrong product par easy exchange. Smart shopping, bina tension!",
-  whatsapp_number: ""
+  whatsapp_number: "",
+  /* --- V2 keys (Part A admin contract) --- */
+  font_family: { name: "", stack: "", google: "" },
+  theme_color: "",
+  logo_url: "",
+  socials: { facebook: "", instagram: "", tiktok: "", youtube: "", x: "", whatsapp: "" },
+  menu_links: [],
+  footer_links: [],
+  footer_text: "",
+  sections_order: null,
+  custom_sections: [],
+  checkout_fields: [],
+  product_fields: [],
+  animations: true
 };
 let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
@@ -124,7 +160,7 @@ function feeOf(p){ return Math.max(0, Number(p && p.delivery_fee) || 0); }
 function deliveryTotal(entries){ return entries.reduce((sum, [id]) => sum + feeOf(findP(id)), 0); }
 function delivText(p){
   const f = feeOf(p);
-  return f === 0 ? "🚚 FREE Delivery" : "🚚 Delivery: " + fmt(f);
+  return f === 0 ? `${icon("truck", "ic-inline")} FREE Delivery` : `${icon("truck", "ic-inline")} Delivery: ${fmt(f)}`;
 }
 
 /* ---------- Settings ---------- */
@@ -157,6 +193,33 @@ function mergeSettings(raw){
   /* Deep merge: store profile */
   if (raw.profile && typeof raw.profile === "object")
     Object.keys(out.profile).forEach(k => { if (typeof raw.profile[k] === "string") out.profile[k] = raw.profile[k].trim(); });
+  /* --- V2 keys (Part A contract — admin ke merge se match) --- */
+  if (raw.font_family && typeof raw.font_family === "object")
+    out.font_family = { name: String(raw.font_family.name || ""), stack: String(raw.font_family.stack || ""), google: String(raw.font_family.google || "") };
+  else if (typeof raw.font_family === "string" && STORE_FONTS[raw.font_family])
+    out.font_family = { ...STORE_FONTS[raw.font_family] };
+  if (typeof raw.theme_color === "string") out.theme_color = raw.theme_color;
+  if (typeof raw.logo_url === "string") out.logo_url = raw.logo_url;
+  if (raw.socials && typeof raw.socials === "object")
+    Object.keys(out.socials).forEach(k => { if (typeof raw.socials[k] === "string") out.socials[k] = raw.socials[k]; });
+  const cleanLinks = arr => Array.isArray(arr) ? arr.filter(l => l && typeof l === "object").map(l => ({ label: String(l.label || ""), url: String(l.url || "") })) : [];
+  out.menu_links = cleanLinks(raw.menu_links);
+  out.footer_links = cleanLinks(raw.footer_links);
+  if (typeof raw.footer_text === "string") out.footer_text = raw.footer_text;
+  if (Array.isArray(raw.sections_order))
+    out.sections_order = raw.sections_order.filter(e => e && typeof e.key === "string").map(e => ({ key: e.key, visible: e.visible !== false }));
+  if (Array.isArray(raw.custom_sections))
+    out.custom_sections = raw.custom_sections.filter(c => c && c.id).map(c => ({ id: String(c.id), heading: String(c.heading || ""), text: String(c.text || ""), img: String(c.img || ""), btn_label: String(c.btn_label || ""), btn_link: String(c.btn_link || "") }));
+  const cleanFields = arr => Array.isArray(arr) ? arr.filter(f => f && typeof f === "object" && String(f.label || "").trim()).map(f => ({
+    id: String(f.id || ("f" + Math.random().toString(36).slice(2, 9))),
+    label: String(f.label || ""),
+    type: ["text", "number", "select", "textarea"].includes(f.type) ? f.type : "text",
+    options: Array.isArray(f.options) ? f.options.map(x => String(x)).filter(Boolean) : String(f.options || "").split(",").map(x => x.trim()).filter(Boolean),
+    required: !!f.required
+  })) : [];
+  out.checkout_fields = cleanFields(raw.checkout_fields);
+  out.product_fields = cleanFields(raw.product_fields);
+  if (typeof raw.animations === "boolean") out.animations = raw.animations;
   return out;
 }
 async function loadSettings(){
@@ -183,13 +246,27 @@ function applySettings(){
   $("#logoName").textContent = name;
   $("#footerLogoName").textContent = name;
   $("#copyStoreName").textContent = name;
-  /* Profile logo: image set ho to header mein text ki jagah logo image. */
-  const logoUrl = (SETTINGS.profile && SETTINGS.profile.logo_url) || "";
+  /* Logo: V2 top-level logo_url pehle, warna legacy profile.logo_url.
+     Image ke saath store name bhi rehta hai (image ~36px, name us ke saath). */
+  const logoUrl = (SETTINGS.logo_url || (SETTINGS.profile && SETTINGS.profile.logo_url) || "").trim();
   const logoImg = $("#logoImg");
   if (logoImg){
     if (logoUrl){ logoImg.src = logoUrl; logoImg.alt = name; logoImg.hidden = false; $("#logoHome").classList.add("has-logo"); }
     else { logoImg.hidden = true; logoImg.removeAttribute("src"); $("#logoHome").classList.remove("has-logo"); }
   }
+  const footLogoImg = $("#footerLogoImg");
+  if (footLogoImg){
+    if (logoUrl){ footLogoImg.src = logoUrl; footLogoImg.alt = name; footLogoImg.hidden = false; }
+    else { footLogoImg.hidden = true; footLogoImg.removeAttribute("src"); }
+    const bag = $("#footerBagIcon"); if (bag) bag.hidden = !!logoUrl;
+  }
+  /* V2 appearance: font, theme color, animations, socials, nav/footer links */
+  applyFont();
+  applyTheme();
+  applyAnimations();
+  renderSocials();
+  renderNav();
+  renderFooterLinks();
   const messages = SETTINGS.announcements.map(t => esc(String(t).replaceAll("{STORE}", name).replaceAll("{Store}", name)));
   const group = `<div class="marquee-group">${messages.map(m => `<span>${m}</span>`).join("")}</div>`;
   $("#announceTrack").innerHTML = group + group;
@@ -215,28 +292,187 @@ function applySettings(){
   });
   $("#aboutHeading").textContent = SETTINGS.about_heading;
   $("#aboutText").textContent = SETTINGS.about_text;
-  $("#footerAbout").textContent = SETTINGS.about_text;
+  /* footer_text set ho to footer blurb us se; warna about_text hi rehta hai. */
+  $("#footerAbout").textContent = (SETTINGS.footer_text && SETTINGS.footer_text.trim()) ? SETTINGS.footer_text : SETTINGS.about_text;
   const wa = $("#waFloat");
   const digits = String(SETTINGS.whatsapp_number || "").replace(/\D/g, "");
   if (digits){ wa.href = "https://wa.me/" + digits; wa.hidden = false; } else { wa.hidden = true; wa.removeAttribute("href"); }
-  /* Section toggles: flag false ho to poora section hide. */
-  const SECTION_IDS = { best: "bestSection", hot: "hotSection", arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", howto: "howSection", faq: "faqSection", reviews: "reviewsSection", promos: "promoSection" };
-  Object.entries(SECTION_IDS).forEach(([key, id]) => {
-    const el = document.getElementById(id);
-    if (el) el.hidden = SETTINGS.sections[key] === false;
-  });
+  /* Homepage sections: sections_order (V2) ho to wohi order + visibility;
+     na ho to legacy settings.sections toggles wala purana behaviour. */
+  applySections();
   /* Footer contact lines (profile se) — jo field bhara ho sirf wohi line. */
   const fc = $("#footerContact");
   if (fc){
     const prof = SETTINGS.profile || {};
     const lines = [];
-    if (prof.email) lines.push(`<p>✉️ <a href="mailto:${esc(prof.email)}">${esc(prof.email)}</a></p>`);
-    if (prof.phone) lines.push(`<p>📞 ${esc(prof.phone)}</p>`);
-    if (prof.address) lines.push(`<p>📍 ${esc(prof.address)}</p>`);
+    if (prof.email) lines.push(`<p>${icon("mail", "ic-inline")} <a href="mailto:${esc(prof.email)}">${esc(prof.email)}</a></p>`);
+    if (prof.phone) lines.push(`<p>${icon("phone", "ic-inline")} ${esc(prof.phone)}</p>`);
+    if (prof.address) lines.push(`<p>${icon("pin", "ic-inline")} ${esc(prof.address)}</p>`);
     fc.innerHTML = lines.join("");
     fc.hidden = lines.length === 0;
   }
   watchReveals();
+}
+
+/* ---------- V2: Appearance (font / theme / animations) ---------- */
+function applyFont(){
+  const ff = SETTINGS.font_family || {};
+  const root = document.documentElement;
+  let link = document.getElementById("storeFontLink");
+  if (ff.google){
+    if (!link){
+      link = document.createElement("link");
+      link.id = "storeFontLink"; link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    link.href = "https://fonts.googleapis.com/css2?family=" + ff.google + "&display=swap";
+  } else if (link) link.remove();
+  if (ff.stack){
+    root.style.setProperty("--font-body", ff.stack);
+    root.style.setProperty("--font-head", ff.stack);
+  } else {
+    root.style.removeProperty("--font-body");
+    root.style.removeProperty("--font-head");
+  }
+}
+/* theme_color = single accent: GREEN accent ki jagah (primary buttons, badges,
+   prices ke accents, hovers). Navy headers/footer wesay ke wesay rehte hain.
+   Hover shade JS mein derive hoti hai (darken). */
+function applyTheme(){
+  const root = document.documentElement;
+  const tc = String(SETTINGS.theme_color || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(tc)){
+    root.style.setProperty("--green", tc);
+    root.style.setProperty("--mint", shade(tc, 0.3));
+    root.style.setProperty("--green-dark", shade(tc, -0.3));
+    root.style.setProperty("--accent", tc);
+  } else {
+    ["--green", "--mint", "--green-dark", "--accent"].forEach(v => root.style.removeProperty(v));
+  }
+}
+/* settings.animations === false ho to marquee + reveals band. */
+function applyAnimations(){
+  const off = SETTINGS.animations === false;
+  document.body.classList.toggle("no-anim", off);
+  if (off) $$(".reveal").forEach(el => el.classList.add("in"));
+  setupCatRail();
+}
+
+/* ---------- V2: Socials (footer icon buttons) ---------- */
+const SOCIAL_DEFS = [["facebook", "Facebook"], ["instagram", "Instagram"], ["tiktok", "TikTok"], ["youtube", "YouTube"], ["x", "X"], ["whatsapp", "WhatsApp"]];
+function renderSocials(){
+  const wrap = $("#footerSocials");
+  if (!wrap) return;
+  const s = SETTINGS.socials || {};
+  const html = SOCIAL_DEFS.map(([key, label]) => {
+    const u = String(s[key] || "").trim();
+    return u ? `<a class="soc-btn" href="${esc(u)}" target="_blank" rel="noopener" aria-label="${label}">${brandIcon(key)}</a>` : "";
+  }).join("");
+  wrap.innerHTML = html;
+  wrap.hidden = !html;
+}
+
+/* ---------- V2: Header nav (menu_links) + Footer links ----------
+   menu_links khaali hon to header nav = categories (default behaviour).
+   "#id" wali url in-page anchor scroll hai; baaki external link. */
+function navLinkHTML(l){
+  const url = String(l.url || "").trim();
+  const label = esc(l.label || url);
+  if (!url) return "";
+  if (url.startsWith("#")) return `<button type="button" data-menu-anchor="${esc(url.slice(1))}">${label}</button>`;
+  return `<a href="${esc(url)}">${label}</a>`;
+}
+function bindAnchors(root){
+  if (!root) return;
+  root.querySelectorAll("[data-menu-anchor]").forEach(b => b.onclick = () => {
+    const t = document.getElementById(b.dataset.menuAnchor);
+    if (t){ showPage("homeView"); t.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  });
+}
+function renderNav(){
+  const nav = $("#catNav");
+  if (!nav) return;
+  const links = (SETTINGS.menu_links || []).filter(l => l && (l.label || l.url));
+  if (links.length){
+    nav.innerHTML = links.map(navLinkHTML).join("");
+    bindAnchors(nav);
+    return;
+  }
+  const cats = ["All", ...CAT_LIST];
+  nav.innerHTML = cats.map(c => `<button type="button" class="${c === activeCat ? "active" : ""}" data-nav-cat="${esc(c)}">${esc(c)}</button>`).join("");
+  nav.querySelectorAll("[data-nav-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.navCat, maxPrice: null }));
+}
+function renderFooterLinks(){
+  const box = $("#footerHelpLinks");
+  const title = $("#footerHelpTitle");
+  if (!box) return;
+  const links = (SETTINGS.footer_links || []).filter(l => l && (l.label || l.url));
+  if (links.length){
+    if (title) title.textContent = "Quick Links";
+    box.innerHTML = links.map(navLinkHTML).join("");
+    bindAnchors(box);
+  } else {
+    if (title) title.textContent = "Help & Policies";
+    box.innerHTML = DEFAULT_HELP_HTML;
+    bindPolicyButtons(box);
+  }
+}
+
+/* ---------- V2: Homepage sections order + custom sections ---------- */
+const SECTION_NODE_IDS = { hero: "heroSection", trust: "trustSection", categories: "categoriesSection", best_sellers: "bestSection", all_products: "shop", promos: "promoSection", hot: "hotSection", new_arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", how_to_order: "howSection", faq: "faqSection", testimonials: "reviewsSection" };
+const SECTION_DEFAULT_KEYS = Object.keys(SECTION_NODE_IDS);
+function buildCustomSection(def){
+  const sec = document.createElement("section");
+  sec.className = "section wrap custom-section reveal";
+  sec.dataset.customSection = String(def.id);
+  const btn = def.btn_label ? `<a class="btn primary" href="${esc(def.btn_link || "#")}">${esc(def.btn_label)}</a>` : "";
+  sec.innerHTML = `${def.img ? `<div class="custom-media"><img src="${esc(def.img)}" alt="${esc(def.heading || "")}" loading="lazy"></div>` : ""}
+    <div class="custom-body">${def.heading ? `<h2 class="section-title left">${esc(def.heading)}</h2>` : ""}${def.text ? `<p>${esc(def.text)}</p>` : ""}${btn}</div>`;
+  if (def.img) sec.classList.add("has-img");
+  return sec;
+}
+function applySections(){
+  const home = $("#homeView");
+  if (!home) return;
+  /* Purane custom sections hamesha saaf — settings se dobara bante hain. */
+  home.querySelectorAll(".custom-section").forEach(el => el.remove());
+  const order = Array.isArray(SETTINGS.sections_order) && SETTINGS.sections_order.length ? SETTINGS.sections_order : null;
+  if (!order){
+    /* Legacy: settings.sections toggles (hero sirf slides par depend karta hai). */
+    const SECTION_IDS = { best: "bestSection", hot: "hotSection", arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", howto: "howSection", faq: "faqSection", reviews: "reviewsSection", promos: "promoSection" };
+    Object.entries(SECTION_IDS).forEach(([key, id]) => {
+      const el = document.getElementById(id);
+      if (el) el.hidden = SETTINGS.sections[key] === false;
+    });
+    return;
+  }
+  /* sections_order precedence: order + visibility yahi se. Jo key list mein
+     nahi, woh default order ke end par, visible rehti hai. */
+  const seen = new Set();
+  const seq = [];
+  order.forEach(e => {
+    if (typeof e.key !== "string") return;
+    if (e.key.startsWith("custom:")){
+      const def = (SETTINGS.custom_sections || []).find(c => String(c.id) === e.key.slice(7));
+      if (!def) return;
+      const el = buildCustomSection(def);
+      el.hidden = e.visible === false;
+      seq.push(el); seen.add(e.key);
+      return;
+    }
+    const el = document.getElementById(SECTION_NODE_IDS[e.key] || "");
+    if (!el || seen.has(e.key)) return;
+    el.hidden = e.visible === false || (e.key === "hero" && HERO_SLIDES.length === 0);
+    seq.push(el); seen.add(e.key);
+  });
+  SECTION_DEFAULT_KEYS.forEach(k => {
+    if (seen.has(k)) return;
+    const el = document.getElementById(SECTION_NODE_IDS[k]);
+    if (!el) return;
+    el.hidden = k === "hero" && HERO_SLIDES.length === 0;
+    seq.push(el);
+  });
+  seq.forEach(el => home.appendChild(el));
 }
 function setHero(i){
   if (!HERO_SLIDES.length) return;
@@ -285,19 +521,41 @@ async function loadProducts(){
   renderCats(); renderProductSections(); renderGrid(); renderCart();
 }
 function renderCats(){
-  const cats = ["All", ...CAT_LIST];
-  $("#catNav").innerHTML = cats.map(c => `<button type="button" class="${c === activeCat ? "active" : ""}" data-nav-cat="${esc(c)}">${esc(c)}</button>`).join("");
-  $$("[data-nav-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.navCat, maxPrice: null }));
-  $("#catTiles").innerHTML = CAT_LIST.map(c => {
+  renderNav();
+  /* Categories rail: tiles do dafa render hote hain (seamless marquee loop ke
+     liye). setupCatRail tay karta hai ke auto-scroll chale ya manual scroll. */
+  const tiles = CAT_LIST.map(c => {
     const row = CATEGORIES.find(x => x.name === c);
     const p = PRODUCTS.find(x => x.cat === c);
     const tileImg = (row && row.image) || (p ? p.img : "");
     return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${esc(tileImg)}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
   }).join("");
+  $("#catTiles").innerHTML = `<div class="cat-rail">${tiles}${tiles}</div>`;
   $$("[data-tile-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.tileCat, maxPrice: null }));
+  setupCatRail();
   watchReveals();
   $("#footerCats").innerHTML = CAT_LIST.map(c => `<button type="button" data-footer-cat="${esc(c)}">${esc(c)}</button>`).join("");
   $$("[data-footer-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.footerCat, maxPrice: null }));
+}
+/* Categories marquee: content viewport se bara ho AUR animations on hon to
+   auto-scroll; warna duplicate set hata kar purana manual-scroll behaviour.
+   prefers-reduced-motion par bhi auto-scroll nahi chalta. */
+function setupCatRail(){
+  const vp = $("#catTiles");
+  const rail = vp && vp.querySelector(".cat-rail");
+  if (!vp || !rail) return;
+  vp.classList.remove("marquee-on");
+  rail.style.animationDuration = "";
+  const off = SETTINGS.animations === false || REDUCED_MOTION;
+  const half = rail.scrollWidth / 2;
+  if (!off && half > vp.clientWidth + 10){
+    vp.classList.add("marquee-on");
+    rail.style.animationDuration = Math.max(14, Math.round(half / 55)) + "s";
+  } else {
+    /* Marquee nahi — dusra (duplicate) set hata dein. */
+    const tiles = rail.querySelectorAll(".cat-tile");
+    tiles.forEach((t, i) => { if (i >= CAT_LIST.length) t.remove(); });
+  }
 }
 
 /* ---------- Product cards & sections ---------- */
@@ -432,11 +690,8 @@ const FAQS = [
   ["Kya products original aur tested hain?", "Har product dispatch se pehle quality-check aur test kiya jata hai taa ke aapko sahi aur working product mile."]
 ];
 function renderFaq(){
-  $("#faqWrap").innerHTML = FAQS.map(([q,a], i) => `<div class="faq-item ${i === 0 ? "open" : ""}"><button class="faq-q" type="button">${esc(q)}<i>${i === 0 ? "−" : "+"}</i></button><div class="faq-a">${esc(a)}</div></div>`).join("");
-  $$(".faq-item").forEach(item => item.querySelector(".faq-q").onclick = () => {
-    const open = item.classList.toggle("open");
-    item.querySelector(".faq-q i").textContent = open ? "−" : "+";
-  });
+  $("#faqWrap").innerHTML = FAQS.map(([q,a], i) => `<div class="faq-item ${i === 0 ? "open" : ""}"><button class="faq-q" type="button">${esc(q)}${icon("chevron", "faq-caret")}</button><div class="faq-a">${esc(a)}</div></div>`).join("");
+  $$(".faq-item").forEach(item => item.querySelector(".faq-q").onclick = () => item.classList.toggle("open"));
 }
 
 /* ---------- Analytics: visits tracking ----------
@@ -478,6 +733,7 @@ function showPage(id){
   if (id !== "productPage") stopLiveTicker();
   PAGE_IDS.forEach(pid => { document.getElementById(pid).hidden = pid !== id; });
   if (id !== "homeView") window.scrollTo({ top: 0 });
+  if (typeof updatePdpSticky === "function") updatePdpSticky();
   if (PAGE_TRACK[id]) trackPage(PAGE_TRACK[id]);
 }
 function showHome(){ showPage("homeView"); window.scrollTo({ top: 0 }); }
@@ -505,12 +761,36 @@ function openProduct(id){
   $("#pdpPrice").innerHTML = `<strong>${fmt(p.price)}</strong>${save ? `<del>${fmt(p.old)}</del>` : ""}${pill}${isOut ? `<span class="save-pill oos-pill">OUT OF STOCK</span>` : ""}`;
   const pdpAddBtn = $("#pdpAdd"), pdpOrderBtn = $("#pdpOrder");
   pdpAddBtn.disabled = isOut; pdpAddBtn.textContent = isOut ? "OUT OF STOCK" : "ADD TO CART";
-  pdpOrderBtn.disabled = isOut; pdpOrderBtn.textContent = isOut ? "OUT OF STOCK" : "🔒 ORDER NOW";
+  pdpOrderBtn.disabled = isOut; pdpOrderBtn.innerHTML = isOut ? "OUT OF STOCK" : `${icon("lock", "ic-inline")} ORDER NOW`;
   liveSold = (Number(p.id) * 137) % 900 + 120;
   liveVisiting = Math.min(240, Math.max(12, (Number(p.id) * 53) % 40 + 8));
   $("#pdpSold").textContent = liveSold.toLocaleString("en-PK");
   $("#pdpVisiting").textContent = liveVisiting;
-  $("#pdpFee").textContent = delivText(p);
+  $("#pdpFee").innerHTML = `${delivText(p)} <span class="pdp-fee-days">• 2–4 working days</span>`;
+  /* Stock indicator (products.stock field se). */
+  const stockEl = $("#pdpStock");
+  if (stockEl){
+    stockEl.className = "pdp-stock " + (isOut ? "out" : "in");
+    stockEl.innerHTML = `<span class="stock-dot"></span> ${isOut ? "Out of Stock" : "In Stock"}`;
+  }
+  /* Share row: is store ke link ke saath share (SPA hai — store slug wala base link). */
+  const shareUrl = location.origin + location.pathname + "?store=" + encodeURIComponent(STORE_SLUG);
+  const shareText = `${p.name} — ${fmt(p.price)} | ${SETTINGS.store_name}`;
+  const waShare = $("#shareWa"); if (waShare) waShare.href = "https://wa.me/?text=" + encodeURIComponent(shareText + " " + shareUrl);
+  const fbShare = $("#shareFb"); if (fbShare) fbShare.href = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(shareUrl);
+  const copyBtn = $("#shareCopy");
+  if (copyBtn) copyBtn.onclick = async () => {
+    try { await navigator.clipboard.writeText(shareUrl); toast("Product link copy ho gaya"); }
+    catch (e) { toast(shareUrl); }
+  };
+  /* product_fields: values sirf product.custom?.[id] se — na hon to khamoshi se skip. */
+  renderPdpCustomFields(p);
+  /* Mobile sticky buy bar ki values. */
+  const stPrice = $("#pdpStickyPrice"); if (stPrice) stPrice.textContent = fmt(p.price);
+  const stName = $("#pdpStickyName"); if (stName) stName.textContent = p.name;
+  const stAdd = $("#pdpStickyAdd"), stOrder = $("#pdpStickyOrder");
+  if (stAdd) stAdd.disabled = isOut;
+  if (stOrder) stOrder.disabled = isOut;
   $("#pdpQty").textContent = "1";
   $("#pdpEtaText").textContent = `Get it by ${dateText(3)} – ${dateText(4)}`;
   $("#pdpD1").textContent = dateText(0);
@@ -555,6 +835,58 @@ function startLiveTicker(){
 function stopLiveTicker(){
   if (liveTimer){ clearInterval(liveTimer); liveTimer = null; }
 }
+/* product_fields (admin-defined) — product record mein `custom` object ho to
+   usi se values; storage na ho to section chhupa rehta hai (koi error nahi). */
+function renderPdpCustomFields(p){
+  const box = $("#pdpCustomFields");
+  if (!box) return;
+  const fields = Array.isArray(SETTINGS.product_fields) ? SETTINGS.product_fields : [];
+  const custom = p && p.custom && typeof p.custom === "object" ? p.custom : {};
+  const rows = fields.map(f => {
+    const v = custom[f.id];
+    if (v === undefined || v === null || String(v).trim() === "") return "";
+    return `<div class="pdp-field-row"><span>${esc(f.label)}</span><strong>${esc(String(v))}</strong></div>`;
+  }).join("");
+  box.innerHTML = rows;
+  box.hidden = !rows;
+}
+/* ---------- PDP image zoom (desktop hover) + lightbox ---------- */
+(function initPdpZoom(){
+  const wrap = document.querySelector(".pdp-imgwrap");
+  const img = $("#pdpImg");
+  if (!wrap || !img) return;
+  wrap.addEventListener("mousemove", e => {
+    if (!window.matchMedia || !window.matchMedia("(hover: hover)").matches) return;
+    const r = wrap.getBoundingClientRect();
+    img.style.transformOrigin = ((e.clientX - r.left) / r.width * 100) + "% " + ((e.clientY - r.top) / r.height * 100) + "%";
+    img.classList.add("zooming");
+  });
+  wrap.addEventListener("mouseleave", () => img.classList.remove("zooming"));
+  const openLb = () => {
+    const lb = $("#pdpLightbox"), li = $("#pdpLightboxImg");
+    if (!lb || !li || !img.src) return;
+    li.src = img.src; li.alt = img.alt || "";
+    lb.hidden = false;
+  };
+  img.addEventListener("click", openLb);
+  const thumb = $("#pdpThumb");
+  if (thumb) thumb.addEventListener("click", openLb);
+  const closeLb = () => { const lb = $("#pdpLightbox"); if (lb) lb.hidden = true; };
+  const lbEl = $("#pdpLightbox");
+  if (lbEl) lbEl.addEventListener("click", closeLb);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeLb(); });
+})();
+/* ---------- PDP sticky buy bar (mobile) ---------- */
+$("#pdpStickyAdd").onclick = () => { if (pdpId !== null) addToCart(pdpId, pdpQty); };
+$("#pdpStickyOrder").onclick = () => { if (pdpId !== null) buyNow(pdpId, pdpQty); };
+function updatePdpSticky(){
+  const bar = $("#pdpSticky");
+  if (!bar) return;
+  const show = !$("#productPage").hidden && window.scrollY > 560;
+  bar.classList.toggle("show", show);
+}
+window.addEventListener("scroll", updatePdpSticky, { passive: true });
+
 $("#pdpBack").onclick = showHome;
 $("#crumbHome").onclick = showHome;
 $("#pdpCrumbCat").onclick = () => { const p = findP(pdpId); if (p) setFilter({ cat: p.cat, maxPrice: null }); };
@@ -597,7 +929,7 @@ function renderCart(){
   const sub = cartSubtotal();
   const fee = deliveryTotal(entries);
   $("#cpSubtotal").textContent = fmt(sub);
-  $("#cpDelivery").textContent = n === 0 ? "—" : (fee === 0 ? "FREE 🎉" : fmt(fee));
+  $("#cpDelivery").textContent = n === 0 ? "—" : (fee === 0 ? "FREE" : fmt(fee));
   $("#cpTotal").textContent = fmt(sub + fee);
   $("#cpCheckoutBtn").disabled = !n;
 }
@@ -626,7 +958,7 @@ function renderCheckoutSummary(){
   }).join("");
   const { sub, fee, discount, total } = checkoutTotals();
   $("#coSubtotal").textContent = fmt(sub);
-  $("#coDelivery").textContent = fee === 0 ? "FREE 🎉" : fmt(fee);
+  $("#coDelivery").textContent = fee === 0 ? "FREE" : fmt(fee);
   const dRow = $("#coDiscountRow");
   if (dRow){
     dRow.hidden = !(appliedCoupon && discount > 0);
@@ -641,7 +973,7 @@ function renderCouponUI(){
   const applied = $("#couponApplied");
   if (!applied) return;
   applied.hidden = !appliedCoupon;
-  if (appliedCoupon) $("#couponAppliedText").textContent = `${appliedCoupon.code} — ${appliedCoupon.pct}% OFF laga diya gaya hai 🎉`;
+  if (appliedCoupon) $("#couponAppliedText").textContent = `${appliedCoupon.code} — ${appliedCoupon.pct}% OFF laga diya gaya hai`;
   $("#couponInput").disabled = !!appliedCoupon;
   $("#couponApplyBtn").disabled = !!appliedCoupon;
 }
@@ -661,7 +993,7 @@ async function applyCoupon(){
     const pct = row ? Number(row.pct) : NaN;
     if (!Number.isFinite(pct) || pct <= 0) throw new Error("invalid");
     appliedCoupon = { code, pct };
-    msg.textContent = `✅ Coupon ${code} lag gaya — ${pct}% discount!`;
+    msg.textContent = `Coupon ${code} lag gaya — ${pct}% discount!`;
     msg.classList.add("ok");
   } catch (e) {
     appliedCoupon = null;
@@ -681,7 +1013,22 @@ function removeCoupon(){
   renderCouponUI();
   renderCheckoutSummary();
 }
-function showCheckoutPage(){ renderCheckoutSummary(); showPage("checkoutPage"); }
+/* ---------- V2: Checkout custom fields (settings.checkout_fields) ---------- */
+function renderCheckoutFields(){
+  const wrap = $("#coCustomFields");
+  if (!wrap) return;
+  const fields = Array.isArray(SETTINGS.checkout_fields) ? SETTINGS.checkout_fields : [];
+  wrap.innerHTML = fields.map(f => {
+    const req = f.required ? " required" : "";
+    const name = "cf_" + esc(f.id);
+    const label = esc(f.label) + (f.required ? ' <span class="req-star">*</span>' : "");
+    if (f.type === "textarea") return `<label>${label}<textarea name="${name}" rows="2"${req}></textarea><small class="field-err" data-ferr="${esc(f.id)}" hidden>Ye field lazmi hai</small></label>`;
+    if (f.type === "select") return `<label>${label}<select name="${name}"${req}><option value="">— Select karein —</option>${(f.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select><small class="field-err" data-ferr="${esc(f.id)}" hidden>Ye field lazmi hai</small></label>`;
+    return `<label>${label}<input name="${name}" type="${f.type === "number" ? "number" : "text"}"${req}><small class="field-err" data-ferr="${esc(f.id)}" hidden>Ye field lazmi hai</small></label>`;
+  }).join("");
+  wrap.hidden = fields.length === 0;
+}
+function showCheckoutPage(){ renderCheckoutFields(); renderCheckoutSummary(); showPage("checkoutPage"); }
 function buyNow(id, qty){
   if (!findP(id)) return;
   checkoutState = { source: "buynow", entries: [[id, qty]] };
@@ -698,8 +1045,24 @@ $("#checkoutForm").onsubmit = async e => {
   const btn = $("#placeOrderBtn");
   const err = $("#checkoutError");
   err.textContent = "";
-  btn.disabled = true; btn.textContent = "Order save ho raha hai…";
   const f = new FormData(e.target);
+  /* Custom fields: required wale khaali hon to inline error + submit rokein. */
+  const coFields = Array.isArray(SETTINGS.checkout_fields) ? SETTINGS.checkout_fields : [];
+  let firstMissing = null;
+  coFields.forEach(cf => {
+    const msg = document.querySelector(`[data-ferr="${CSS.escape(cf.id)}"]`);
+    const val = String(f.get("cf_" + cf.id) || "").trim();
+    const bad = cf.required && !val;
+    if (msg) msg.hidden = !bad;
+    if (bad && !firstMissing) firstMissing = cf;
+  });
+  if (firstMissing){
+    err.textContent = `"${firstMissing.label}" lazmi hai — pehle ye field bharein.`;
+    const inp = e.target.querySelector(`[name="cf_${CSS.escape(firstMissing.id)}"]`);
+    if (inp) inp.focus();
+    return;
+  }
+  btn.disabled = true; btn.textContent = "Order save ho raha hai…";
   const { total, discount } = checkoutTotals();
   const lines = checkoutState.entries.map(([id,q]) => {
     const p = findP(id);
@@ -707,8 +1070,11 @@ $("#checkoutForm").onsubmit = async e => {
   });
   /* items jsonb ab ek object hai: { lines, coupon, discount } — line items ke
      saath coupon meta bhi save hota hai. Purane orders plain array thay;
-     admin dono shapes ko parh leta hai. */
+     admin dono shapes ko parh leta hai. Custom checkout fields ki values
+     custom_fields: [{label, value}] mein jati hain (shape break nahi hota). */
   const items = { lines, coupon: appliedCoupon ? appliedCoupon.code : null, discount };
+  if (coFields.length)
+    items.custom_fields = coFields.map(cf => ({ label: cf.label, value: String(f.get("cf_" + cf.id) || "").trim() })).filter(x => x.value !== "");
   const orderRow = {
     customer_name: String(f.get("name") || "").trim(),
     phone: String(f.get("phone") || "").trim(),
@@ -718,7 +1084,7 @@ $("#checkoutForm").onsubmit = async e => {
   };
   if (STORE_ID) orderRow.store_id = STORE_ID;
   const { error } = await sb.from("orders").insert(orderRow);
-  btn.disabled = false; btn.textContent = "✅ ORDER PLACE KAREIN";
+  btn.disabled = false; btn.innerHTML = `${icon("check", "ic-inline")} ORDER PLACE KAREIN`;
   if (error){
     console.error(error);
     err.textContent = "Order save nahi ho saka — internet check karke dobara try karein.";
@@ -765,21 +1131,24 @@ const POLICIES = {
   privacy: ["Privacy Policy", "<p>Aapka naam, phone number, city aur address sirf order processing aur delivery ke liye istemal hota hai. Hum aapki maloomat kisi irrelevant third party ko nahi bechte.</p>"],
   terms: ["Terms of Service", "<p>Order place karke aap product details, price aur delivery terms se ittefaq karte hain. Confirmation call par order verify hone ke baad hi parcel dispatch kiya jata hai.</p><p>Prices aur stock baghair notice change ho sakte hain.</p>"]
 };
-$$("[data-policy]").forEach(b => b.onclick = () => {
-  const key = b.dataset.policy;
-  const p = POLICIES[key]; if (!p) return;
-  $("#policyTitle").textContent = p[0];
-  /* Admin Settings mein policy text likha ho to wohi; warna built-in default. */
-  const custom = SETTINGS.policies && SETTINGS.policies[key];
-  $("#policyBody").innerHTML = (typeof custom === "string" && custom.trim()) ? descHtml(custom) : p[1];
-  $("#policyModal").classList.add("open");
-});
+function bindPolicyButtons(root){
+  (root || document).querySelectorAll("[data-policy]").forEach(b => b.onclick = () => {
+    const key = b.dataset.policy;
+    const p = POLICIES[key]; if (!p) return;
+    $("#policyTitle").textContent = p[0];
+    /* Admin Settings mein policy text likha ho to wohi; warna built-in default. */
+    const custom = SETTINGS.policies && SETTINGS.policies[key];
+    $("#policyBody").innerHTML = (typeof custom === "string" && custom.trim()) ? descHtml(custom) : p[1];
+    $("#policyModal").classList.add("open");
+  });
+}
+bindPolicyButtons(document);
 $$("[data-close]").forEach(b => b.onclick = () => $("#policyModal").classList.remove("open"));
 $("#policyModal").addEventListener("click", e => { if (e.target.id === "policyModal") e.currentTarget.classList.remove("open"); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") $("#policyModal").classList.remove("open"); });
 $("#subForm").onsubmit = e => {
   e.preventDefault();
-  $("#subMsg").textContent = "✅ Shukriya! Aap subscribe ho gaye hain.";
+  $("#subMsg").innerHTML = `${icon("check", "ic-inline")} Shukriya! Aap subscribe ho gaye hain.`;
   e.target.reset();
 };
 $("#backTop").onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -891,6 +1260,11 @@ async function boot(){
   loadSettings();
   loadProducts();
 }
+
+/* Footer ki default "Help & Policies" column ka HTML — footer_links (V2) set
+   hon to renderFooterLinks isay Quick Links se badal deta hai, aur khaali hon
+   to yehi wapis lagta hai. Pehli applySettings() se pehle capture lazmi hai. */
+const DEFAULT_HELP_HTML = $("#footerHelpLinks") ? $("#footerHelpLinks").innerHTML : "";
 
 applySettings();
 renderFaq();

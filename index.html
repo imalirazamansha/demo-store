@@ -12,11 +12,54 @@
 </head>
 <body>
 
+<!-- ===== SVG ICON SPRITE (UI stroke icons + brand icons) =====
+     Stroke icons: <symbol id="i-*"> (feather-style, currentColor).
+     Brand icons:  <symbol id="b-*"> (fill currentColor).
+     JS icon()/brandIcon() helpers bhi yahi symbols use karte hain. -->
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></g></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></g></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></symbol>
+    <symbol id="i-bag" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></g></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></g></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11.5 11 13.5 15 9.5"/></g></symbol>
+    <symbol id="i-cash" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></g></symbol>
+    <symbol id="i-returns" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></g></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></g></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><polygon fill="currentColor" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></g></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></g></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></g></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></g></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></g></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></g></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></g></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></g></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></g></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></g></symbol>
+    <symbol id="i-package" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></g></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></g></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></g></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></g></symbol>
+    <!-- Brand icons (fill) -->
+    <symbol id="b-facebook" viewBox="0 0 24 24"><path fill="currentColor" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></symbol>
+    <symbol id="b-instagram" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></g></symbol>
+    <symbol id="b-tiktok" viewBox="0 0 24 24"><path fill="currentColor" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></symbol>
+    <symbol id="b-youtube" viewBox="0 0 24 24"><path fill="currentColor" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></symbol>
+    <symbol id="b-x" viewBox="0 0 24 24"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></symbol>
+    <symbol id="b-whatsapp" viewBox="0 0 24 24"><path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></symbol>
+  </defs>
+</svg>
+
 <!-- Multi-tenant notice: store suspended / na milne par sirf ye nazar aata hai
      (body.store-closed baaki saara page chhupa deta hai). -->
 <div class="store-notice" id="storeNotice" hidden>
   <div class="store-notice-card">
-    <div class="store-notice-icon">🛍️</div>
+    <div class="store-notice-icon"><svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg></div>
     <h1 id="noticeTitle">Store</h1>
     <p id="noticeText"></p>
   </div>
@@ -26,11 +69,10 @@
 
 <header class="site-header">
   <div class="header-pill">
-    <button class="icon-btn" id="searchToggle" type="button" aria-label="Search products">⌕</button>
-    <a class="logo" href="#" id="logoHome" aria-label="Store home"><img id="logoImg" class="logo-img" alt="" hidden><span class="logo-bag">🛍️</span><span id="logoName">ShopNest</span></a>
+    <button class="icon-btn" id="searchToggle" type="button" aria-label="Search products"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></button>
+    <a class="logo" href="#" id="logoHome" aria-label="Store home"><img id="logoImg" class="logo-img" alt="" hidden><span class="logo-bag"><svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg></span><span id="logoName">ShopNest</span></a>
     <div class="header-actions">
-      <a class="icon-btn account-btn" href="admin.html" aria-label="Admin account">👤</a>
-      <button class="icon-btn cart-icon" id="cartBtn" type="button" aria-label="Open cart">🛒<span class="cart-count" id="cartCount">0</span></button>
+      <button class="icon-btn cart-icon" id="cartBtn" type="button" aria-label="Open cart"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg><span class="cart-count" id="cartCount">0</span></button>
     </div>
   </div>
   <div class="search-bar" id="searchBar" hidden>
@@ -41,27 +83,27 @@
 </header>
 
 <div id="homeView">
-  <section class="hero-slider" id="heroSection" aria-label="Featured offers">
+  <section class="hero-slider" id="heroSection" data-section="hero" aria-label="Featured offers">
     <div class="hero-track" id="heroTrack"></div>
     <div class="hero-dots" id="heroDots"></div>
   </section>
 
-  <section class="trust-strip" aria-label="Store benefits">
+  <section class="trust-strip" id="trustSection" data-section="trust" aria-label="Store benefits">
     <div class="trust-grid">
-      <div><strong>💵 CASH ON DELIVERY</strong><span>Pay when it arrives</span></div>
-      <div><strong>🚚 FAST DELIVERY</strong><span>3–5 days, all Pakistan</span></div>
-      <div><strong>✅ QUALITY CHECKED</strong><span>Tested before dispatch</span></div>
-      <div><strong>🔁 EASY EXCHANGE</strong><span>On damaged items</span></div>
+      <div><svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg><strong>CASH ON DELIVERY</strong><span>Pay when it arrives</span></div>
+      <div><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg><strong>FAST DELIVERY</strong><span>3–5 days, all Pakistan</span></div>
+      <div><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg><strong>QUALITY CHECKED</strong><span>Tested before dispatch</span></div>
+      <div><svg class="ic" aria-hidden="true"><use href="#i-returns"/></svg><strong>EASY EXCHANGE</strong><span>On damaged items</span></div>
     </div>
   </section>
 
-  <section class="section wrap" id="categoriesSection">
+  <section class="section wrap" id="categoriesSection" data-section="categories">
     <p class="eyebrow">Apni Pasand Chunein</p>
     <h2 class="section-title">SHOP BY CATEGORY</h2>
     <div class="cat-track" id="catTiles"></div>
   </section>
 
-  <section class="section section-alt" id="bestSection">
+  <section class="section section-alt" id="bestSection" data-section="best_sellers">
     <div class="wrap">
       <p class="eyebrow">SAB SE ZYADA ORDER HONE WALE PRODUCTS</p>
       <h2 class="section-title">BEST SELLERS</h2>
@@ -70,7 +112,7 @@
     </div>
   </section>
 
-  <main class="section wrap" id="shop">
+  <main class="section wrap" id="shop" data-section="all_products">
     <div class="shop-heading">
       <div><p class="eyebrow">Complete Collection</p><h2 class="section-title left" id="shopTitle">ALL PRODUCTS</h2></div>
       <p class="results" id="resultsText">Loading products…</p>
@@ -88,12 +130,12 @@
     </div>
     <div class="grid" id="grid"></div>
     <p class="empty" id="emptyMsg" hidden>No products found. Search, category ya budget filter change karke dobara dekhein.</p>
-    <p class="empty error" id="loadError" hidden>⚠️ Products load nahi ho sakay. Internet check karke page refresh karein.</p>
+    <p class="empty error" id="loadError" hidden><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Products load nahi ho sakay. Internet check karke page refresh karein.</p>
   </main>
 
-  <section class="section wrap" id="promoSection"><div class="promo-grid" id="promoGrid"></div></section>
+  <section class="section wrap" id="promoSection" data-section="promos"><div class="promo-grid" id="promoGrid"></div></section>
 
-  <section class="section section-alt" id="hotSection">
+  <section class="section section-alt" id="hotSection" data-section="hot">
     <div class="wrap">
       <div class="section-head-row">
         <div><p class="eyebrow">Trending Now</p><h2 class="section-title left">HOT SELLING THIS WEEK</h2></div>
@@ -101,18 +143,18 @@
       </div>
       <div class="h-track" id="hotTrack"></div>
       <div class="center-action"><button class="btn primary wide" id="hotOrderBtn" type="button">ORDER NOW</button></div>
-      <p class="trust-checklist">⚡ SMART PRODUCTS &nbsp; ✔ QUALITY CHECKED &nbsp; 💵 CASH ON DELIVERY &nbsp; 🚚 FAST DELIVERY &nbsp; 🔁 EASY EXCHANGE</p>
+      <p class="trust-checklist"><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg> SMART PRODUCTS &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> QUALITY CHECKED &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg> CASH ON DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> FAST DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-returns"/></svg> EASY EXCHANGE</p>
     </div>
   </section>
 
-  <section class="section wrap" id="newSection">
+  <section class="section wrap" id="newSection" data-section="new_arrivals">
     <p class="eyebrow">JUST LAUNCHED</p>
     <h2 class="section-title">NEW ARRIVALS</h2>
     <div class="grid" id="newGrid"></div>
     <div class="center-action"><button class="btn outline wide" id="viewNewBtn" type="button">VIEW ALL NEW ARRIVALS</button></div>
   </section>
 
-  <section class="section deals-section" id="dealsSection">
+  <section class="section deals-section" id="dealsSection" data-section="deals">
     <div class="wrap">
       <p class="eyebrow light">LIMITED TIME</p>
       <h2 class="section-title light">MEGA DEALS — HAR GHAR KI ZAROORAT</h2>
@@ -121,26 +163,27 @@
     </div>
   </section>
 
-  <section class="section wrap" id="budgetSection">
+  <section class="section wrap" id="budgetSection" data-section="budget">
     <p class="eyebrow">Har Budget Ke Liye</p>
     <h2 class="section-title">SHOP BY BUDGET</h2>
     <div class="budget-grid">
       <button class="budget-tile" type="button" data-budget="1499"><span>UNDER</span><strong>Rs.1,499</strong><small>Choti price, smart choice</small></button>
       <button class="budget-tile" type="button" data-budget="1999"><span>UNDER</span><strong>Rs.1,999</strong><small>Roz-marra ki essentials</small></button>
       <button class="budget-tile" type="button" data-budget="2999"><span>UNDER</span><strong>Rs.2,999</strong><small>Value picks, zyada faida</small></button>
-      <button class="budget-tile top-pick" type="button" data-budget="top"><span>★ TOP PICKS</span><strong>HIGHEST RATED</strong><small>Customers ki pehli pasand</small></button>
+      <button class="budget-tile top-pick" type="button" data-budget="top"><span><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg> TOP PICKS</span><strong>HIGHEST RATED</strong><small>Customers ki pehli pasand</small></button>
     </div>
   </section>
 
-  <section class="section section-alt" id="aboutSection">
+  <section class="section section-alt" id="aboutSection" data-section="about">
     <div class="wrap about-grid">
       <div><p class="eyebrow">ABOUT</p><h2 class="section-title left" id="aboutHeading">PAKISTAN KA SMART STORE</h2><p class="about-text" id="aboutText"></p></div>
-      <div class="about-checks"><div>✅ <strong>Quality Checked</strong><span>Har product dispatch se pehle test hota hai.</span></div><div>💵 <strong>Cash on Delivery</strong><span>Payment product milne ke baad.</span></div><div>🚚 <strong>Fast Dispatch</strong><span>Poore Pakistan mein jaldi delivery.</span></div></div>
+      <div class="about-checks"><div><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg> <strong>Quality Checked</strong><span>Har product dispatch se pehle test hota hai.</span></div><div><svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg> <strong>Cash on Delivery</strong><span>Payment product milne ke baad.</span></div><div><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> <strong>Fast Dispatch</strong><span>Poore Pakistan mein jaldi delivery.</span></div></div>
     </div>
   </section>
 
-  <section class="section wrap" id="howSection">
-    <p class="eyebrow">Asaan Tareeqa</p><h2 class="section-title">HOW TO ORDER</h2>
+  <section class="section wrap" id="howSection" data-section="how_to_order">
+    <p class="eyebrow">Asaan Tareeqa</p>
+    <h2 class="section-title">HOW TO ORDER</h2>
     <div class="steps-grid">
       <div><span>01</span><h3>PRODUCT CHUNEIN</h3><p>Apni pasand ka product select karein aur details achi tarah parhein.</p></div>
       <div><span>02</span><h3>ORDER FORM BHAREIN</h3><p>Naam, mobile number, city aur mukammal address likhein.</p></div>
@@ -149,11 +192,11 @@
     </div>
   </section>
 
-  <section class="section section-alt" id="faqSection">
+  <section class="section section-alt" id="faqSection" data-section="faq">
     <div class="wrap narrow"><p class="eyebrow">Aksar Sawalat</p><h2 class="section-title">FAQ</h2><div id="faqWrap"></div></div>
   </section>
 
-  <section class="section wrap" id="reviewsSection">
+  <section class="section wrap" id="reviewsSection" data-section="testimonials">
     <div class="section-head-row"><div><p class="eyebrow">Customer Love</p><h2 class="section-title left">HAPPY CUSTOMERS</h2></div><div class="carousel-arrows"><button class="arrow-btn" id="revPrev" type="button" aria-label="Previous reviews">‹</button><button class="arrow-btn" id="revNext" type="button" aria-label="Next reviews">›</button></div></div>
     <div class="review-track" id="reviewTrack"></div>
   </section>
@@ -164,38 +207,51 @@
   <button class="back-btn" id="pdpBack" type="button">← Back to Shop</button>
   <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" id="crumbHome">Home</button><span>›</span><button type="button" id="pdpCrumbCat">Category</button><span>›</span><strong id="pdpCrumbName">Product</strong></nav>
   <div class="pdp-grid">
-    <div class="pdp-media"><img id="pdpImg" alt=""><div class="pdp-thumbs"><img id="pdpThumb" alt=""></div></div>
+    <div class="pdp-media"><div class="pdp-imgwrap"><img id="pdpImg" alt=""></div><div class="pdp-thumbs"><img id="pdpThumb" alt=""></div></div>
     <div class="pdp-info">
-      <p class="verified-line">✓ Verified Brand <span>|</span> 100,000+ Happy Customers</p>
+      <p class="verified-line"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Verified Brand <span>|</span> 100,000+ Happy Customers</p>
       <h1 id="pdpTitle">Product</h1>
       <p class="pdp-rating" id="pdpRating"></p>
       <div class="pdp-price" id="pdpPrice"></div>
-      <p class="live-line"><span class="live-dot"></span> LIVE / <strong id="pdpSold">0</strong> items sold &nbsp; • &nbsp; 👁 <strong id="pdpVisiting">0</strong> people visiting now</p>
+      <p class="live-line"><span class="live-dot"></span> LIVE / <strong id="pdpSold">0</strong> items sold &nbsp; • &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg> <strong id="pdpVisiting">0</strong> people visiting now</p>
       <p class="pdp-fee" id="pdpFee"></p>
+      <p class="pdp-stock" id="pdpStock"></p>
       <div class="qty-row"><span>Quantity</span><button class="qty-btn" id="pdpMinus" type="button">−</button><strong id="pdpQty">1</strong><button class="qty-btn" id="pdpPlus" type="button">+</button></div>
       <button class="btn outline big" id="pdpAdd" type="button">ADD TO CART</button>
-      <button class="btn primary big" id="pdpOrder" type="button">🔒 ORDER NOW</button>
+      <button class="btn primary big" id="pdpOrder" type="button"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> ORDER NOW</button>
       <div class="delivery-widget">
         <p><strong id="pdpEtaText">Get it by —</strong><span>Delivery estimate</span></p>
         <div class="delivery-track"><i class="done"></i><i class="done mid"></i><i></i></div>
         <div class="delivery-dates"><span>Ordered<br><strong id="pdpD1">—</strong></span><span>Shipped<br><strong id="pdpD2">—</strong></span><span>Delivered<br><strong id="pdpD3">—</strong></span></div>
       </div>
-      <div class="pdp-trust"><div>💵<strong>COD</strong><span>Cash on Delivery</span></div><div>🔒<strong>SECURE PAYMENT</strong><span>Safe & protected</span></div><div>🚚<strong>FAST DELIVERY</strong><span>3–5 days</span></div><div>🔁<strong>EASY EXCHANGE</strong><span>Damaged items</span></div></div>
+      <div class="pdp-trust"><div><svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg><strong>COD</strong><span>Cash on Delivery</span></div><div><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><strong>SECURE PAYMENT</strong><span>Safe & protected</span></div><div><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg><strong>FAST DELIVERY</strong><span>3–5 days</span></div><div><svg class="ic" aria-hidden="true"><use href="#i-returns"/></svg><strong>EASY EXCHANGE</strong><span>Damaged items</span></div></div>
+      <div class="share-row"><span class="share-label"><svg class="ic" aria-hidden="true"><use href="#i-share"/></svg> Share</span><a class="share-btn" id="shareWa" href="#" target="_blank" rel="noopener" aria-label="Share on WhatsApp"><svg class="ic" aria-hidden="true"><use href="#b-whatsapp"/></svg></a><a class="share-btn" id="shareFb" href="#" target="_blank" rel="noopener" aria-label="Share on Facebook"><svg class="ic" aria-hidden="true"><use href="#b-facebook"/></svg></a><button class="share-btn" id="shareCopy" type="button" aria-label="Copy product link"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button></div>
     </div>
   </div>
   <section class="pdp-details">
     <h2 class="section-title left">PRODUCT DETAILS</h2>
     <div class="pdp-details-body" id="pdpDesc"></div>
+    <div class="pdp-fields" id="pdpCustomFields" hidden></div>
   </section>
   <div class="related"><h2 class="section-title left">YOU MIGHT ALSO LIKE</h2><div class="grid related-grid" id="relatedWrap"></div></div>
 </section>
+
+<!-- PDP sticky buy bar (mobile) — buy box se aagay scroll karne par nazar aata hai -->
+<div class="pdp-sticky" id="pdpSticky">
+  <div class="pdp-sticky-info"><strong id="pdpStickyPrice">Rs.0</strong><span id="pdpStickyName">Product</span></div>
+  <button class="btn outline" id="pdpStickyAdd" type="button">ADD TO CART</button>
+  <button class="btn primary" id="pdpStickyOrder" type="button">BUY NOW</button>
+</div>
+
+<!-- PDP image lightbox -->
+<div class="pdp-lightbox" id="pdpLightbox" hidden><img id="pdpLightboxImg" alt=""><button class="icon-btn lightbox-x" id="pdpLightboxClose" type="button" aria-label="Close image"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button></div>
 
 <!-- CART PAGE -->
 <section id="cartPage" class="page wrap" hidden>
   <button class="back-btn" id="backFromCart" type="button">← Shopping jaari rakhein</button>
   <h1 class="page-title">SHOPPING CART</h1>
   <div class="cart-layout">
-    <div><div id="cartRows"></div><p class="empty" id="cartEmptyMsg" hidden>🛒 Your cart is empty. Kuch pasand karein aur shopping shuru karein!</p></div>
+    <div><div id="cartRows"></div><p class="empty" id="cartEmptyMsg" hidden><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg> Your cart is empty. Kuch pasand karein aur shopping shuru karein!</p></div>
     <aside class="summary-card">
       <h2>ORDER SUMMARY</h2>
       <div class="summary-row"><span>Subtotal</span><strong id="cpSubtotal">Rs.0</strong></div>
@@ -212,23 +268,29 @@
   <button class="back-btn" id="backToShop" type="button">← Shopping jaari rakhein</button>
   <h1 class="page-title">CHECKOUT</h1>
   <p class="page-intro">Apni details dein — hum call karke order confirm karein ge. Payment Cash on Delivery hai: pehle product, phir payment.</p>
+  <div class="co-steps" aria-hidden="true">
+    <div class="co-step done"><span><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span>Cart</div><div class="co-line done"></div>
+    <div class="co-step active"><span>2</span>Details</div><div class="co-line"></div>
+    <div class="co-step"><span>3</span>Done</div>
+  </div>
   <div class="co-grid">
     <form id="checkoutForm" class="co-box">
-      <h2>📦 Delivery Details</h2>
+      <h2><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> Delivery Details</h2>
       <label>Full name<input required name="name" placeholder="e.g. Ali Raza" autocomplete="name"></label>
       <label>Mobile number<input required name="phone" placeholder="03XX-XXXXXXX" pattern="[0-9+\- ]{10,15}" autocomplete="tel"></label>
       <label>City<input required name="city" placeholder="e.g. Lahore" autocomplete="address-level2"></label>
       <label>Complete address<textarea required name="address" rows="2" placeholder="House, street, area" autocomplete="street-address"></textarea></label>
+      <div class="co-custom-fields" id="coCustomFields" hidden></div>
       <fieldset class="payment-box"><legend>Payment Method</legend>
         <label class="radio-row"><input type="radio" name="pay" value="cod" checked> <span><strong>Cash on Delivery (COD)</strong><small>Product milne par payment karein.</small></span></label>
         <label class="radio-row disabled"><input type="radio" name="pay" value="advance" disabled> <span><strong>Pay Advance Payment</strong><small>Jald aa raha hai</small></span></label>
       </fieldset>
-      <button class="btn primary big" type="submit" id="placeOrderBtn">✅ ORDER PLACE KAREIN</button>
+      <button class="btn primary big" type="submit" id="placeOrderBtn"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> ORDER PLACE KAREIN</button>
       <p class="form-error" id="checkoutError"></p>
-      <p class="muted center">🔒 Aapki details sirf delivery ke liye istemal hongi.</p>
+      <p class="muted center"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Aapki details sirf delivery ke liye istemal hongi.</p>
     </form>
     <aside class="co-box summary-panel">
-      <h2>🧾 Order Summary</h2>
+      <h2><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg> Order Summary</h2>
       <div id="coItems"></div>
       <div class="coupon-box">
         <div class="coupon-row">
@@ -236,13 +298,13 @@
           <button class="btn outline small" id="couponApplyBtn" type="button">APPLY</button>
         </div>
         <p class="coupon-msg" id="couponMsg"></p>
-        <p class="coupon-applied" id="couponApplied" hidden>🎟️ <span id="couponAppliedText"></span> <button type="button" id="couponRemoveBtn" class="remove-link">Remove</button></p>
+        <p class="coupon-applied" id="couponApplied" hidden><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg> <span id="couponAppliedText"></span> <button type="button" id="couponRemoveBtn" class="remove-link">Remove</button></p>
       </div>
       <div class="co-row"><span>Subtotal</span><strong id="coSubtotal">Rs.0</strong></div>
       <div class="co-row"><span>Delivery</span><strong id="coDelivery">—</strong></div>
       <div class="co-row discount" id="coDiscountRow" hidden><span>Discount (<span id="coCouponCode"></span>)</span><strong id="coDiscount">−Rs.0</strong></div>
       <div class="co-row total"><span>Total (Cash on Delivery)</span><strong id="coTotal">Rs.0</strong></div>
-      <p class="co-note">✅ Har product dispatch se pehle quality-check hota hai. Order confirm karne ke liye humari call aayegi.</p>
+      <p class="co-note"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Har product dispatch se pehle quality-check hota hai. Order confirm karne ke liye humari call aayegi.</p>
     </aside>
   </div>
 </section>
@@ -250,27 +312,26 @@
 <!-- SUCCESS PAGE -->
 <section id="successPage" class="page wrap" hidden>
   <div class="success-box">
-    <div class="success-icon">✅</div>
+    <div class="success-icon"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg></div>
     <h1>Order mil gaya!</h1>
     <p id="successText">Shukriya! Aapka order save ho gaya hai.</p>
     <p class="order-id" id="successOrderId"></p>
-    <p>Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai — pehle product, phir payment. 💵</p>
-    <button class="btn primary big" id="continueBtn" type="button">🛒 SHOPPING JAARI RAKHEIN</button>
+    <p>Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai — pehle product, phir payment.</p>
+    <button class="btn primary big" id="continueBtn" type="button"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg> SHOPPING JAARI RAKHEIN</button>
   </div>
 </section>
 
 <div class="footer-wave" aria-hidden="true"><svg viewBox="0 0 1440 90" preserveAspectRatio="none"><path d="M0,48 C240,90 420,5 720,38 C1020,70 1200,18 1440,52 L1440,90 L0,90 Z"></path></svg></div>
 <footer class="footer">
   <div class="footer-in">
-    <div><p class="footer-logo">🛍️ <span id="footerLogoName">ShopNest</span></p><p class="footer-about" id="footerAbout"></p></div>
+    <div><p class="footer-logo"><img id="footerLogoImg" class="footer-logo-img" alt="" hidden><span class="logo-bag" id="footerBagIcon"><svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg></span><span id="footerLogoName">ShopNest</span></p><p class="footer-about" id="footerAbout"></p><div class="footer-socials" id="footerSocials" hidden></div></div>
     <div><h3>Categories</h3><div class="footer-links" id="footerCats"></div></div>
-    <div><h3>Help & Policies</h3><div class="footer-links">
+    <div><h3 id="footerHelpTitle">Help &amp; Policies</h3><div class="footer-links" id="footerHelpLinks">
       <button type="button" data-policy="contact">Contact Us</button>
       <button type="button" data-policy="shipping">Shipping Policy</button>
       <button type="button" data-policy="refund">Refund Policy</button>
       <button type="button" data-policy="privacy">Privacy Policy</button>
       <button type="button" data-policy="terms">Terms of Service</button>
-      <a href="admin.html">Store Admin →</a>
     </div></div>
     <div><h3>Let's Get In Touch</h3><div class="footer-contact" id="footerContact" hidden></div><p>New deals aur smart products ki updates sab se pehle paayein.</p><form class="subscribe" id="subForm"><input type="email" id="subEmail" placeholder="Your email address" required><button class="btn primary" type="submit">SUBSCRIBE</button></form><p class="sub-msg" id="subMsg"></p></div>
   </div>
@@ -278,11 +339,11 @@
 </footer>
 
 <div class="float-stack">
-  <a class="float-btn whatsapp" id="waFloat" href="#" target="_blank" rel="noopener" aria-label="WhatsApp" hidden>✆</a>
-  <button class="float-btn back-top" id="backTop" type="button" aria-label="Back to top">↑</button>
+  <a class="float-btn whatsapp" id="waFloat" href="#" target="_blank" rel="noopener" aria-label="WhatsApp" hidden><svg class="ic" aria-hidden="true"><use href="#b-whatsapp"/></svg></a>
+  <button class="float-btn back-top" id="backTop" type="button" aria-label="Back to top"><svg class="ic" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
 </div>
 
-<div class="modal" id="policyModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" data-close type="button" aria-label="Close">✕</button><h2 id="policyTitle">Policy</h2><div class="policy-body" id="policyBody"></div></div></div>
+<div class="modal" id="policyModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" data-close type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><h2 id="policyTitle">Policy</h2><div class="policy-body" id="policyBody"></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
