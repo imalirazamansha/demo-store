@@ -21,7 +21,7 @@ button{font-family:inherit;cursor:pointer} input,select,textarea{font-family:inh
 img{display:block;max-width:100%} a{color:inherit}
 .wrap{max-width:1180px;margin:0 auto;padding-left:16px;padding-right:16px}
 .grid>*,.cart-layout>*,.co-grid>*,.pdp-grid>*{min-width:0}
-.section{padding:52px 0}.section-alt{background:var(--soft)}
+.section{padding-top:52px;padding-bottom:52px}.section-alt{background:var(--soft)}
 .eyebrow{color:var(--green-dark);font-size:clamp(11px,2.8vw,12.5px);font-weight:900;letter-spacing:.16em;text-transform:uppercase;text-align:center;margin-bottom:8px;overflow-wrap:break-word}
 .eyebrow.light{color:#a7f3d0}.eyebrow.left,.section-title.left{text-align:left}
 .section-title{color:var(--navy);font-size:clamp(26px,5.2vw,42px);line-height:1.08;text-align:center;text-transform:uppercase;margin-bottom:26px;overflow-wrap:break-word}
@@ -202,7 +202,7 @@ body.anim .reveal.in{opacity:1;transform:none}
   .promo-grid,.about-grid,.co-grid,.cart-layout,.pdp-grid{grid-template-columns:1fr}.pdp-imgwrap>img{height:330px}.summary-card,.summary-panel{position:static}.related-grid{grid-template-columns:repeat(2,1fr)}
   .section-head-row{flex-wrap:wrap}.section-head-row .section-title{text-align:left}.carousel-arrows{padding-bottom:14px}
   .cart-layout>*,.co-grid>*{min-width:0}.pdp-details{padding:21px 17px;margin-top:28px}.pdp-trust{grid-template-columns:repeat(2,1fr)}
-  .section{padding:38px 0}.results{padding-bottom:0}.shop-heading{align-items:start;flex-direction:column}.shop-heading .section-title{margin-bottom:4px}
+  .section{padding-top:38px;padding-bottom:38px}.results{padding-bottom:0}.shop-heading{align-items:start;flex-direction:column}.shop-heading .section-title{margin-bottom:4px}
 }
 @media(max-width:520px){.header-pill{padding:6px}.logo{font-size:20px}.icon-btn{width:38px;height:38px}.catnav button{font-size:11px}.budget-grid,.steps-grid{grid-template-columns:1fr}.footer-in{grid-template-columns:1fr}.cart-row{grid-template-columns:70px 1fr}.cart-row img{width:70px;height:70px}.line-total{grid-column:2}.h-track .card{min-width:215px;max-width:215px}.review-card{min-width:278px;max-width:278px}.subscribe{flex-direction:column;border-radius:16px}.subscribe .btn{width:100%}}
 
@@ -419,7 +419,7 @@ body.layout-button-sharp .mini-btn{border-radius:4px}
 body.layout-button-rounded{--btn-radius:14px}
 body.layout-button-rounded .mini-btn{border-radius:14px}
 /* --- FASHION: serif uppercase headings + bara section padding, centered footer, gold pill buttons, editorial promos --- */
-body.layout-heading-serif-upper .section{padding:72px 0}
+body.layout-heading-serif-upper .section{padding-top:72px;padding-bottom:72px}
 body.layout-heading-serif-upper .section-title, body.layout-heading-serif-upper .page-title{letter-spacing:.14em;font-family:var(--font-head,'Playfair Display',Georgia,serif)}
 body.layout-footer-centered .footer-in{display:flex;flex-direction:column;align-items:center;text-align:center;gap:20px}
 body.layout-footer-centered .footer-links{align-items:center}
@@ -428,7 +428,7 @@ body.layout-footer-centered .footer-logo{justify-content:center}
 body.layout-button-pill-gold .btn.primary{background:var(--btn-primary-bg,linear-gradient(135deg,#8a6d1b,#C9A227));box-shadow:0 8px 20px rgba(201,162,39,.35)}
 body.layout-hero-editorial .promo-card{min-height:300px;padding:36px}
 body.layout-hero-editorial .promo-card h3{font-size:36px}
-@media(max-width:760px){body.layout-heading-serif-upper .section{padding:52px 0}}
+@media(max-width:760px){body.layout-heading-serif-upper .section{padding-top:52px;padding-bottom:52px}}
 /* --- BEAUTY: soft normal-case headings, fully-rounded pink-shadow cards, solid pink pill buttons, alternate pink/white sections, tinted footer, bare pills, pink-border reviews --- */
 body.layout-heading-soft .section-title, body.layout-heading-soft .page-title{text-transform:none;letter-spacing:.01em;font-weight:700}
 body.layout-heading-soft .card{border-radius:var(--card-radius,28px);box-shadow:var(--card-shadow,0 18px 40px rgba(190,24,93,.12))}
@@ -565,4 +565,57 @@ body[style*="--btn-radius"] .mini-btn{border-radius:var(--btn-radius)}
 /* --- Grid children kabhi overflow ka sabab na banein (min-width:0 guards) --- */
 @media(max-width:760px){
   .grid>*,.related-grid>*,.promo-grid>*,.about-grid>*,.pdp-grid>*,.budget-grid>*,.steps-grid>*,.trust-grid>*{min-width:0}
+}
+
+/* ================= V3.4: recording feedback fixes =================
+   #2 ROOT CAUSE (edge-touch): `.section{padding:52px 0}` shorthand ne
+   `.wrap` ki left/right padding (16px) ko daba diya tha — shorthand
+   chaaron taraf set karta hai, aur file mein .wrap ke BAAD aata hai,
+   is liye `class="section wrap"` wale sections (shop/new/budget/promo/
+   how/reviews/categories) ka side padding 0 ho gaya tha; inner
+   `<div class="wrap">` wale sections (best/hot/deals/about/faq) bach
+   gaye thay. Upar 4 shorthand rules ko top/bottom-only kar diya gaya
+   hai, is liye ab HAR section ko .wrap se wahi 16px side padding
+   milta hai — ek hi source, koi per-section magic number nahi.
+   Desktop par bhi wahi 16px (jo best/hot ko pehle se tha) — yehi
+   consistency fix hai, koi redesign nahi. */
+/* --- Dark plain sections (paired bg + light text, taake contrast
+   kabhi na toote): recording mein ye sections dark-navy background
+   par thay aur navy headings/labels nazar nahi aate thay. Ab bg + text
+   dono ek saath set hain. Style Editor ki inline section bg / heading
+   color (agar admin ne set ki) in par haavi rehti hai — inline style
+   stylesheet se jeet-ta hai. --- */
+#categoriesSection,#shop,#newSection,#budgetSection,#howSection,#reviewsSection{background:var(--navy)}
+#categoriesSection .section-title,#shop .section-title,#newSection .section-title,#budgetSection .section-title,#howSection .section-title,#reviewsSection .section-title{color:#fff}
+#categoriesSection .eyebrow,#shop .eyebrow,#newSection .eyebrow,#budgetSection .eyebrow,#howSection .eyebrow,#reviewsSection .eyebrow{color:#a7f3d0}
+#shop .results,#shop .filter-note,#shop .empty{color:#cbd5e1}
+#shop .sort{color:#e2e8f0}
+#budgetSection .budget-tile.top-pick{border-color:rgba(255,255,255,.35)}
+/* Food theme ka budget section cream rehta hai (us ki rule ki
+   specificity zyada hai) — us par title/eyebrow dobara dark, warna
+   safed title cream par nazar na aata. */
+body.theme-food #budgetSection .section-title{color:var(--navy)}
+body.theme-food #budgetSection .eyebrow{color:var(--green-dark)}
+/* --- #1 Category labels: safed, apni line par, neechay jagah ke
+   saath (clip nahi). Pills/bar layouts ki tiles ka bg halka hai, is
+   liye wahan label dobara navy (warna safed halke pill par gayab). --- */
+#categoriesSection .cat-tile{color:#fff}
+#categoriesSection .cat-tile span{display:block}
+#categoriesSection .cat-track{padding-bottom:22px}
+body.cats-pills #categoriesSection .cat-tile,body.layout-cats-bar #categoriesSection .cat-tile{color:var(--navy)}
+/* --- #2b Shop toolbar mobile par centered (jaise baaqi headings) --- */
+@media(max-width:760px){
+  #shop .shop-heading{text-align:center;align-items:center}
+  #shop .shop-heading .section-title.left{text-align:center}
+  #shop .results{text-align:center}
+  #shop .toolbar{justify-content:center;text-align:center}
+  /* --- #5 Arrows mobile par nahi (tracks touch se swipe hote hain) --- */
+  .carousel-arrows{display:none}
+  /* --- #4 Promo strip (General deals-strip): mobile par EXACTLY ek
+     poora card per screen — card = container ki poori chaudai
+     (container pehle se .wrap ki 16px padding ke andar hai, is liye
+     card = viewport minus standard side padding). Snap mandatory,
+     taake swipe ke baad agli card poori nazar aaye. Desktop same. --- */
+  body.layout-deals-strip .promo-grid{scroll-snap-type:x mandatory}
+  body.layout-deals-strip .promo-card{flex:0 0 100%;min-width:0;max-width:none;scroll-snap-align:start}
 }

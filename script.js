@@ -887,6 +887,10 @@ function renderProductSections(){
   $("#hotOrderBtn").disabled = !hot;
   $("#hotOrderBtn").onclick = () => { if (hot) openProduct(hot.id); };
   watchReveals();
+  /* V3.4: hot + reviews auto-slide (pehli render par setup; dataset
+     guard dobara timer nahi banne deta). */
+  setupTrackAutoSlide($("#hotTrack"), $("#hotPrev"), $("#hotNext"));
+  setupTrackAutoSlide($("#reviewTrack"), $("#revPrev"), $("#revNext"));
 }
 function currentList(){
   const q = $("#searchInput").value.trim().toLowerCase();
@@ -1492,6 +1496,37 @@ $("#hotPrev").onclick = () => $("#hotTrack").scrollBy({ left: -280, behavior: "s
 $("#hotNext").onclick = () => $("#hotTrack").scrollBy({ left: 280, behavior: "smooth" });
 $("#revPrev").onclick = () => $("#reviewTrack").scrollBy({ left: -330, behavior: "smooth" });
 $("#revNext").onclick = () => $("#reviewTrack").scrollBy({ left: 330, behavior: "smooth" });
+/* V3.4: Tracks auto-slide (hot + reviews) — interval se ek card aage,
+   aakhir par wapas shuru, smooth scroll. Touch/drag/hover ke dauran
+   pause (force-scroll nahi — manual swipe se nahi takrata), chhorne
+   par resume; arrow click timer dobara shuru karta hai. Animations
+   off / reduced-motion par kabhi nahi chalta. */
+function setupTrackAutoSlide(track, prevBtn, nextBtn){
+  if (!track || track.dataset.autoSlide) return;
+  track.dataset.autoSlide = "1";
+  let timer = null, touching = false, hovering = false;
+  const animOff = () => SETTINGS.animations === false || REDUCED_MOTION || document.body.classList.contains("no-anim");
+  const overflows = () => track.scrollWidth > track.clientWidth + 10;
+  const stop = () => { if (timer){ clearInterval(timer); timer = null; } };
+  const start = () => { stop(); if (animOff() || !overflows()) return; timer = setInterval(advance, 4000); };
+  const advance = () => {
+    if (touching || hovering || document.hidden) return;
+    if (animOff()){ stop(); return; }
+    if (!overflows()) return;
+    const card = track.querySelector(":scope > *");
+    const gap = parseFloat(getComputedStyle(track).gap) || 16;
+    const step = (card ? card.offsetWidth : 280) + gap;
+    if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 20) track.scrollTo({ left: 0, behavior: "smooth" });
+    else track.scrollBy({ left: step, behavior: "smooth" });
+  };
+  track.addEventListener("pointerdown", () => { touching = true; stop(); });
+  ["pointerup", "pointercancel"].forEach(ev => track.addEventListener(ev, () => { touching = false; start(); }));
+  track.addEventListener("mouseenter", () => { hovering = true; stop(); });
+  track.addEventListener("mouseleave", () => { hovering = false; start(); });
+  [prevBtn, nextBtn].forEach(b => { if (b) b.addEventListener("click", () => start()); });
+  window.addEventListener("resize", () => start());
+  start();
+}
 bindBudgetTiles();
 const POLICIES = {
   contact: ["Contact Us", "<p>Order, delivery ya product ke baray mein sawal ho to store ke WhatsApp ya admin se rabta karein. Humari team aapko order ki sahi maloomat aur guidance degi.</p>"],
