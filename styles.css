@@ -517,3 +517,52 @@ body.no-anim .btn.primary::after{transition:none!important}
    theme radius rules ke BAAD hai, is liye Style set ho to wahi jeet-ta hai;
    Style khaali ho to body par --btn-radius maujood hi nahi, rule be-asar. */
 body[style*="--btn-radius"] .mini-btn{border-radius:var(--btn-radius)}
+
+/* ================= V3.3: Footer responsive + responsive audit fixes =================
+   V3.1c scroll rules (html overflow-x:hidden, body overflow-x:visible) ko CHHERA
+   NAHI gaya — neeche koi body overflow-x:hidden nahi hai. */
+/* Review glyph (jab product naam se image na mile) — img ke barabar box. */
+.review-glyph{width:54px;height:54px;flex:none;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--green-dark)}
+.review-glyph .ic{width:26px;height:26px}
+/* --- Footer: desktop (901px+) har theme mein 4-column grid ---
+   Specificity line 424 wali Fashion rule ke barabar hai (body + 2 classes),
+   lekin file ke end par hone se jeet-ti hai. Fashion ka dark bg/serif/gold
+   themes.js se aata hai, wohi rehta hai — sirf columns wapas aate hain,
+   aur har column ka text center rehta hai (Fashion ki pehchan). */
+@media(min-width:901px){
+  body.layout-footer-centered .footer-in{display:grid;grid-template-columns:1.25fr .75fr 1fr 1.25fr;gap:28px;text-align:center}
+  body.layout-footer-centered .footer-links{align-items:center}
+  body.layout-footer-centered .footer-socials{justify-content:center}
+  body.layout-footer-centered .footer-logo{justify-content:center}
+}
+/* --- Footer: tablet (521–900px) 2 columns, har theme --- */
+@media(min-width:521px) and (max-width:900px){
+  body.layout-footer-centered .footer-in{display:grid;grid-template-columns:1fr 1fr;gap:24px;text-align:center}
+  body.layout-footer-centered .footer-links{align-items:center}
+}
+/* --- Footer: mobile (520px tak) single column, stacked, centered --- */
+@media(max-width:520px){
+  body.layout-footer-centered .footer-in{display:flex;flex-direction:column;align-items:center;text-align:center;gap:20px}
+  .footer-in>*{min-width:0}
+  .footer p,.footer-links a,.footer-links button{overflow-wrap:anywhere}
+  .footer-in{padding:24px 14px 30px}
+  /* Modal: 360px par saans lene ki jagah */
+  .modal{padding:10px}
+  .modal-card{padding:20px 16px;border-radius:16px}
+  /* Toast: lambi line 360px se bahar na jaye */
+  .toast{max-width:calc(100vw - 32px);text-align:center;white-space:normal}
+  /* PDP sticky buy bar: 360px par buttons + price sab fit hon */
+  .pdp-sticky{padding:8px 10px;gap:8px}
+  .pdp-sticky .btn{padding:10px 11px;font-size:12px}
+  .pdp-sticky-info strong{font-size:15px}
+  .pdp-sticky-info span{max-width:26vw}
+  .pdp-imgwrap>img{height:280px}
+  /* Header: logo lamba ho to icons dabayein nahi, naam ... se kate */
+  .header-pill{flex-wrap:nowrap}
+  .header-pill .logo{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .header-pill .logo-name,.header-pill #logoName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+/* --- Grid children kabhi overflow ka sabab na banein (min-width:0 guards) --- */
+@media(max-width:760px){
+  .grid>*,.related-grid>*,.promo-grid>*,.about-grid>*,.pdp-grid>*,.budget-grid>*,.steps-grid>*,.trust-grid>*{min-width:0}
+}

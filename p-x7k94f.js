@@ -121,6 +121,38 @@ const ADMIN_DEFAULT_SETTINGS = {
   ],
   about_heading: "PAKISTAN KA SMART STORE",
   about_text: "ShopNest par hum sirf wohi products rakhte hain jo pehle test kiye jayein. Har order dispatch se pehle quality-check hota hai aur payment Cash on Delivery hai — pehle product aapke haath mein, phir paisay. Poore Pakistan mein fast dispatch, aur damaged ya wrong product par easy exchange. Smart shopping, bina tension!",
+  /* V3.3 Content — storefront DEFAULT_SETTINGS se match (khaali = defaults). */
+  howSteps: [
+    { title: "PRODUCT CHUNEIN", text: "Apni pasand ka product select karein aur details achi tarah parhein." },
+    { title: "ORDER FORM BHAREIN", text: "Naam, mobile number, city aur mukammal address likhein." },
+    { title: "CONFIRMATION CALL", text: "Humari team call karke order aur address confirm karegi." },
+    { title: "DELIVERY PE PAYMENT", text: "Product milne par Cash on Delivery mein payment karein." }
+  ],
+  faqs: [
+    { q: "Kya Cash on Delivery available hai?", a: "Ji haan, poore Pakistan mein Cash on Delivery available hai. Product milne ke baad payment karein." },
+    { q: "Delivery kitne din mein hoti hai?", a: "Aam taur par delivery 3–5 working days mein ho jati hai. Kuch shehron mein is se jaldi bhi mil sakti hai." },
+    { q: "Order confirm kaise hoga?", a: "Order place karne ke baad humari team aapko call karke naam, address aur product details confirm karegi." },
+    { q: "Agar product damaged ya wrong aa jaye to?", a: "Damaged ya wrong product ki soorat mein hum se foran rabta karein. Policy ke mutabiq easy exchange ki sahulat available hai." },
+    { q: "Kya products original aur tested hain?", a: "Har product dispatch se pehle quality-check aur test kiya jata hai taa ke aapko sahi aur working product mile." }
+  ],
+  reviews: [
+    { product: "Luxury Perfume — 100ml", name: "Ahmed Raza", city: "Lahore", rating: 4.8, text: "Product bilkul tasveer jaisa mila. Quality boht achi hai aur delivery bhi time par ho gayi." },
+    { product: "Wireless Noise-Cancelling Headphones", name: "Fatima Khan", city: "Karachi", rating: 4.8, text: "Cash on Delivery ki wajah se bina tension order kiya. Packing aur product dono zabardast thay." },
+    { product: "Running Sneakers — Lightweight", name: "Usman Ali", city: "Islamabad", rating: 4.7, text: "Price ke hisaab se quality boht behtar hai. Main apni family ko bhi recommend karoon ga." },
+    { product: "Mechanical Keyboard — RGB", name: "Ayesha Noor", city: "Faisalabad", rating: 4.7, text: "Order confirm karne ke liye call aayi aur do din mein parcel mil gaya. Boht satisfied hoon." }
+  ],
+  budgetTiles: [
+    { label: "UNDER", amount: "Rs.1,499", note: "Choti price, smart choice", budget: "1499" },
+    { label: "UNDER", amount: "Rs.1,999", note: "Roz-marra ki essentials", budget: "1999" },
+    { label: "UNDER", amount: "Rs.2,999", note: "Value picks, zyada faida", budget: "2999" },
+    { label: "★ TOP PICKS", amount: "HIGHEST RATED", note: "Customers ki pehli pasand", budget: "top" }
+  ],
+  trustItems: [
+    { title: "CASH ON DELIVERY", sub: "Pay when it arrives" },
+    { title: "FAST DELIVERY", sub: "3–5 days, all Pakistan" },
+    { title: "QUALITY CHECKED", sub: "Tested before dispatch" },
+    { title: "EASY EXCHANGE", sub: "On damaged items" }
+  ],
   whatsapp_number: "",
   sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
   policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
@@ -146,7 +178,7 @@ const ADMIN_DEFAULT_SETTINGS = {
     sections: {},
     buttons: { primaryBg: "", primaryColor: "", radius: "", secondaryColor: "", fontSize: "" },
     page: { headerBg: "", footerBg: "", marqueeBg: "", pageBg: "", textColor: "" },
-    socialProof: { enabled: true, intervalSec: 20, durationSec: 5, demo: true }
+    socialProof: { enabled: true, intervalSec: 20, durationSec: 5, entries: [] }
   }
 };
 
@@ -289,7 +321,7 @@ function showDash(){
   $("#logoutBtn").classList.remove("hidden");
   /* Role gating (current store ki role par): staff ko Categories/Coupons/Team/Settings nahi; admin ko Team nahi. */
   $("#tabTeam").classList.toggle("hidden", effRole() !== "owner");
-  const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings", "tabHomepage", "tabAppearance", "tabStyle"];
+  const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings", "tabHomepage", "tabAppearance", "tabStyle", "tabContent"];
   adminOnlyTabs.forEach(id => document.getElementById(id).classList.toggle("hidden", !isAdminPlus()));
   switchTab("dashboard");
   loadAll();
@@ -995,6 +1027,16 @@ function mergeAdminSettings(raw){
   if (Array.isArray(raw.promo)) out.promo = out.promo.map((d,i) => ({ ...d, ...(raw.promo[i] && typeof raw.promo[i] === "object" ? raw.promo[i] : {}) }));
   if (typeof raw.about_heading === "string" && raw.about_heading.trim()) out.about_heading = raw.about_heading.trim();
   if (typeof raw.about_text === "string" && raw.about_text.trim()) out.about_text = raw.about_text.trim();
+  /* V3.3 Content — key maujood ho to wahi (khaali array = sab delete); na ho to defaults. */
+  const cs = v => String(v || "");
+  if (Array.isArray(raw.howSteps)) out.howSteps = raw.howSteps.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), text: cs(x.text) }));
+  if (Array.isArray(raw.faqs)) out.faqs = raw.faqs.filter(x => x && typeof x === "object").map(x => ({ q: cs(x.q), a: cs(x.a) }));
+  if (Array.isArray(raw.reviews)) out.reviews = raw.reviews.filter(x => x && typeof x === "object").map(x => {
+    const r = parseFloat(x.rating);
+    return { product: cs(x.product), name: cs(x.name), city: cs(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cs(x.text) };
+  });
+  if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cs(x.label), amount: cs(x.amount), note: cs(x.note), budget: cs(x.budget) }));
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) }));
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
@@ -1041,7 +1083,8 @@ function mergeAdminSettings(raw){
     if (st.socialProof && typeof st.socialProof === "object"){
       const sp = st.socialProof;
       if (typeof sp.enabled === "boolean") out.style.socialProof.enabled = sp.enabled;
-      if (typeof sp.demo === "boolean") out.style.socialProof.demo = sp.demo;
+      /* V3.3: demo flag ab parha hi nahi jata — popups sirf manual entries se. */
+      if (Array.isArray(sp.entries)) out.style.socialProof.entries = sp.entries.filter(e => e && typeof e === "object").map(e => ({ name: String(e.name || ""), product: String(e.product || ""), city: String(e.city || ""), amount: String(e.amount || ""), timeText: String(e.timeText || "") })).filter(e => e.name || e.product);
       const iv = parseInt(sp.intervalSec, 10);
       if (Number.isFinite(iv)) out.style.socialProof.intervalSec = Math.max(5, iv);
       const du = parseInt(sp.durationSec, 10);
@@ -1164,6 +1207,7 @@ function fillSettings(s){
   seedHomepage(s);
   fillAppearance(s);
   fillStyle(s);
+  fillContent(s);
 }
 async function loadSettings(){
   settingsLoaded = true;
@@ -1550,8 +1594,7 @@ function fillStyle(s){
   if (spI) spI.value = st.socialProof.intervalSec || 20;
   const spD = document.getElementById("stySpDuration");
   if (spD) spD.value = st.socialProof.durationSec || 5;
-  const spDemo = document.getElementById("stySpDemo");
-  if (spDemo) spDemo.checked = st.socialProof.demo !== false;
+  renderSpEntries(st.socialProof.entries || []);
   renderStyleSections(st.sections || {});
   styleFilled = true;
 }
@@ -1606,8 +1649,8 @@ function readStyle(){
   if (spI){ const v = parseInt(spI.value, 10); if (Number.isFinite(v)) base.socialProof.intervalSec = Math.max(5, v); }
   const spD = document.getElementById("stySpDuration");
   if (spD){ const v = parseInt(spD.value, 10); if (Number.isFinite(v)) base.socialProof.durationSec = Math.max(1, v); }
-  const spDemo = document.getElementById("stySpDemo");
-  if (spDemo) base.socialProof.demo = spDemo.checked;
+  base.socialProof.entries = readSpEntries();
+  delete base.socialProof.demo; /* V3.3: demo flag ab save hi nahi hota */
   return base;
 }
 /* Static Style pairs + radius controls: sirf ek dafa bind (fillStyle dobara
@@ -1634,6 +1677,85 @@ $("#addFooterLinkBtn").onclick = () => { $("#footerLinksWrap").insertAdjacentHTM
 $("#addCheckoutFieldBtn").onclick = () => { $("#checkoutFieldsWrap").insertAdjacentHTML("beforeend", fieldRowHtml()); bindFieldRows($("#checkoutFieldsWrap")); };
 $("#addProductFieldBtn").onclick = () => { $("#productFieldsWrap").insertAdjacentHTML("beforeend", fieldRowHtml()); bindFieldRows($("#productFieldsWrap")); };
 
+
+/* ---------- V3.3 Content tab — list editors (generic row pattern) ----------
+   Rows DOM mein hi state hain: up/down DOM nodes move karte hain, delete
+   node hatata hai, save waqt readCntList DOM se parhta hai. onclick
+   assignment se dobara bind karna safe hai (duplicate listener nahi lagta). */
+let contentFilled = false;
+const HOW_FIELDS = [["title", "Step title", "text"], ["text", "Step text", "textarea"]];
+const FAQ_FIELDS = [["q", "Sawal", "text"], ["a", "Jawab", "textarea"]];
+const REVIEW_FIELDS = [["product", "Product (store jaisa naam)", "text"], ["name", "Customer naam", "text"], ["city", "Sheher", "text"], ["rating", "Rating (1–5)", "number"], ["text", "Review text", "textarea"]];
+const BUDGET_FIELDS = [["label", "Label (UNDER / ★ TOP PICKS)", "text"], ["amount", "Amount (Rs.1,499 / HIGHEST RATED)", "text"], ["note", "Note", "text"], ["budget", "Budget value (1499 ya top)", "text"]];
+const TRUST_FIELDS = [["title", "Title", "text"], ["sub", "Sub text", "text"]];
+const SP_FIELDS = [["name", "Naam", "text"], ["product", "Product", "text"], ["city", "Sheher", "text"], ["amount", "Amount", "text"], ["timeText", "Waqt exact", "text"]];
+function escAttr(v){ return String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+function cntRowHtml(fields, row, rowClass){
+  let h = `<div class="${rowClass || "cnt-row"}">`;
+  fields.forEach(([k, label, type]) => {
+    const v = escAttr(row[k] ?? "");
+    h += `<label style="font-size:13px;color:var(--muted)">${label}</label>`;
+    if (type === "textarea") h += `<textarea data-f="${k}" rows="2">${v}</textarea>`;
+    else if (type === "number") h += `<input data-f="${k}" type="number" min="1" max="5" step="0.1" value="${v}">`;
+    else h += `<input data-f="${k}" type="text" value="${v}">`;
+  });
+  h += `<div class="cnt-row-actions"><button class="btn small" type="button" data-cnt-up>↑ Upar</button><button class="btn small" type="button" data-cnt-down>↓ Neeche</button><button class="btn small danger" type="button" data-cnt-del>Delete</button></div></div>`;
+  return h;
+}
+function bindCntRows(wrap){
+  if (!wrap) return;
+  wrap.querySelectorAll(".cnt-row").forEach(row => {
+    row.querySelector("[data-cnt-up]").onclick = () => { const p = row.previousElementSibling; if (p) wrap.insertBefore(row, p); };
+    row.querySelector("[data-cnt-down]").onclick = () => { const n = row.nextElementSibling; if (n) wrap.insertBefore(n, row); };
+    row.querySelector("[data-cnt-del]").onclick = () => row.remove();
+  });
+}
+function renderCntList(wrapId, rows, fields, rowClass){
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  wrap.innerHTML = (rows || []).map(r => cntRowHtml(fields, r, rowClass)).join("");
+  bindCntRows(wrap);
+}
+function readCntList(wrapId, fields){
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return [];
+  return [...wrap.querySelectorAll(".cnt-row")].map(row => {
+    const o = {};
+    fields.forEach(([k]) => { const el = row.querySelector(`[data-f="${k}"]`); o[k] = el ? el.value.trim() : ""; });
+    return o;
+  }).filter(o => Object.values(o).some(v => v !== ""));
+}
+function fillContent(s){
+  const g = id => document.getElementById(id);
+  if (g("cntAboutHeading")) g("cntAboutHeading").value = s.about_heading || "";
+  if (g("cntAboutText")) g("cntAboutText").value = s.about_text || "";
+  if (g("cntFooterText")) g("cntFooterText").value = s.footer_text || "";
+  renderCntList("cntHowWrap", s.howSteps || [], HOW_FIELDS);
+  renderCntList("cntFaqWrap", s.faqs || [], FAQ_FIELDS);
+  renderCntList("cntReviewsWrap", s.reviews || [], REVIEW_FIELDS);
+  renderCntList("cntBudgetWrap", s.budgetTiles || [], BUDGET_FIELDS);
+  renderCntList("cntTrustWrap", s.trustItems || [], TRUST_FIELDS);
+  contentFilled = true;
+}
+function addCntRow(wrapId, fields, rowClass){
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  wrap.insertAdjacentHTML("beforeend", cntRowHtml(fields, {}, rowClass));
+  bindCntRows(wrap);
+}
+$("#addCntHowBtn").onclick = () => addCntRow("cntHowWrap", HOW_FIELDS);
+$("#addCntFaqBtn").onclick = () => addCntRow("cntFaqWrap", FAQ_FIELDS);
+$("#addCntReviewsBtn").onclick = () => addCntRow("cntReviewsWrap", REVIEW_FIELDS);
+$("#addCntBudgetBtn").onclick = () => addCntRow("cntBudgetWrap", BUDGET_FIELDS);
+$("#addCntTrustBtn").onclick = () => addCntRow("cntTrustWrap", TRUST_FIELDS);
+$("#addSpEntryBtn").onclick = () => addCntRow("spEntriesWrap", SP_FIELDS, "sp-row cnt-row");
+function renderSpEntries(entries){
+  renderCntList("spEntriesWrap", entries || [], SP_FIELDS, "sp-row cnt-row");
+}
+function readSpEntries(){
+  return readCntList("spEntriesWrap", SP_FIELDS);
+}
+
 /* ---------- Settings SAVE (shared) ----------
    Settings / Homepage / Appearance teeno tabs ki save EK hi routine hai:
    saare tabs ke DOM se values parh kar EK settings.data upsert hota hai,
@@ -1643,7 +1765,7 @@ async function persistAllSettings(){
   const saveBtns = [...document.querySelectorAll(".js-save, #globalSaveBtn")];
   const savedLabels = saveBtns.map(b => b.innerHTML);
   saveBtns.forEach(b => { b.disabled = true; b.textContent = "Saving…"; });
-  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg"), style: $("#styleMsg") };
+  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg"), style: $("#styleMsg"), content: $("#contentMsg") };
   Object.values(msgEls).forEach(m => { if (m){ m.textContent = ""; m.className = "msg"; } });
   const topMsg = $("#topSaveMsg");
   if (topMsg) topMsg.textContent = "";
@@ -1662,8 +1784,9 @@ async function persistAllSettings(){
       text: document.getElementById(`setP${n}Text`).value.trim(),
       category: document.getElementById(`setP${n}Category`).value.trim()
     }));
-    data.about_heading = $("#setAboutHeading").value.trim();
-    data.about_text = $("#setAboutText").value.trim();
+    /* V3.3: Content tab khula ho to wahi about fields jeet-ti hain, warna Settings tab. */
+    data.about_heading = ((contentFilled && $("#cntAboutHeading")) ? $("#cntAboutHeading").value.trim() : $("#setAboutHeading").value.trim()) || ADMIN_DEFAULT_SETTINGS.about_heading;
+    data.about_text = ((contentFilled && $("#cntAboutText")) ? $("#cntAboutText").value.trim() : $("#setAboutText").value.trim()) || ADMIN_DEFAULT_SETTINGS.about_text;
     data.whatsapp_number = $("#setWhatsapp").value.trim();
     /* V3 Part B: SEO */
     data.seo_title = $("#setSeoTitle") ? $("#setSeoTitle").value.trim() : "";
@@ -1721,7 +1844,7 @@ async function persistAllSettings(){
     };
     data.menu_links = readLinkRows($("#menuLinksWrap"));
     data.footer_links = readLinkRows($("#footerLinksWrap"));
-    data.footer_text = $("#footerText").value;
+    data.footer_text = (contentFilled && $("#cntFooterText")) ? $("#cntFooterText").value : $("#footerText").value;
     /* Homepage builder */
     if (homepageFilled){
       syncHomepageFromDom();
@@ -1737,6 +1860,18 @@ async function persistAllSettings(){
     /* V3.2 Style Editor — shared save ka hissa; baaki tabs ki tarah
        SETTINGS_STATE clone se shuru hone ki wajah se koi tab wipe nahi hota. */
     data.style = readStyle();
+    /* V3.3 Content — sirf jab Content tab bhara gaya ho; warna SETTINGS_STATE
+       ki values (stored ya defaults) waisi ki waisi rehti hain. */
+    if (contentFilled){
+      data.howSteps = readCntList("cntHowWrap", HOW_FIELDS);
+      data.faqs = readCntList("cntFaqWrap", FAQ_FIELDS);
+      data.reviews = readCntList("cntReviewsWrap", REVIEW_FIELDS).map(r => {
+        const v = parseFloat(r.rating);
+        return { ...r, rating: Number.isFinite(v) ? Math.min(5, Math.max(1, v)) : 5 };
+      });
+      data.budgetTiles = readCntList("cntBudgetWrap", BUDGET_FIELDS);
+      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS);
+    }
     /* Per-store settings: upsert store_id par hota hai (platform migration
        mein settings.store_id par unique index hai; id sequence se auto
        aata hai nayi row par). */
@@ -1855,6 +1990,7 @@ $("#saveSettingsBtn").onclick = persistAllSettings;
 $("#saveHomepageBtn").onclick = persistAllSettings;
 $("#saveAppearanceBtn").onclick = persistAllSettings;
 $("#saveStyleBtn").onclick = persistAllSettings;
+$("#saveContentBtn").onclick = persistAllSettings;
 $("#globalSaveBtn").onclick = persistAllSettings;
 
 /* ---------- Tabs ---------- */
@@ -1868,10 +2004,11 @@ const TAB_VIEWS = {
   homepage: ["tabHomepage", "homepagePanel"],
   appearance: ["tabAppearance", "appearancePanel"],
   style: ["tabStyle", "stylePanel"],
+  content: ["tabContent", "contentPanel"],
   settings: ["tabSettings", "settingsPanel"]
 };
 /* In tabs par topbar wala global Save button nazar aata hai. */
-const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style"];
+const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style", "content"];
 Object.entries(TAB_VIEWS).forEach(([view, [tabId]]) => {
   document.getElementById(tabId).onclick = () => switchTab(view);
 });

@@ -119,6 +119,38 @@ const DEFAULT_SETTINGS = {
   ],
   about_heading: "PAKISTAN KA SMART STORE",
   about_text: "ShopNest par hum sirf wohi products rakhte hain jo pehle test kiye jayein. Har order dispatch se pehle quality-check hota hai aur payment Cash on Delivery hai — pehle product aapke haath mein, phir paisay. Poore Pakistan mein fast dispatch, aur damaged ya wrong product par easy exchange. Smart shopping, bina tension!",
+  /* --- V3.3 Content (admin "Content" tab; key maujood na ho to ye defaults) --- */
+  howSteps: [
+    { title: "PRODUCT CHUNEIN", text: "Apni pasand ka product select karein aur details achi tarah parhein." },
+    { title: "ORDER FORM BHAREIN", text: "Naam, mobile number, city aur mukammal address likhein." },
+    { title: "CONFIRMATION CALL", text: "Humari team call karke order aur address confirm karegi." },
+    { title: "DELIVERY PE PAYMENT", text: "Product milne par Cash on Delivery mein payment karein." }
+  ],
+  faqs: [
+    { q: "Kya Cash on Delivery available hai?", a: "Ji haan, poore Pakistan mein Cash on Delivery available hai. Product milne ke baad payment karein." },
+    { q: "Delivery kitne din mein hoti hai?", a: "Aam taur par delivery 3–5 working days mein ho jati hai. Kuch shehron mein is se jaldi bhi mil sakti hai." },
+    { q: "Order confirm kaise hoga?", a: "Order place karne ke baad humari team aapko call karke naam, address aur product details confirm karegi." },
+    { q: "Agar product damaged ya wrong aa jaye to?", a: "Damaged ya wrong product ki soorat mein hum se foran rabta karein. Policy ke mutabiq easy exchange ki sahulat available hai." },
+    { q: "Kya products original aur tested hain?", a: "Har product dispatch se pehle quality-check aur test kiya jata hai taa ke aapko sahi aur working product mile." }
+  ],
+  reviews: [
+    { product: "Luxury Perfume — 100ml", name: "Ahmed Raza", city: "Lahore", rating: 4.8, text: "Product bilkul tasveer jaisa mila. Quality boht achi hai aur delivery bhi time par ho gayi." },
+    { product: "Wireless Noise-Cancelling Headphones", name: "Fatima Khan", city: "Karachi", rating: 4.8, text: "Cash on Delivery ki wajah se bina tension order kiya. Packing aur product dono zabardast thay." },
+    { product: "Running Sneakers — Lightweight", name: "Usman Ali", city: "Islamabad", rating: 4.7, text: "Price ke hisaab se quality boht behtar hai. Main apni family ko bhi recommend karoon ga." },
+    { product: "Mechanical Keyboard — RGB", name: "Ayesha Noor", city: "Faisalabad", rating: 4.7, text: "Order confirm karne ke liye call aayi aur do din mein parcel mil gaya. Boht satisfied hoon." }
+  ],
+  budgetTiles: [
+    { label: "UNDER", amount: "Rs.1,499", note: "Choti price, smart choice", budget: "1499" },
+    { label: "UNDER", amount: "Rs.1,999", note: "Roz-marra ki essentials", budget: "1999" },
+    { label: "UNDER", amount: "Rs.2,999", note: "Value picks, zyada faida", budget: "2999" },
+    { label: "★ TOP PICKS", amount: "HIGHEST RATED", note: "Customers ki pehli pasand", budget: "top" }
+  ],
+  trustItems: [
+    { title: "CASH ON DELIVERY", sub: "Pay when it arrives" },
+    { title: "FAST DELIVERY", sub: "3–5 days, all Pakistan" },
+    { title: "QUALITY CHECKED", sub: "Tested before dispatch" },
+    { title: "EASY EXCHANGE", sub: "On damaged items" }
+  ],
   whatsapp_number: "",
   /* --- V2 keys (Part A admin contract) --- */
   font_family: { name: "", stack: "", google: "" },
@@ -141,7 +173,7 @@ const DEFAULT_SETTINGS = {
     sections: {},
     buttons: { primaryBg: "", primaryColor: "", radius: "", secondaryColor: "", fontSize: "" },
     page: { headerBg: "", footerBg: "", marqueeBg: "", pageBg: "", textColor: "" },
-    socialProof: { enabled: true, intervalSec: 20, durationSec: 5, demo: true }
+    socialProof: { enabled: true, intervalSec: 20, durationSec: 5, entries: [] }
   }
 };
 let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -229,6 +261,17 @@ function mergeSettings(raw){
   if (Array.isArray(raw.promo)) out.promo = out.promo.map((d, i) => ({ ...d, ...(raw.promo[i] && typeof raw.promo[i] === "object" ? raw.promo[i] : {}) }));
   if (typeof raw.about_heading === "string" && raw.about_heading.trim()) out.about_heading = raw.about_heading.trim();
   if (typeof raw.about_text === "string" && raw.about_text.trim()) out.about_text = raw.about_text.trim();
+  /* V3.3 Content lists — key maujood ho to wahi (khaali array = admin ne sab
+     delete kiye); key na ho to DEFAULT_SETTINGS wale defaults rehte hain. */
+  const cleanStr = v => String(v || "");
+  if (Array.isArray(raw.howSteps)) out.howSteps = raw.howSteps.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), text: cleanStr(x.text) }));
+  if (Array.isArray(raw.faqs)) out.faqs = raw.faqs.filter(x => x && typeof x === "object").map(x => ({ q: cleanStr(x.q), a: cleanStr(x.a) }));
+  if (Array.isArray(raw.reviews)) out.reviews = raw.reviews.filter(x => x && typeof x === "object").map(x => {
+    const r = parseFloat(x.rating);
+    return { product: cleanStr(x.product), name: cleanStr(x.name), city: cleanStr(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cleanStr(x.text) };
+  });
+  if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cleanStr(x.label), amount: cleanStr(x.amount), note: cleanStr(x.note), budget: cleanStr(x.budget) }));
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), sub: cleanStr(x.sub) }));
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* Deep merge: sections toggles */
   if (raw.sections && typeof raw.sections === "object")
@@ -298,7 +341,9 @@ function mergeSettings(raw){
     if (st.socialProof && typeof st.socialProof === "object"){
       const sp = st.socialProof;
       if (typeof sp.enabled === "boolean") out.style.socialProof.enabled = sp.enabled;
-      if (typeof sp.demo === "boolean") out.style.socialProof.demo = sp.demo;
+      /* V3.3: popups sirf owner ke likhe entries se — purana demo flag yahan
+         parha hi nahi jata, aur na hi aage save hota hai. */
+      if (Array.isArray(sp.entries)) out.style.socialProof.entries = sp.entries.filter(e => e && typeof e === "object").map(e => ({ name: String(e.name || ""), product: String(e.product || ""), city: String(e.city || ""), amount: String(e.amount || ""), timeText: String(e.timeText || "") })).filter(e => e.name || e.product);
       const iv = parseInt(sp.intervalSec, 10);
       if (Number.isFinite(iv)) out.style.socialProof.intervalSec = Math.max(5, iv);
       const du = parseInt(sp.durationSec, 10);
@@ -404,6 +449,10 @@ function applySettings(){
     fc.innerHTML = lines.join("");
     fc.hidden = lines.length === 0;
   }
+  /* V3.3: settings-driven content sections (static HTML ko overwrite karte hain). */
+  renderTrust();
+  renderBudget();
+  renderSteps();
   watchReveals();
   syncHeaderOffset();
   applyStyleSettings();
@@ -870,24 +919,49 @@ function scrollToId(id){
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-/* Demo review copy sirf code mein demo hai; page par koi demo label nahi dikhaya jata. */
-const DEMO_REVIEWS = [
-  "Product bilkul tasveer jaisa mila. Quality boht achi hai aur delivery bhi time par ho gayi.",
-  "Cash on Delivery ki wajah se bina tension order kiya. Packing aur product dono zabardast thay.",
-  "Price ke hisaab se quality boht behtar hai. Main apni family ko bhi recommend karoon ga.",
-  "Order confirm karne ke liye call aayi aur do din mein parcel mil gaya. Boht satisfied hoon.",
-  "Pehle thoda doubt tha, lekin product test kiya hua aur bilkul fresh mila. Highly recommended!",
-  "Customer service ne call par achi guidance di. Product roz ke use mein boht kaam ka hai."
-];
-const DEMO_NAMES = ["Ahmed Raza — Lahore", "Fatima Khan — Karachi", "Usman Ali — Islamabad", "Ayesha Noor — Faisalabad", "Bilal Ahmed — Rawalpindi", "Hira Shahid — Multan"];
+/* V3.3: Reviews ab SETTINGS.reviews se aate hain (admin Content tab).
+   Product image naam se match karke lagti hai; match na ho to glyph. */
 function renderReviews(){
-  const top = [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 6);
-  $("#reviewTrack").innerHTML = top.map((p, i) => `<article class="review-card reveal">
-    <div class="review-product"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}"><strong>${esc(p.name)}</strong></div>
-    <p class="stars">${stars(p.rating)} <small>${ratingOf(p).toFixed(1)}</small></p>
-    <p>${esc(DEMO_REVIEWS[i % DEMO_REVIEWS.length])}</p>
-    <p class="verified">✓ Verified Purchase</p><p class="reviewer">${esc(DEMO_NAMES[i % DEMO_NAMES.length])}</p>
-  </article>`).join("");
+  const list = (SETTINGS && Array.isArray(SETTINGS.reviews)) ? SETTINGS.reviews : [];
+  $("#reviewTrack").innerHTML = list.map(r => {
+    const p = PRODUCTS.find(x => x.name === r.product);
+    const media = (p && p.img) ? `<img src="${safeUrl(p.img)}" alt="${esc(r.product)}">` : `<span class="review-glyph">${icon("bag")}</span>`;
+    const who = r.city ? `${esc(r.name)} — ${esc(r.city)}` : esc(r.name);
+    const rt = Number(r.rating) || 0;
+    return `<article class="review-card reveal">
+    <div class="review-product">${media}<strong>${esc(r.product)}</strong></div>
+    <p class="stars">${stars(rt)} <small>${rt.toFixed(1)}</small></p>
+    <p>${esc(r.text)}</p>
+    <p class="verified">✓ Verified Purchase</p><p class="reviewer">${who}</p>
+  </article>`;
+  }).join("");
+}
+/* V3.3: Trust strip, budget tiles, how-to steps — sab settings-driven. */
+const TRUST_ICONS = ["cash", "truck", "shield", "returns"];
+function renderTrust(){
+  const wrap = document.querySelector("#trustSection .trust-grid");
+  if (!wrap) return;
+  const list = (SETTINGS && Array.isArray(SETTINGS.trustItems)) ? SETTINGS.trustItems : [];
+  wrap.innerHTML = list.map((t, i) => `<div>${icon(TRUST_ICONS[i % TRUST_ICONS.length])}<strong>${esc(t.title)}</strong><span>${esc(t.sub)}</span></div>`).join("");
+}
+function bindBudgetTiles(){
+  $$("#budgetSection [data-budget]").forEach(b => b.onclick = () => {
+    if (b.dataset.budget === "top") setFilter({ cat: "All", maxPrice: null, sort: "rating" });
+    else { const v = Number(b.dataset.budget); setFilter({ cat: "All", maxPrice: Number.isFinite(v) ? v : null, sort: "price-low" }); }
+  });
+}
+function renderBudget(){
+  const wrap = document.querySelector("#budgetSection .budget-grid");
+  if (!wrap) return;
+  const list = (SETTINGS && Array.isArray(SETTINGS.budgetTiles)) ? SETTINGS.budgetTiles : [];
+  wrap.innerHTML = list.map(b => `<button class="budget-tile${b.budget === "top" ? " top-pick" : ""}" type="button" data-budget="${esc(b.budget)}"><span>${b.budget === "top" ? icon("star", "ic-inline") + " " : ""}${esc(b.label)}</span><strong>${esc(b.amount)}</strong><small>${esc(b.note)}</small></button>`).join("");
+  bindBudgetTiles();
+}
+function renderSteps(){
+  const wrap = document.querySelector("#howSection .steps-grid");
+  if (!wrap) return;
+  const list = (SETTINGS && Array.isArray(SETTINGS.howSteps)) ? SETTINGS.howSteps : [];
+  wrap.innerHTML = list.map((st, i) => `<div><span>${String(i + 1).padStart(2, "0")}</span><h3>${esc(st.title)}</h3><p>${esc(st.text)}</p></div>`).join("");
 }
 
 /* ---------- Scroll-reveal animations ----------
@@ -911,16 +985,10 @@ function watchReveals(){
 /* Static homepage sections ko bhi reveal mein shamil karein. */
 $$("#homeView > section, #homeView > main").forEach(s => s.classList.add("reveal"));
 
-/* ---------- FAQ ---------- */
-const FAQS = [
-  ["Kya Cash on Delivery available hai?", "Ji haan, poore Pakistan mein Cash on Delivery available hai. Product milne ke baad payment karein."],
-  ["Delivery kitne din mein hoti hai?", "Aam taur par delivery 3–5 working days mein ho jati hai. Kuch shehron mein is se jaldi bhi mil sakti hai."],
-  ["Order confirm kaise hoga?", "Order place karne ke baad humari team aapko call karke naam, address aur product details confirm karegi."],
-  ["Agar product damaged ya wrong aa jaye to?", "Damaged ya wrong product ki soorat mein hum se foran rabta karein. Policy ke mutabiq easy exchange ki sahulat available hai."],
-  ["Kya products original aur tested hain?", "Har product dispatch se pehle quality-check aur test kiya jata hai taa ke aapko sahi aur working product mile."]
-];
+/* ---------- FAQ (V3.3: SETTINGS.faqs se, admin Content tab) ---------- */
 function renderFaq(){
-  $("#faqWrap").innerHTML = FAQS.map(([q,a], i) => `<div class="faq-item ${i === 0 ? "open" : ""}"><button class="faq-q" type="button">${esc(q)}${icon("chevron", "faq-caret")}</button><div class="faq-a">${esc(a)}</div></div>`).join("");
+  const list = (SETTINGS && Array.isArray(SETTINGS.faqs)) ? SETTINGS.faqs : [];
+  $("#faqWrap").innerHTML = list.map((f, i) => `<div class="faq-item ${i === 0 ? "open" : ""}"><button class="faq-q" type="button">${esc(f.q)}${icon("chevron", "faq-caret")}</button><div class="faq-a">${esc(f.a)}</div></div>`).join("");
   $$(".faq-item").forEach(item => item.querySelector(".faq-q").onclick = () => item.classList.toggle("open"));
 }
 
@@ -1114,6 +1182,9 @@ function updatePdpSticky(){
   if (!bar) return;
   const show = !$("#productPage").hidden && window.scrollY > 560;
   bar.classList.toggle("show", show);
+  /* V3.3: buy bar aate hi dikhta hua popup hata do (timers chalte rehte hain,
+     agli cycle waise hi aayegi) — popup kabhi buy buttons par nahi chadhega. */
+  if (show && typeof spEl !== "undefined" && spEl) spEl.classList.remove("show");
 }
 window.addEventListener("scroll", updatePdpSticky, { passive: true });
 
@@ -1414,10 +1485,7 @@ $("#hotPrev").onclick = () => $("#hotTrack").scrollBy({ left: -280, behavior: "s
 $("#hotNext").onclick = () => $("#hotTrack").scrollBy({ left: 280, behavior: "smooth" });
 $("#revPrev").onclick = () => $("#reviewTrack").scrollBy({ left: -330, behavior: "smooth" });
 $("#revNext").onclick = () => $("#reviewTrack").scrollBy({ left: 330, behavior: "smooth" });
-$$("[data-budget]").forEach(b => b.onclick = () => {
-  if (b.dataset.budget === "top") setFilter({ cat: "All", maxPrice: null, sort: "rating" });
-  else setFilter({ cat: "All", maxPrice: Number(b.dataset.budget), sort: "price-low" });
-});
+bindBudgetTiles();
 const POLICIES = {
   contact: ["Contact Us", "<p>Order, delivery ya product ke baray mein sawal ho to store ke WhatsApp ya admin se rabta karein. Humari team aapko order ki sahi maloomat aur guidance degi.</p>"],
   shipping: ["Shipping Policy", "<p>Orders aam taur par 3–5 working days mein deliver kiye jate hain. Delivery charges har product par alag ho sakte hain aur checkout par wazeh dikhaye jate hain.</p><p>Har parcel dispatch se pehle quality-check kiya jata hai.</p>"],
@@ -1456,56 +1524,26 @@ function toast(text){
   toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
 }
 
-/* ---------- V3.2: Social-proof popups ----------
+/* ---------- V3.3: Social-proof popups — SIRF MANUAL ENTRIES ----------
    Cycle: pehla popup 8s baad → durationSec dikhaye → hide → intervalSec
-   wait → agla. Real orders pehle, phir demo (sirf jab demo on ho AUR
-   real orders 5 se kam hon — 5+ asal orders par demo khud band).
-   Privacy: RPC se sirf first name, city, pehli item ka naam, total aur
-   date aati hai — phone, address, poora naam, poori items kabhi nahi.
-   RPC fail ho to catch → demo (agar on) warna khamoshi se kuch nahi. */
+   wait → agla entry (tartib se, loop). Entries admin Style tab mein owner
+   khud likhta hai (name/product/city/amount/timeText) — koi previous-order
+   fetch nahi, koi demo entry nahi, koi "Verified" daawa nahi. timeText
+   EXACT waisa dikhta hai jaisa owner ne likha (kabhi compute nahi hota).
+   PDP sticky buy bar dikh raha ho to us cycle popup skip hota hai taake
+   popup buy buttons par na chadhe; dikhta hua popup bhi bar aate hi chhup
+   jata hai (updatePdpSticky mein hook hai). */
 let spStarted = false, spTimer = null, spHideTimer = null, spEl = null;
-let spReal = null, spIndex = 0;
+let spIndex = 0;
 function spConfig(){
-  const s = (SETTINGS && SETTINGS.style && SETTINGS.style.socialProof) || {};
+  const st = (SETTINGS && SETTINGS.style && SETTINGS.style.socialProof) || {};
+  const entries = Array.isArray(st.entries) ? st.entries.filter(e => e && (e.name || e.product)).map(e => ({ name: String(e.name || ""), product: String(e.product || ""), city: String(e.city || ""), amount: String(e.amount || ""), timeText: String(e.timeText || "") })) : [];
   return {
-    enabled: typeof s.enabled === "boolean" ? s.enabled : true,
-    intervalSec: Math.max(5, parseInt(s.intervalSec, 10) || 20),
-    durationSec: Math.max(1, parseInt(s.durationSec, 10) || 5),
-    demo: typeof s.demo === "boolean" ? s.demo : true
+    enabled: typeof st.enabled === "boolean" ? st.enabled : true,
+    intervalSec: Math.max(5, parseInt(st.intervalSec, 10) || 20),
+    durationSec: Math.max(1, parseInt(st.durationSec, 10) || 5),
+    entries
   };
-}
-function spTimeAgo(ts){
-  const ms = Date.now() - new Date(ts).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return "abhi pehle";
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return "abhi pehle";
-  if (min < 60) return min + " min pehle";
-  const h = Math.floor(min / 60);
-  if (h < 24) return h === 1 ? "1 ghanta pehle" : h + " ghante pehle";
-  const d = Math.floor(h / 24);
-  return d === 1 ? "1 din pehle" : d + " din pehle";
-}
-const SP_DEMO_NAMES = ["Ahmed", "Fatima", "Usman", "Ayesha", "Bilal", "Hira", "Zainab", "Omar"];
-const SP_DEMO_CITIES = ["Lahore", "Karachi", "Islamabad", "Faisalabad", "Multan", "Rawalpindi", "Gujranwala", "Sialkot"];
-const SP_DEMO_OFFSETS = ["12 min pehle", "35 min pehle", "1 ghanta pehle", "2 ghante pehle", "3 ghante pehle", "5 ghante pehle", "8 ghante pehle", "1 din pehle"];
-function spDemoList(){
-  if (!PRODUCTS.length) return [];
-  return SP_DEMO_NAMES.map((n, i) => {
-    const p = PRODUCTS[i % PRODUCTS.length];
-    return { firstName: n, city: SP_DEMO_CITIES[i % SP_DEMO_CITIES.length], product: p.name, total: Number(p.price) || 0, ago: SP_DEMO_OFFSETS[i], demo: true };
-  });
-}
-async function spEnsureReal(){
-  if (spReal !== null) return spReal;
-  try {
-    const { data, error } = await sb.rpc("get_recent_orders_for_proof", { p_store_slug: STORE_SLUG });
-    if (error) throw error;
-    spReal = (Array.isArray(data) ? data : []).filter(r => r && r.product_name).map(r => ({
-      firstName: r.first_name || "Customer", city: r.city || "", product: r.product_name,
-      total: Number(r.total) || 0, ago: spTimeAgo(r.ordered_at), demo: false
-    }));
-  } catch (e) { spReal = []; /* RPC fail = demo fallback / silent, page kabhi nahi toot-ta */ }
-  return spReal;
 }
 function spHide(schedule){
   if (spEl) spEl.classList.remove("show");
@@ -1516,14 +1554,13 @@ function spSchedule(ms){
   clearTimeout(spTimer);
   spTimer = setTimeout(spShowNext, ms);
 }
-async function spShowNext(){
+function spShowNext(){
   const cfg = spConfig();
   if (!cfg.enabled){ stopSocialProof(); return; }
-  const real = await spEnsureReal();
-  let queue = real.slice();
-  if (cfg.demo && real.length < 5) queue = queue.concat(spDemoList());
-  if (!queue.length){ spSchedule(cfg.intervalSec * 1000); return; }
-  const item = queue[spIndex % queue.length];
+  if (!cfg.entries.length){ spSchedule(cfg.intervalSec * 1000); return; }
+  const bar = document.getElementById("pdpSticky");
+  if (bar && bar.classList.contains("show")){ spSchedule(cfg.intervalSec * 1000); return; }
+  const item = cfg.entries[spIndex % cfg.entries.length];
   spIndex++;
   if (!spEl){
     spEl = document.createElement("div");
@@ -1531,13 +1568,15 @@ async function spShowNext(){
     spEl.className = "sp-popup";
     document.body.appendChild(spEl);
   }
-  const initial = esc(String(item.firstName || "C").charAt(0).toUpperCase());
-  const cityPart = item.city ? esc(item.city) + " • " : "";
+  const initial = esc(String(item.name || "C").charAt(0).toUpperCase());
+  const metaParts = [];
+  if (item.city) metaParts.push(esc(item.city));
+  if (item.amount) metaParts.push("Rs " + esc(item.amount));
+  if (item.timeText) metaParts.push(esc(item.timeText));
   spEl.innerHTML = `<button class="sp-close" type="button" aria-label="Band karein">×</button>`
     + `<span class="sp-avatar">${initial}</span>`
-    + `<div class="sp-body"><p class="sp-line"><strong>${esc(item.firstName)}</strong> ne <strong>${esc(item.product)}</strong> order kiya${item.demo ? ' <span class="sp-demo">Demo</span>' : ""}</p>`
-    + `<p class="sp-meta">${cityPart}Rs ${Number(item.total || 0).toLocaleString("en-PK")} • ${esc(item.ago)}</p>`
-    + (item.demo ? "" : `<p class="sp-verified">✓ Verified order</p>`) + `</div>`;
+    + `<div class="sp-body"><p class="sp-line"><strong>${esc(item.name)}</strong> ne <strong>${esc(item.product)}</strong> order kiya</p>`
+    + (metaParts.length ? `<p class="sp-meta">${metaParts.join(" • ")}</p>` : "") + `</div>`;
   spEl.querySelector(".sp-close").onclick = e => { e.stopPropagation(); spHide(true); };
   spEl.onclick = () => {
     const p = PRODUCTS.find(x => x.name === item.product);

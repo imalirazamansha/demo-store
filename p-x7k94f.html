@@ -169,6 +169,10 @@
   .style-table th,.style-table td{padding:8px}
   .style-table input[type=text]{border:1.5px solid var(--line);border-radius:7px;padding:6px 8px;width:100%;background:#fff}
   .style-table input[type=color]{width:44px;height:34px;padding:2px;border:1.5px solid var(--line);border-radius:7px;background:#fff}
+  /* --- V3.3 Content tab + SP entry rows --- */
+  .cnt-row,.sp-row{border:1.5px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#fff}
+  .cnt-row input,.cnt-row textarea,.sp-row input{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;margin-bottom:6px;font-size:14px}
+  .cnt-row-actions{display:flex;gap:6px;flex-wrap:wrap}
   input[type=range]{accent-color:var(--accent-dark)}
   @media (max-width:700px){.ostats{grid-template-columns:repeat(3,1fr)} .oe-item,.oe-head{grid-template-columns:1fr 50px 76px 76px 30px}}
   @media (max-width:700px){.stats,.acards{grid-template-columns:repeat(2,1fr)} .settings-grid,.dash-grid{grid-template-columns:1fr} table{font-size:13px} th:nth-child(4),td:nth-child(4){display:none}}
@@ -231,6 +235,7 @@
     <button id="tabHomepage"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>Homepage</button>
     <button id="tabAppearance"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.9 2-1.8 0-.8-.7-1.3-.7-2.1 0-.9.7-1.6 1.7-1.6h2A4.5 4.5 0 0 0 21.5 12C21.4 6.9 17.2 3 12 3z"/><circle cx="7.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/></svg>Appearance</button>
     <button id="tabStyle"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="#fff"/><circle cx="15" cy="12" r="2.2" fill="#fff"/><circle cx="7" cy="17" r="2.2" fill="#fff"/></svg>Style</button>
+    <button id="tabContent"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="9" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="8" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg>Content</button>
     <button id="tabSettings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
     <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
   </div>
@@ -480,6 +485,7 @@
   <div class="card hidden" id="homepagePanel">
     <h3 style="margin-bottom:6px">🧩 Homepage Sections</h3>
     <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Har section ko <strong>⠿ handle se drag</strong> karke upar/neeche karein — store ka homepage bilkul isi tartib mein bane ga. 👁 toggle off karne se section store se chhup jayega. Neeche <strong>Custom Section</strong> se apna heading/text/image wala naya section bhi jor sakte hain. <strong>Save</strong> ke baad store reload karke dekhein.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">ℹ️ <strong>Farq samajh lein:</strong> yahan sirf sections ki <strong>tartib + show/hide + custom sections</strong> hote hain. Built-in sections ke <strong>andar ka content</strong> (FAQ ke sawal, reviews, How-to-Order steps, budget tiles, trust strip, About text) <strong>Content tab</strong> mein edit hota hai.</p>
     <div id="sectionsWrap"></div>
     <button class="btn ghost" id="addCustomSectionBtn" type="button" style="margin-top:4px">＋ Custom Section add karein</button>
     <div style="margin-top:18px">
@@ -682,11 +688,66 @@
           <input type="number" id="stySpDuration" min="1" step="1" value="5" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff">
         </div>
       </div>
-      <label class="checkline" style="margin-top:12px"><input type="checkbox" id="stySpDemo" checked> Demo popups dikhayein <span style="color:var(--muted);font-weight:400">(demo popups par "Demo" tag lagta hai — jab 5+ asal orders aa jayenge to demo khud band ho jayega)</span></label>
+      <div style="margin-top:14px">
+        <h4 style="margin-bottom:6px">📝 Popup entries — aap khud likhein</h4>
+        <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Yehi entries popup mein dikhengi — <strong>koi auto order fetch nahi, koi demo nahi</strong>. Waqt <strong>exact waisa likhein jaisa dikhana hai</strong> (masalan "2 min pehle"). Amount khaali bhi chalega. Poori khaali row save nahi hogi. Entries khaali hon to koi popup nahi dikhega.</p>
+        <div id="spEntriesWrap"></div>
+        <button class="btn ghost" id="addSpEntryBtn" type="button" style="margin-top:6px">＋ Entry add karein</button>
+      </div>
     </div>
 
     <button class="btn js-save" id="saveStyleBtn" style="margin-top:2px">💾 Save Style</button>
     <p class="msg" id="styleMsg"></p>
+  </div>
+
+  <!-- CONTENT (V3.3) — built-in sections ke andar ka content -->
+  <div class="card hidden" id="contentPanel">
+    <h3 style="margin-bottom:6px">📝 Content — Homepage Sections ka Andaruni Content</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Yahan built-in sections ka <strong>text</strong> badalta hai. Sections ki <strong>tartib/show-hide</strong> Homepage tab mein hoti hai, rang Style tab mein. Khaali row save nahi hogi. <strong>Save</strong> ke baad store reload karke dekhein.</p>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>ℹ️ About + Footer Text</h4>
+      <label>About heading</label>
+      <input id="cntAboutHeading" placeholder="PAKISTAN KA SMART STORE">
+      <label style="margin-top:10px;display:block">About text</label>
+      <textarea id="cntAboutText" rows="3" placeholder="Store ke baare mein..."></textarea>
+      <label style="margin-top:10px;display:block">Footer about text (khaali ho to About text hi dikhega)</label>
+      <textarea id="cntFooterText" rows="2" placeholder="Footer mein store ke baare mein..."></textarea>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>🪜 How to Order — Steps (number khud lagte hain: 01, 02, ...)</h4>
+      <div id="cntHowWrap"></div>
+      <button class="btn ghost" id="addCntHowBtn" type="button" style="margin-top:6px">＋ Step add karein</button>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>❓ FAQ — Sawal / Jawab</h4>
+      <div id="cntFaqWrap"></div>
+      <button class="btn ghost" id="addCntFaqBtn" type="button" style="margin-top:6px">＋ FAQ add karein</button>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>⭐ Happy Customers — Reviews</h4>
+      <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Product ka naam <strong>bilkul waisa likhein jaisa store mein hai</strong> — to us ki photo khud lag jayegi; na mile to generic icon dikhega.</p>
+      <div id="cntReviewsWrap"></div>
+      <button class="btn ghost" id="addCntReviewsBtn" type="button" style="margin-top:6px">＋ Review add karein</button>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>💰 Shop by Budget — Tiles (aakhri tile "top" budget wali = HIGHEST RATED jaisi hoti hai)</h4>
+      <div id="cntBudgetWrap"></div>
+      <button class="btn ghost" id="addCntBudgetBtn" type="button" style="margin-top:6px">＋ Tile add karein</button>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>🛡️ Trust Strip — Store Benefits (upar wali patti)</h4>
+      <div id="cntTrustWrap"></div>
+      <button class="btn ghost" id="addCntTrustBtn" type="button" style="margin-top:6px">＋ Benefit add karein</button>
+    </div>
+
+    <button class="btn js-save" id="saveContentBtn" style="margin-top:2px">💾 Save Content</button>
+    <p class="msg" id="contentMsg"></p>
   </div>
 </div>
 
