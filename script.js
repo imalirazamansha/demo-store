@@ -449,10 +449,17 @@ function applySettings(){
     fc.innerHTML = lines.join("");
     fc.hidden = lines.length === 0;
   }
-  /* V3.3: settings-driven content sections (static HTML ko overwrite karte hain). */
+  /* V3.3: settings-driven content sections (static HTML ko overwrite karte hain).
+     renderFaq/renderReviews yahan LAZMI hain: neechay wali akeli renderFaq()
+     call settings load hone se PEHLE chalti hai (is liye FAQ hamesha
+     defaults dikhata tha), aur reviews bhi products/settings race mein
+     defaults par atak sakte thay — applySettings har settings load par
+     dobara chalta hai, is liye yahan re-render hi sahi source hai. */
   renderTrust();
   renderBudget();
   renderSteps();
+  renderFaq();
+  renderReviews();
   watchReveals();
   syncHeaderOffset();
   applyStyleSettings();
