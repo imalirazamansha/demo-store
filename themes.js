@@ -3,9 +3,14 @@
    storefront, and before p-x7k94f.js / hq-m3d8w5.js on the admin pages
    (they reuse the same definitions for the theme pickers).
 
-   A theme changes ONLY the LOOK (colors, fonts, card radius, hero style,
-   category style) — never content or sections. Sections order/visibility
-   stays in settings.data.sections_order (Homepage builder).
+   V3.1: a theme now ALSO changes the whole storefront LAYOUT per
+   business (themes.js -> layout: hero/header/grid/card/cats/deals/
+   defaultOrder), inspired by big Pakistani sites (Daraz/Zeebay, Khaadi/
+   Gul Ahmed, Telemart, Naheed/HumMart). It still never changes CONTENT:
+   products, prices and section definitions stay the admin's. A theme's
+   defaultOrder applies ONLY when the admin has NOT set a custom
+   sections_order (custom order always wins); general's defaultOrder is
+   null, so general keeps the exact legacy section behaviour.
 
    ALLOCATION SEMANTICS (stores.allowed_themes, jsonb):
      [] (empty array) or missing/null  =>  ALL themes allowed.
@@ -22,6 +27,8 @@
   var THEMES = [
     {
       key: "general",
+      layoutDesc: "Daraz/Zeebay style dense marketplace — 5-column grid, compact cards, slider hero",
+      layout: { hero: "slider", header: "standard", grid: "dense", card: "compact", cats: "tiles", deals: "strip", defaultOrder: null },
       name: "General Store",
       nameUr: "Aam Dukaan",
       business: "General / local shopkeeper",
@@ -34,6 +41,8 @@
     },
     {
       key: "fashion",
+      layoutDesc: "Khaadi style editorial — full-width hero image, bari 4/5 images, centered header",
+      layout: { hero: "editorial", header: "centered", grid: "large", card: "large", cats: "circles", deals: "grid", defaultOrder: ["hero", "categories", "best_sellers", "all_products", "promos", "hot", "new_arrivals", "deals", "about", "testimonials", "faq"] },
       name: "Fashion / Clothing",
       nameUr: "Fashion / Kapray",
       business: "Clothing, boutique, fashion store",
@@ -45,6 +54,8 @@
     },
     {
       key: "beauty",
+      layoutDesc: "Clean beauty store — soft banner, reviews upar, pill categories",
+      layout: { hero: "banner", header: "standard", grid: "standard", card: "standard", cats: "pills", deals: "strip", defaultOrder: ["hero", "categories", "best_sellers", "testimonials", "all_products", "promos", "about"] },
       name: "Beauty / Cosmetics",
       nameUr: "Beauty / Cosmetics",
       business: "Beauty, skincare, cosmetics store",
@@ -56,6 +67,8 @@
     },
     {
       key: "electronics",
+      layoutDesc: "Telemart style spec store — bara search bar, spec line har card par, deals upar",
+      layout: { hero: "compact", header: "search-first", grid: "standard", card: "spec", cats: "bar", deals: "grid", defaultOrder: ["hero", "deals", "categories", "best_sellers", "all_products", "hot", "about"] },
       name: "Electronics / Mobile",
       nameUr: "Electronics / Mobile",
       business: "Tech, mobile, gadgets store",
@@ -67,6 +80,8 @@
     },
     {
       key: "food",
+      layoutDesc: "Naheed/HumMart style grocery — dense grid, deals + budget upar, bar categories",
+      layout: { hero: "banner", header: "standard", grid: "dense", card: "compact", cats: "bar", deals: "grid", defaultOrder: ["hero", "categories", "deals", "budget", "best_sellers", "all_products", "about"] },
       name: "Food / Bakery / Grocery",
       nameUr: "Food / Bakery / Grocery",
       business: "Food, bakery, grocery store",

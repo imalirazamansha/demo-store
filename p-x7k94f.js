@@ -1375,7 +1375,7 @@ function renderThemePicker(){
     var ok = allowedKeys.indexOf(t.key) !== -1;
     var sel = ADMIN_THEME_SELECTED === t.key;
     var dots = `<span class="theme-dots"><i style="background:${t.palette.primary}"></i><i style="background:${t.palette.accent}"></i><i style="background:${t.palette.header}"></i></span>`;
-    return `<button type="button" class="theme-card ${sel ? "selected" : ""} ${ok ? "" : "locked"}" data-theme="${t.key}" ${ok ? "" : "disabled"}>${dots}<h5>${t.name} <small>(${t.nameUr})</small></h5><p>${t.tagline}</p><p><small>${t.business}</small></p>${sel ? "<p><strong>✓ Selected</strong></p>" : ""}${ok ? "" : "<p><strong>🔒 Super Admin ne ye theme allow nahi ki</strong></p>"}</button>`;
+    return `<button type="button" class="theme-card ${sel ? "selected" : ""} ${ok ? "" : "locked"}" data-theme="${t.key}" ${ok ? "" : "disabled"}>${dots}<h5>${t.name} <small>(${t.nameUr})</small></h5><p>${t.tagline}</p><p><small>${t.business}</small></p><p><small>\u{1F4D0} Layout: ${t.layoutDesc || ""}</small></p>${sel ? "<p><strong>✓ Selected</strong></p>" : ""}${ok ? "" : "<p><strong>🔒 Super Admin ne ye theme allow nahi ki</strong></p>"}</button>`;
   }).join("");
   wrap.querySelectorAll("[data-theme]").forEach(function(b){
     b.onclick = function(){ ADMIN_THEME_SELECTED = b.dataset.theme; renderThemePicker(); };

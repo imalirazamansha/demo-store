@@ -6,12 +6,19 @@
   --radius:18px; --shadow:0 14px 34px rgba(10,43,78,.12);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:var(--font-body,'Archivo',Arial,sans-serif);background:#fff;color:var(--ink);overflow-x:hidden}
+/* V3.1 SCROLL FIX: body{overflow-x:hidden} body ko khud ek scroll container
+   bana deta hai (kuch browsers mein) — phir window wheel/PageDown/End/
+   touch-drag kaam nahi karta, sirf scrollIntoView jumps chalte hain.
+   overflow-x:clip koi scroll container nahi banata, is liye sticky header
+   aur window scrolling dono mehfooz rehte hain. */
+html{scroll-behavior:smooth;overflow-x:clip}
+body{font-family:var(--font-body,'Archivo',Arial,sans-serif);background:#fff;color:var(--ink);overflow-x:clip}
+@supports not (overflow-x:clip){html{overflow-x:hidden}body{overflow-x:visible}}
 h1,h2,h3,.logo,.section-title,.budget-tile strong{font-family:var(--font-head,'Oswald','Archivo',Arial,sans-serif);letter-spacing:.02em}
 button{font-family:inherit;cursor:pointer} input,select,textarea{font-family:inherit;font-size:16px}
 img{display:block;max-width:100%} a{color:inherit}
 .wrap{max-width:1180px;margin:0 auto;padding-left:16px;padding-right:16px}
+.grid>*,.cart-layout>*,.co-grid>*,.pdp-grid>*{min-width:0}
 .section{padding:52px 0}.section-alt{background:var(--soft)}
 .eyebrow{color:var(--green-dark);font-size:clamp(11px,2.8vw,12.5px);font-weight:900;letter-spacing:.16em;text-transform:uppercase;text-align:center;margin-bottom:8px;overflow-wrap:break-word}
 .eyebrow.light{color:#a7f3d0}.eyebrow.left,.section-title.left{text-align:left}
@@ -338,3 +345,55 @@ body.cats-list .cat-tile span{font-size:14px}
 .track-card{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px;line-height:1.8}
 .track-card .pill{display:inline-block;background:#0A2B4E;color:#fff;border-radius:999px;padding:2px 12px;font-size:13px}
 .track-note{background:#fff;border:1px dashed #86efac;border-radius:8px;padding:8px 10px;margin-top:8px}
+
+/* ================= V3.1: Layout themes =================
+   layout-* classes applyTheme() se lagti hain (themes.js -> layout).
+   Purani theme-*/hero-*/cards-*/cats-* classes backward compat ke liye
+   rehti hain; layout rules sirf look ke upar layout badalti hain. */
+/* --- Grids --- */
+body.layout-grid-dense .grid{grid-template-columns:repeat(5,1fr);gap:14px}
+@media(max-width:960px){body.layout-grid-dense .grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){body.layout-grid-dense .grid{grid-template-columns:repeat(2,1fr);gap:12px}}
+body.layout-grid-large .grid{grid-template-columns:repeat(3,1fr);gap:22px}
+@media(max-width:960px){body.layout-grid-large .grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){body.layout-grid-large .grid{grid-template-columns:repeat(2,1fr);gap:12px}}
+/* --- Cards --- */
+body.layout-card-compact .card-body{padding:10px}
+body.layout-card-compact .card-title{font-size:14px;min-height:37px}
+body.layout-card-compact .price strong{font-size:16.5px}
+body.layout-card-large .card-imgwrap img{aspect-ratio:4/5}
+body.layout-card-large .card-body{text-align:center;align-items:center}
+body.layout-card-large .card-title{font-size:18px;min-height:46px}
+body.layout-card-large .price{justify-content:center}
+body.layout-card-large .card-actions{width:100%}
+.card-spec{font-size:13px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:37px}
+/* --- Categories: circles (bigger) / bar (full-width pill row) --- */
+body.layout-cats-circles .cat-tile{min-width:150px}
+body.layout-cats-circles .cat-tile img{width:140px;height:140px}
+body.layout-cats-bar .cat-tile{display:flex;align-items:center;gap:8px;background:var(--soft);border-radius:999px;padding:6px 14px 6px 6px;min-width:0}
+body.layout-cats-bar .cat-tile img{width:44px;height:44px;margin:0;border-width:3px}
+body.layout-cats-bar .cat-tile span{font-size:12px}
+/* --- Deals: strip (horizontal scroll row) vs grid (base 2-col) --- */
+body.layout-deals-strip .promo-grid{display:flex;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:10px}
+body.layout-deals-strip .promo-card{min-width:320px;max-width:380px;flex:none;scroll-snap-align:start}
+/* --- Hero: banner / compact / editorial --- */
+body.layout-hero-banner .hero-slide{min-height:520px}
+body.layout-hero-compact .hero-slide{min-height:300px}
+body.layout-hero-compact .hero-img{height:220px}
+body.layout-hero-editorial .hero-slide{min-height:560px;position:relative;overflow:hidden}
+body.layout-hero-editorial .hero-inner{grid-template-columns:1fr} /* NOTE: .hero-inner relative NAHI — warna absolute .hero-img sirf inner box cover karta; containing block .hero-slide (relative) hona chahiye taake image poori slide cover kare */
+body.layout-hero-editorial .hero-img{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;box-shadow:none;object-fit:cover}
+body.layout-hero-editorial .hero-slide::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,20,35,.85) 0%,rgba(7,20,35,.55) 55%,rgba(7,20,35,.12) 100%);z-index:1}
+body.layout-hero-editorial .hero-content{position:relative;z-index:2;max-width:58ch}
+body.layout-hero-editorial .hero-dots{z-index:3}
+@media(max-width:760px){body.layout-hero-editorial .hero-slide{min-height:420px}}
+/* --- Header: centered (desktop only, mobile = standard) --- */
+@media(min-width:761px){
+  body.layout-header-centered .header-pill{position:relative;justify-content:center}
+  body.layout-header-centered #searchToggle{position:absolute;left:10px}
+  body.layout-header-centered .header-actions{position:absolute;right:10px}
+  body.layout-header-centered .catnav{justify-content:center}
+}
+/* --- Header: search-first (search bar hamesha nazar aaye, bari) --- */
+body.layout-header-search-first .search-bar{max-width:1180px;margin:12px auto 4px}
+body.layout-header-search-first .search-bar input{padding:14px 18px}

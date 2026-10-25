@@ -369,8 +369,23 @@ function applyTheme(){
   ["slider", "banner", "minimal"].forEach(function(x){ document.body.classList.remove("hero-" + x); });
   ["rounded", "sharp", "soft"].forEach(function(x){ document.body.classList.remove("cards-" + x); });
   ["tiles", "pills", "list"].forEach(function(x){ document.body.classList.remove("cats-" + x); });
+  /* V3.1 layout classes (purani classes backward compat ke liye rehti hain). */
+  ["slider", "banner", "compact", "editorial"].forEach(function(x){ document.body.classList.remove("layout-hero-" + x); });
+  ["standard", "centered", "search-first"].forEach(function(x){ document.body.classList.remove("layout-header-" + x); });
+  ["dense", "standard", "large"].forEach(function(x){ document.body.classList.remove("layout-grid-" + x); });
+  ["compact", "standard", "large", "spec"].forEach(function(x){ document.body.classList.remove("layout-card-" + x); });
+  ["tiles", "circles", "pills", "bar"].forEach(function(x){ document.body.classList.remove("layout-cats-" + x); });
+  ["strip", "grid"].forEach(function(x){ document.body.classList.remove("layout-deals-" + x); });
   if (t){
     document.body.classList.add("theme-" + t.key, "hero-" + t.heroStyle, "cards-" + t.cardStyle, "cats-" + t.categoryStyle);
+    /* Layout: themes.js -> layout; missing ho to standard look. */
+    var L = t.layout || {};
+    document.body.classList.add("layout-hero-" + (L.hero || "slider"), "layout-header-" + (L.header || "standard"), "layout-grid-" + (L.grid || "standard"), "layout-card-" + (L.card || "standard"), "layout-cats-" + (L.cats || "tiles"), "layout-deals-" + (L.deals || "grid"));
+    /* search-first: search bar hamesha nazar aaye (boot par; toggle baad
+       mein phir bhi kaam karta hai). [hidden] rule class se nahi tootta,
+       is liye JS se hidden hatana zaroori hai. */
+    var sbEl = $("#searchBar");
+    if (sbEl) sbEl.hidden = (L.header !== "search-first");
     var p = t.palette || {};
     var setOrRemove = function(v, val){ if (val) root.style.setProperty(v, val); else root.style.removeProperty(v); };
     setOrRemove("--theme-primary", p.primary);
@@ -512,7 +527,16 @@ function applySections(){
   if (!home) return;
   /* Purane custom sections hamesha saaf — settings se dobara bante hain. */
   home.querySelectorAll(".custom-section").forEach(el => el.remove());
-  const order = Array.isArray(SETTINGS.sections_order) && SETTINGS.sections_order.length ? SETTINGS.sections_order : null;
+  let order = Array.isArray(SETTINGS.sections_order) && SETTINGS.sections_order.length ? SETTINGS.sections_order : null;
+  if (!order){
+    /* V3.1: admin ne custom order NAHI set kiya to active theme ka
+       defaultOrder use ho (general ka null hai -> legacy behaviour).
+       Custom order set ho to ye kabhi nahi chalta — admin ki pasand
+       hamesha theme se upar hai. */
+    if (!ACTIVE_THEME) resolveActiveTheme();
+    const dflt = ACTIVE_THEME && ACTIVE_THEME.layout && ACTIVE_THEME.layout.defaultOrder;
+    if (Array.isArray(dflt) && dflt.length) order = dflt.map(k => ({ key: k, visible: true }));
+  }
   if (!order){
     /* Legacy: settings.sections toggles (hero sirf slides par depend karta hai). */
     const SECTION_IDS = { best: "bestSection", hot: "hotSection", arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", howto: "howSection", faq: "faqSection", reviews: "reviewsSection", promos: "promoSection" };
@@ -645,10 +669,14 @@ function cardHTML(p, opts = {}){
     : (opts.buyOnly
       ? `<button class="mini-btn order" type="button" data-order="${p.id}">BUY NOW</button>`
       : `<button class="mini-btn add" type="button" data-add="${p.id}">Add to Cart</button><button class="mini-btn order" type="button" data-order="${p.id}">Order Now</button>`);
+  /* V3.1 spec line: sirf card-spec layout (electronics) par, desc ke pehle
+     ~60 chars, escaped; desc khaali ho to line hi nahi banti. */
+  const spec = (ACTIVE_THEME && ACTIVE_THEME.layout && ACTIVE_THEME.layout.card === "spec" && String(p.desc || "").trim())
+    ? `<p class="card-spec">${esc(String(p.desc).slice(0, 60))}</p>` : "";
   return `<article class="card reveal ${out ? "is-oos" : ""}">
     <div class="card-imgwrap" data-view="${p.id}"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}" loading="lazy">${badge}${oosBadge}</div>
     <div class="card-body">
-      <h3 class="card-title" data-view="${p.id}">${esc(p.name)}</h3>
+      <h3 class="card-title" data-view="${p.id}">${esc(p.name)}</h3>${spec}
       <p class="stars">${stars(p.rating)} <small>${ratingOf(p).toFixed(1)} (${reviewsOf(p)})</small></p>
       <div class="price"><strong>${fmt(p.price)}</strong>${Number(p.old) > Number(p.price) ? `<del>${fmt(p.old)}</del>` : ""}</div>
       <p class="deliv ${feeOf(p) ? "paid" : ""}">${delivText(p)}</p>
