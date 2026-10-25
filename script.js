@@ -336,6 +336,7 @@ function applySettings(){
     fc.hidden = lines.length === 0;
   }
   watchReveals();
+  syncHeaderOffset();
 }
 
 /* ---------- V3: Themes (look) + Appearance (font / accent) ----------
@@ -1258,7 +1259,16 @@ $("#searchToggle").onclick = () => {
   const bar = $("#searchBar");
   bar.hidden = !bar.hidden;
   if (!bar.hidden) $("#searchInput").focus();
+  syncHeaderOffset();
 };
+/* V3.1c: fixed header ki height ke barabar body padding — header ki height
+   theme/search-bar/mobile wrap se badal sakti hai, is liye measure karke
+   lagayen (resize + settings apply par dobara). */
+function syncHeaderOffset(){
+  const h = $("#siteHeader") || document.querySelector(".site-header");
+  if (h) document.body.style.paddingTop = h.offsetHeight + "px";
+}
+window.addEventListener("resize", syncHeaderOffset);
 $("#searchBtn").onclick = () => { showPage("homeView"); renderGrid(); requestAnimationFrame(() => scrollToId("shop")); };
 $("#searchInput").addEventListener("input", renderGrid);
 $("#searchInput").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); $("#searchBtn").click(); } });

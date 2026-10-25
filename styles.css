@@ -70,7 +70,11 @@ body.store-closed>*:not(.store-notice){display:none!important}
 @keyframes marquee{to{transform:translateX(-50%)}}
 
 /* Header */
-.site-header{position:sticky;top:0;z-index:45;background:rgba(255,255,255,.97);padding:10px 12px 8px;box-shadow:0 5px 22px rgba(10,43,78,.08)}
+/* V3.1c: sticky header live par nahi tik raha tha (overflow rules ke saath
+   browser quirks) — is liye header ab FIXED hai; body padding JS se header
+   ki asal height ke barabar set hoti hai (syncHeaderOffset), taake content
+   header ke neechay se shuru ho aur koi cheez chhupay nahi. */
+.site-header{position:fixed;top:0;left:0;right:0;z-index:45;background:rgba(255,255,255,.97);padding:10px 12px 8px;box-shadow:0 5px 22px rgba(10,43,78,.08)}
 .header-pill{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 10px;box-shadow:0 5px 18px rgba(10,43,78,.07)}
 .logo{font-size:clamp(21px,3vw,28px);font-weight:700;color:var(--navy);text-decoration:none;text-transform:uppercase;white-space:nowrap;display:flex;align-items:center;gap:8px}.logo-bag{display:inline-flex}.logo-bag .ic{width:.95em;height:.95em}.header-actions{display:flex;gap:8px}
 .icon-btn{position:relative;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--navy);font-size:20px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
