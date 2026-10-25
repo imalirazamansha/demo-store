@@ -111,7 +111,7 @@ body.store-closed>*:not(.store-notice){display:none!important}
 .stars{color:var(--gold);font-size:14px;letter-spacing:.5px;min-height:20px;white-space:nowrap;overflow:hidden}.stars small{color:var(--muted);letter-spacing:0;font-family:'Archivo'}
 .price{margin-top:auto;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-height:24px}.price strong{font-size:19px;color:var(--card-price,var(--navy))}.price del{color:#94a3b8;font-size:13.5px}
 .deliv{font-size:12.5px;font-weight:800;color:var(--green-dark);min-height:17px}.deliv.paid{color:var(--muted)}
-.card-actions{display:flex;gap:7px}.mini-btn{flex:1;border-radius:999px;padding:9px 3px;font-size:11.5px;font-weight:900;text-transform:uppercase;white-space:nowrap;min-height:38px;display:inline-flex;align-items:center;justify-content:center;transition:.18s}.mini-btn:active{transform:scale(.97)}.mini-btn.add{background:#fff;border:1.5px solid var(--navy);color:var(--navy)}.mini-btn.order{background:linear-gradient(135deg,var(--green),var(--mint));border:0;color:#fff}
+.card-actions{display:flex;gap:7px}.mini-btn{flex:1;border-radius:999px;padding:9px 3px;font-size:11.5px;font-weight:900;text-transform:uppercase;white-space:nowrap;min-height:38px;display:inline-flex;align-items:center;justify-content:center;transition:.18s}.mini-btn:active{transform:scale(.97)}.mini-btn.add{background:#fff;border:1.5px solid var(--btn-secondary-color,var(--navy));color:var(--btn-secondary-color,var(--navy))}.mini-btn.order{background:var(--btn-primary-bg,linear-gradient(135deg,var(--green),var(--mint)));border:0;color:var(--btn-primary-color,#fff)}
 .shop-heading{display:flex;justify-content:space-between;align-items:end;gap:14px}.results{color:var(--muted);font-size:14px;padding-bottom:28px}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}.filter-note{color:var(--muted);font-size:13.5px}.sort select{border:1.5px solid var(--line);border-radius:999px;padding:9px 12px;background:#fff;color:var(--navy);font-weight:700}.empty{text-align:center;color:var(--muted);padding:36px 0}.empty.error{color:var(--red)}
 
 /* Promos */
@@ -512,3 +512,8 @@ body.no-anim .btn.primary::after{transition:none!important}
 .sp-demo{font-size:10.5px;font-weight:900;background:#FEF3C7;color:#92400e;border-radius:999px;padding:2px 8px;letter-spacing:.03em;white-space:nowrap}
 .sp-close{position:absolute;top:6px;right:8px;border:0;background:none;font-size:18px;color:var(--muted);line-height:1;padding:2px 4px;cursor:pointer}
 @media(max-width:520px){.sp-popup{left:12px;right:12px;bottom:12px;max-width:none;width:auto}}
+
+/* V3.2b: Style Editor ki button radius mini-btns par bhi laagu ho — ye rule
+   theme radius rules ke BAAD hai, is liye Style set ho to wahi jeet-ta hai;
+   Style khaali ho to body par --btn-radius maujood hi nahi, rule be-asar. */
+body[style*="--btn-radius"] .mini-btn{border-radius:var(--btn-radius)}
