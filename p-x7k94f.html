@@ -162,6 +162,14 @@
   .star-on{color:#f59e0b;font-size:16px}
   .star-off{color:#cbd5e1;font-size:16px}
   #topSaveMsg{font-size:13px;font-weight:600;color:#a7f3d0}
+  /* --- V3.2 Style Editor: color rows + sections table --- */
+  .color-row{display:flex;gap:8px;align-items:center}
+  .color-row input[type=color]{width:46px;height:38px;padding:3px;border:1.5px solid var(--line);border-radius:8px;background:#fff;flex:none}
+  .color-row input[type=text]{flex:1;min-width:110px}
+  .style-table th,.style-table td{padding:8px}
+  .style-table input[type=text]{border:1.5px solid var(--line);border-radius:7px;padding:6px 8px;width:100%;background:#fff}
+  .style-table input[type=color]{width:44px;height:34px;padding:2px;border:1.5px solid var(--line);border-radius:7px;background:#fff}
+  input[type=range]{accent-color:var(--accent-dark)}
   @media (max-width:700px){.ostats{grid-template-columns:repeat(3,1fr)} .oe-item,.oe-head{grid-template-columns:1fr 50px 76px 76px 30px}}
   @media (max-width:700px){.stats,.acards{grid-template-columns:repeat(2,1fr)} .settings-grid,.dash-grid{grid-template-columns:1fr} table{font-size:13px} th:nth-child(4),td:nth-child(4){display:none}}
 </style>
@@ -222,6 +230,7 @@
     <button id="tabTeam"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6"/><path d="M18.6 14.8c1.4.9 2.4 2.5 2.4 5.2"/></svg>Team</button>
     <button id="tabHomepage"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>Homepage</button>
     <button id="tabAppearance"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.9 2-1.8 0-.8-.7-1.3-.7-2.1 0-.9.7-1.6 1.7-1.6h2A4.5 4.5 0 0 0 21.5 12C21.4 6.9 17.2 3 12 3z"/><circle cx="7.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/></svg>Appearance</button>
+    <button id="tabStyle"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="#fff"/><circle cx="15" cy="12" r="2.2" fill="#fff"/><circle cx="7" cy="17" r="2.2" fill="#fff"/></svg>Style</button>
     <button id="tabSettings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
     <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
   </div>
@@ -570,6 +579,114 @@
 
     <button class="btn js-save" id="saveAppearanceBtn" style="margin-top:16px">💾 Save Appearance</button>
     <p class="msg" id="appearanceMsg"></p>
+  </div>
+
+  <!-- STYLE EDITOR (V3.2) — theme ke upar custom style; khaali = theme default -->
+  <div class="card hidden" id="stylePanel">
+    <h3 style="margin-bottom:6px">🎨 Style Editor</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Store ke <strong>cards, sections, buttons aur page rang</strong> yahan se badlein — ye settings <strong>theme ke upar</strong> lagti hain. Koi rang <strong>khaali</strong> chor dein to us jagah theme ka default look chalega. Save ke baad store reload karke dekhein.</p>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>🃏 Product Cards</h4>
+      <div class="settings-grid">
+        <div>
+          <label>Card border radius — <span id="styCardRadiusVal">Theme default</span></label>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="range" id="styCardRadius" min="0" max="30" step="1" value="18" style="flex:1;min-width:160px">
+            <label class="checkline" style="border:0;padding:2px"><input type="checkbox" id="styCardRadiusDefault" checked> Theme default</label>
+          </div>
+          <label>Card background (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styCardBgC" value="#ffffff"><input type="text" id="styCardBg" placeholder="#RRGGBB ya khaali"></div>
+          <label>Card border color (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styCardBorderC" value="#dce8ee"><input type="text" id="styCardBorder" placeholder="#RRGGBB ya khaali"></div>
+        </div>
+        <div>
+          <label>Card shadow</label>
+          <select id="styCardShadow" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff">
+            <option value="">Theme default</option><option value="none">Koi shadow nahi</option><option value="soft">Soft</option><option value="strong">Strong</option>
+          </select>
+          <label>Card title color (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styCardTitleC" value="#0A2B4E"><input type="text" id="styCardTitle" placeholder="#RRGGBB ya khaali"></div>
+          <label>Card price color (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styCardPriceC" value="#0A2B4E"><input type="text" id="styCardPrice" placeholder="#RRGGBB ya khaali"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>🧩 Homepage Sections — background + heading rang</h4>
+      <p class="hint">Har section ka background aur heading rang — khaali = theme default.</p>
+      <div style="overflow-x:auto;margin-top:10px">
+        <table class="style-table">
+          <thead><tr><th>Section</th><th>Background</th><th>Heading rang</th></tr></thead>
+          <tbody id="styleSectionsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>🔘 Buttons</h4>
+      <div class="settings-grid">
+        <div>
+          <label>Primary button background (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styBtnBgC" value="#22C55E"><input type="text" id="styBtnBg" placeholder="#RRGGBB ya khaali"></div>
+          <label>Primary button text color (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styBtnColorC" value="#ffffff"><input type="text" id="styBtnColor" placeholder="#RRGGBB ya khaali"></div>
+        </div>
+        <div>
+          <label>Button border radius — <span id="styBtnRadiusVal">Theme default</span></label>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="range" id="styBtnRadius" min="0" max="30" step="1" value="18" style="flex:1;min-width:160px">
+            <label class="checkline" style="border:0;padding:2px"><input type="checkbox" id="styBtnRadiusDefault" checked> Theme default</label>
+          </div>
+          <label>Secondary (outline) button border + text color (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styBtnSecC" value="#0A2B4E"><input type="text" id="styBtnSec" placeholder="#RRGGBB ya khaali"></div>
+          <label>Button font size</label>
+          <select id="styBtnFontSize" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff">
+            <option value="">Theme default</option><option value="S">S (chhota)</option><option value="M">M (normal)</option><option value="L">L (bara)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>📄 Page Rang</h4>
+      <div class="settings-grid">
+        <div>
+          <label>Header background (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styPageHeaderC" value="#ffffff"><input type="text" id="styPageHeader" placeholder="#RRGGBB ya khaali"></div>
+          <label>Footer background (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styPageFooterC" value="#0A2B4E"><input type="text" id="styPageFooter" placeholder="#RRGGBB ya khaali"></div>
+          <label>Announcement bar background (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styPageMarqueeC" value="#0A2B4E"><input type="text" id="styPageMarquee" placeholder="#RRGGBB ya khaali"></div>
+        </div>
+        <div>
+          <label>Page background (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styPageBgC" value="#ffffff"><input type="text" id="styPageBg" placeholder="#RRGGBB ya khaali"></div>
+          <label>Body text color (khaali = theme default)</label>
+          <div class="color-row"><input type="color" id="styPageTextC" value="#142433"><input type="text" id="styPageText" placeholder="#RRGGBB ya khaali"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>👥 Social Proof Popups <small style="color:var(--muted);font-weight:400">(neeche-left corner mein "X ne Y order kiya" wali chhoti card)</small></h4>
+      <label class="checkline"><input type="checkbox" id="stySpEnabled" checked> Social-proof popups on karein</label>
+      <div class="settings-grid" style="margin-top:10px">
+        <div>
+          <label>Popup har kitne second baad (min 5)</label>
+          <input type="number" id="stySpInterval" min="5" step="1" value="20" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff">
+        </div>
+        <div>
+          <label>Popup kitne second dikhe</label>
+          <input type="number" id="stySpDuration" min="1" step="1" value="5" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff">
+        </div>
+      </div>
+      <label class="checkline" style="margin-top:12px"><input type="checkbox" id="stySpDemo" checked> Demo popups dikhayein <span style="color:var(--muted);font-weight:400">(demo popups par "Demo" tag lagta hai — jab 5+ asal orders aa jayenge to demo khud band ho jayega)</span></label>
+    </div>
+
+    <button class="btn js-save" id="saveStyleBtn" style="margin-top:2px">💾 Save Style</button>
+    <p class="msg" id="styleMsg"></p>
   </div>
 </div>
 

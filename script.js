@@ -37,6 +37,29 @@ const STORE_FONTS = {
   "Playfair Display": { name: "Playfair Display", stack: "'Playfair Display', Georgia, serif", google: "Playfair+Display:wght@500;600;700;800" },
   "Rubik": { name: "Rubik", stack: "'Rubik', system-ui, sans-serif", google: "Rubik:wght@400;500;600;700" }
 };
+/* ---------- V3.2 Style Editor validation ----------
+   Color values sirf tab style mein lagti hain jab ye validator pass kare:
+   #RRGGBB hex ya chhoti allowlist ke named colors. javascript:, data:,
+   url(...) ya koi aur raw string yahan se kabhi style mein nahi jaati. */
+const STYLE_NAMED_COLORS = ["white", "black", "red", "green", "blue", "pink", "orange", "purple", "navy", "teal", "maroon", "gold", "cream", "beige", "grey", "gray", "brown", "yellow", "transparent"];
+function validStyleColor(v){
+  const t = String(v || "").trim();
+  if (!t) return "";
+  if (/^#[0-9a-fA-F]{6}$/.test(t)) return t;
+  const low = t.toLowerCase();
+  return STYLE_NAMED_COLORS.indexOf(low) !== -1 ? low : "";
+}
+function clampStyleRadius(v){
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return "";
+  return Math.min(30, Math.max(0, n));
+}
+const STYLE_SHADOWS = ["", "none", "soft", "strong"];
+const STYLE_SHADOW_VALUES = { none: "none", soft: "0 10px 26px rgba(10,43,78,.10)", strong: "0 22px 46px rgba(10,43,78,.22)" };
+const STYLE_FONT_SIZES = { S: "12px", M: "14px", L: "16px" };
+/* Style Editor wale section keys (SECTION_NODE_IDS ka subset — trust strip
+   is list mein nahi, us ka style theme se hi aata hai). */
+const STYLE_SECTION_KEYS = ["hero", "categories", "best_sellers", "all_products", "promos", "hot", "new_arrivals", "deals", "budget", "about", "how_to_order", "faq", "testimonials"];
 /* Hex color ko halka/gahra karna (theme hover shades ke liye). amt: -1..1 */
 function shade(hex, amt){
   const n = parseInt(String(hex).slice(1), 16);
@@ -111,7 +134,15 @@ const DEFAULT_SETTINGS = {
   product_fields: [],
   animations: true,
   /* --- V3 theme (store admin ki choice; settings.data.theme) --- */
-  theme: ""
+  theme: "",
+  /* --- V3.2 Style Editor (admin "Style" tab; khaali = theme default) --- */
+  style: {
+    card: { radius: "", bg: "", border: "", shadow: "", titleColor: "", priceColor: "" },
+    sections: {},
+    buttons: { primaryBg: "", primaryColor: "", radius: "", secondaryColor: "", fontSize: "" },
+    page: { headerBg: "", footerBg: "", marqueeBg: "", pageBg: "", textColor: "" },
+    socialProof: { enabled: true, intervalSec: 20, durationSec: 5, demo: true }
+  }
 };
 let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
@@ -236,6 +267,44 @@ function mergeSettings(raw){
   out.product_fields = cleanFields(raw.product_fields);
   if (typeof raw.animations === "boolean") out.animations = raw.animations;
   if (typeof raw.theme === "string") out.theme = raw.theme.trim().toLowerCase();
+  /* V3.2 Style Editor — har value validate ho kar aati hai; ghalat value
+     khaali (theme default) ban jati hai, kabhi raw style mein nahi jaati. */
+  if (raw.style && typeof raw.style === "object"){
+    const st = raw.style;
+    if (st.card && typeof st.card === "object"){
+      out.style.card.radius = clampStyleRadius(st.card.radius);
+      out.style.card.bg = validStyleColor(st.card.bg);
+      out.style.card.border = validStyleColor(st.card.border);
+      out.style.card.shadow = STYLE_SHADOWS.indexOf(String(st.card.shadow || "")) !== -1 ? String(st.card.shadow) : "";
+      out.style.card.titleColor = validStyleColor(st.card.titleColor);
+      out.style.card.priceColor = validStyleColor(st.card.priceColor);
+    }
+    if (st.sections && typeof st.sections === "object"){
+      STYLE_SECTION_KEYS.forEach(k => {
+        if (st.sections[k] && typeof st.sections[k] === "object")
+          out.style.sections[k] = { bg: validStyleColor(st.sections[k].bg), heading: validStyleColor(st.sections[k].heading) };
+      });
+    }
+    if (st.buttons && typeof st.buttons === "object"){
+      out.style.buttons.primaryBg = validStyleColor(st.buttons.primaryBg);
+      out.style.buttons.primaryColor = validStyleColor(st.buttons.primaryColor);
+      out.style.buttons.radius = clampStyleRadius(st.buttons.radius);
+      out.style.buttons.secondaryColor = validStyleColor(st.buttons.secondaryColor);
+      out.style.buttons.fontSize = ["", "S", "M", "L"].indexOf(String(st.buttons.fontSize || "")) !== -1 ? String(st.buttons.fontSize) : "";
+    }
+    if (st.page && typeof st.page === "object"){
+      ["headerBg", "footerBg", "marqueeBg", "pageBg", "textColor"].forEach(k => { out.style.page[k] = validStyleColor(st.page[k]); });
+    }
+    if (st.socialProof && typeof st.socialProof === "object"){
+      const sp = st.socialProof;
+      if (typeof sp.enabled === "boolean") out.style.socialProof.enabled = sp.enabled;
+      if (typeof sp.demo === "boolean") out.style.socialProof.demo = sp.demo;
+      const iv = parseInt(sp.intervalSec, 10);
+      if (Number.isFinite(iv)) out.style.socialProof.intervalSec = Math.max(5, iv);
+      const du = parseInt(sp.durationSec, 10);
+      if (Number.isFinite(du)) out.style.socialProof.durationSec = Math.max(1, du);
+    }
+  }
   /* V3 Part B: SEO — Settings tab se (admin). */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title.trim();
   if (typeof raw.seo_description === "string") out.seo_description = raw.seo_description.trim();
@@ -337,6 +406,8 @@ function applySettings(){
   }
   watchReveals();
   syncHeaderOffset();
+  applyStyleSettings();
+  startSocialProof();
 }
 
 /* ---------- V3: Themes (look) + Appearance (font / accent) ----------
@@ -377,11 +448,20 @@ function applyTheme(){
   ["compact", "standard", "large", "spec"].forEach(function(x){ document.body.classList.remove("layout-card-" + x); });
   ["tiles", "circles", "pills", "bar"].forEach(function(x){ document.body.classList.remove("layout-cats-" + x); });
   ["strip", "grid"].forEach(function(x){ document.body.classList.remove("layout-deals-" + x); });
+  /* V3.2 layout axes: footer/button/heading — sirf tab lagte hain jab theme
+     ki layout mein woh key ho. General ki layout mein ye keys nahi hain,
+     is liye general par koi nayi class nahi lagti (zero layout change). */
+  ["centered", "tinted", "dark", "warm"].forEach(function(x){ document.body.classList.remove("layout-footer-" + x); });
+  ["pill-gold", "pill-pink", "sharp", "rounded"].forEach(function(x){ document.body.classList.remove("layout-button-" + x); });
+  ["serif-upper", "soft", "condensed-upper", "bold-rounded"].forEach(function(x){ document.body.classList.remove("layout-heading-" + x); });
   if (t){
     document.body.classList.add("theme-" + t.key, "hero-" + t.heroStyle, "cards-" + t.cardStyle, "cats-" + t.categoryStyle);
     /* Layout: themes.js -> layout; missing ho to standard look. */
     var L = t.layout || {};
     document.body.classList.add("layout-hero-" + (L.hero || "slider"), "layout-header-" + (L.header || "standard"), "layout-grid-" + (L.grid || "standard"), "layout-card-" + (L.card || "standard"), "layout-cats-" + (L.cats || "tiles"), "layout-deals-" + (L.deals || "grid"));
+    if (L.footer) document.body.classList.add("layout-footer-" + L.footer);
+    if (L.button) document.body.classList.add("layout-button-" + L.button);
+    if (L.heading) document.body.classList.add("layout-heading-" + L.heading);
     /* search-first: search bar hamesha nazar aaye (boot par; toggle baad
        mein phir bhi kaam karta hai). [hidden] rule class se nahi tootta,
        is liye JS se hidden hatana zaroori hai. */
@@ -441,6 +521,50 @@ function applyFont(){
   else root.style.removeProperty("--font-body");
   if (headF && headF.stack) root.style.setProperty("--font-head", headF.stack);
   else root.style.removeProperty("--font-head");
+}
+/* ---------- V3.2: Style Editor — theme ke BAAD apply (style > theme) ----------
+   CSS vars body par INLINE lagti hain, is liye stylesheet ki theme layout
+   classes se bhi jeet-ti hain; var clear ho to theme value wapis aa jati
+   hai. Khaali style = aaj ka look bilkul waisa hi (saare vars clear). */
+function applyStyleSettings(){
+  const st = (SETTINGS && SETTINGS.style) || {};
+  const card = st.card || {}, btns = st.buttons || {}, page = st.page || {};
+  const b = document.body;
+  const set = (name, val) => { if (val) b.style.setProperty(name, val); else b.style.removeProperty(name); };
+  const rad = v => { const r = clampStyleRadius(v); return r === "" ? "" : r + "px"; };
+  set("--card-radius", rad(card.radius));
+  set("--card-bg", validStyleColor(card.bg));
+  set("--card-border", validStyleColor(card.border));
+  set("--card-shadow", STYLE_SHADOW_VALUES[card.shadow] || "");
+  set("--card-title", validStyleColor(card.titleColor));
+  set("--card-price", validStyleColor(card.priceColor));
+  set("--btn-primary-bg", validStyleColor(btns.primaryBg));
+  set("--btn-primary-color", validStyleColor(btns.primaryColor));
+  set("--btn-radius", rad(btns.radius));
+  set("--btn-secondary-color", validStyleColor(btns.secondaryColor));
+  set("--btn-font-size", STYLE_FONT_SIZES[btns.fontSize] || "");
+  set("--page-bg", validStyleColor(page.pageBg));
+  set("--text-color", validStyleColor(page.textColor));
+  /* Header/footer/marquee: var + direct background (dono wahi validated
+     value; khaali ho to dono clear = theme look wapis). */
+  const bgPair = (varName, selector, val) => {
+    set(varName, val);
+    const el = document.querySelector(selector);
+    if (el) el.style.background = val || "";
+  };
+  bgPair("--header-bg", ".site-header", validStyleColor(page.headerBg));
+  bgPair("--footer-bg", ".footer", validStyleColor(page.footerBg));
+  bgPair("--marquee-bg", ".marquee", validStyleColor(page.marqueeBg));
+  /* Per-section bg + heading color, SECTION_NODE_IDS se (khali = clear). */
+  const secs = st.sections || {};
+  STYLE_SECTION_KEYS.forEach(k => {
+    const el = document.getElementById(SECTION_NODE_IDS[k]);
+    if (!el) return;
+    const s = secs[k] || {};
+    el.style.background = validStyleColor(s.bg) || "";
+    const h = el.querySelector(".section-title, h1");
+    if (h) h.style.color = validStyleColor(s.heading) || "";
+  });
 }
 /* settings.animations === false ho to marquee + reveals band. */
 function applyAnimations(){
@@ -620,6 +744,7 @@ async function loadProducts(){
   const visibleCats = CATEGORIES.filter(c => c.visible !== false).map(c => c.name).filter(Boolean);
   CAT_LIST = visibleCats.length ? visibleCats : [...new Set(PRODUCTS.map(p => p.cat).filter(Boolean))];
   renderCats(); renderProductSections(); renderGrid(); renderCart();
+  startSocialProof();
 }
 function renderCats(){
   renderNav();
@@ -1009,6 +1134,15 @@ function addToCart(id, qty){
   cart[id] = (Number(cart[id]) || 0) + qty;
   saveCart(); renderCart();
   const p = findP(id); if (p) toast(`Added: ${p.name}`);
+  /* V3.2 cart bump: icon ek dafa uchhalta hai, animationend par class hat
+     jati hai taa ke agla add dobara bump kare. */
+  const cb = document.getElementById("cartBtn");
+  if (cb){
+    cb.classList.remove("bump");
+    void cb.offsetWidth;
+    cb.classList.add("bump");
+    cb.addEventListener("animationend", function h(){ cb.classList.remove("bump"); cb.removeEventListener("animationend", h); });
+  }
 }
 function setQty(id, q){
   if (q <= 0) delete cart[id]; else cart[id] = q;
@@ -1320,6 +1454,109 @@ function toast(text){
   t.textContent = text; t.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+/* ---------- V3.2: Social-proof popups ----------
+   Cycle: pehla popup 8s baad → durationSec dikhaye → hide → intervalSec
+   wait → agla. Real orders pehle, phir demo (sirf jab demo on ho AUR
+   real orders 5 se kam hon — 5+ asal orders par demo khud band).
+   Privacy: RPC se sirf first name, city, pehli item ka naam, total aur
+   date aati hai — phone, address, poora naam, poori items kabhi nahi.
+   RPC fail ho to catch → demo (agar on) warna khamoshi se kuch nahi. */
+let spStarted = false, spTimer = null, spHideTimer = null, spEl = null;
+let spReal = null, spIndex = 0;
+function spConfig(){
+  const s = (SETTINGS && SETTINGS.style && SETTINGS.style.socialProof) || {};
+  return {
+    enabled: typeof s.enabled === "boolean" ? s.enabled : true,
+    intervalSec: Math.max(5, parseInt(s.intervalSec, 10) || 20),
+    durationSec: Math.max(1, parseInt(s.durationSec, 10) || 5),
+    demo: typeof s.demo === "boolean" ? s.demo : true
+  };
+}
+function spTimeAgo(ts){
+  const ms = Date.now() - new Date(ts).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "abhi pehle";
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "abhi pehle";
+  if (min < 60) return min + " min pehle";
+  const h = Math.floor(min / 60);
+  if (h < 24) return h === 1 ? "1 ghanta pehle" : h + " ghante pehle";
+  const d = Math.floor(h / 24);
+  return d === 1 ? "1 din pehle" : d + " din pehle";
+}
+const SP_DEMO_NAMES = ["Ahmed", "Fatima", "Usman", "Ayesha", "Bilal", "Hira", "Zainab", "Omar"];
+const SP_DEMO_CITIES = ["Lahore", "Karachi", "Islamabad", "Faisalabad", "Multan", "Rawalpindi", "Gujranwala", "Sialkot"];
+const SP_DEMO_OFFSETS = ["12 min pehle", "35 min pehle", "1 ghanta pehle", "2 ghante pehle", "3 ghante pehle", "5 ghante pehle", "8 ghante pehle", "1 din pehle"];
+function spDemoList(){
+  if (!PRODUCTS.length) return [];
+  return SP_DEMO_NAMES.map((n, i) => {
+    const p = PRODUCTS[i % PRODUCTS.length];
+    return { firstName: n, city: SP_DEMO_CITIES[i % SP_DEMO_CITIES.length], product: p.name, total: Number(p.price) || 0, ago: SP_DEMO_OFFSETS[i], demo: true };
+  });
+}
+async function spEnsureReal(){
+  if (spReal !== null) return spReal;
+  try {
+    const { data, error } = await sb.rpc("get_recent_orders_for_proof", { p_store_slug: STORE_SLUG });
+    if (error) throw error;
+    spReal = (Array.isArray(data) ? data : []).filter(r => r && r.product_name).map(r => ({
+      firstName: r.first_name || "Customer", city: r.city || "", product: r.product_name,
+      total: Number(r.total) || 0, ago: spTimeAgo(r.ordered_at), demo: false
+    }));
+  } catch (e) { spReal = []; /* RPC fail = demo fallback / silent, page kabhi nahi toot-ta */ }
+  return spReal;
+}
+function spHide(schedule){
+  if (spEl) spEl.classList.remove("show");
+  clearTimeout(spHideTimer);
+  if (schedule) spSchedule(spConfig().intervalSec * 1000);
+}
+function spSchedule(ms){
+  clearTimeout(spTimer);
+  spTimer = setTimeout(spShowNext, ms);
+}
+async function spShowNext(){
+  const cfg = spConfig();
+  if (!cfg.enabled){ stopSocialProof(); return; }
+  const real = await spEnsureReal();
+  let queue = real.slice();
+  if (cfg.demo && real.length < 5) queue = queue.concat(spDemoList());
+  if (!queue.length){ spSchedule(cfg.intervalSec * 1000); return; }
+  const item = queue[spIndex % queue.length];
+  spIndex++;
+  if (!spEl){
+    spEl = document.createElement("div");
+    spEl.id = "spPopup";
+    spEl.className = "sp-popup";
+    document.body.appendChild(spEl);
+  }
+  const initial = esc(String(item.firstName || "C").charAt(0).toUpperCase());
+  const cityPart = item.city ? esc(item.city) + " • " : "";
+  spEl.innerHTML = `<button class="sp-close" type="button" aria-label="Band karein">×</button>`
+    + `<span class="sp-avatar">${initial}</span>`
+    + `<div class="sp-body"><p class="sp-line"><strong>${esc(item.firstName)}</strong> ne <strong>${esc(item.product)}</strong> order kiya${item.demo ? ' <span class="sp-demo">Demo</span>' : ""}</p>`
+    + `<p class="sp-meta">${cityPart}Rs ${Number(item.total || 0).toLocaleString("en-PK")} • ${esc(item.ago)}</p>`
+    + (item.demo ? "" : `<p class="sp-verified">✓ Verified order</p>`) + `</div>`;
+  spEl.querySelector(".sp-close").onclick = e => { e.stopPropagation(); spHide(true); };
+  spEl.onclick = () => {
+    const p = PRODUCTS.find(x => x.name === item.product);
+    if (p) openProduct(p.id);
+  };
+  requestAnimationFrame(() => { if (spEl) spEl.classList.add("show"); });
+  clearTimeout(spHideTimer);
+  spHideTimer = setTimeout(() => spHide(true), cfg.durationSec * 1000);
+}
+function stopSocialProof(){
+  spStarted = false;
+  clearTimeout(spTimer); clearTimeout(spHideTimer);
+  if (spEl) spEl.classList.remove("show");
+}
+function startSocialProof(){
+  if (!spConfig().enabled){ stopSocialProof(); return; }
+  if (spStarted) return;
+  spStarted = true;
+  spSchedule(8000);
 }
 
 /* ---------- Tenant resolution + boot ----------

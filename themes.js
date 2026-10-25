@@ -42,7 +42,7 @@
     {
       key: "fashion",
       layoutDesc: "Khaadi style editorial — full-width hero image, bari 4/5 images, centered header",
-      layout: { hero: "editorial", header: "centered", grid: "large", card: "large", cats: "circles", deals: "grid", defaultOrder: ["hero", "categories", "best_sellers", "all_products", "promos", "hot", "new_arrivals", "deals", "about", "testimonials", "faq"] },
+      layout: { hero: "editorial", header: "centered", grid: "large", card: "large", cats: "circles", deals: "grid", defaultOrder: ["hero", "categories", "best_sellers", "all_products", "promos", "hot", "new_arrivals", "deals", "about", "testimonials", "faq"], footer: "centered", button: "pill-gold", heading: "serif-upper" },
       name: "Fashion / Clothing",
       nameUr: "Fashion / Kapray",
       business: "Clothing, boutique, fashion store",
@@ -55,7 +55,7 @@
     {
       key: "beauty",
       layoutDesc: "Clean beauty store — soft banner, reviews upar, pill categories",
-      layout: { hero: "banner", header: "standard", grid: "standard", card: "standard", cats: "pills", deals: "strip", defaultOrder: ["hero", "categories", "best_sellers", "testimonials", "all_products", "promos", "about"] },
+      layout: { hero: "banner", header: "standard", grid: "standard", card: "standard", cats: "pills", deals: "strip", defaultOrder: ["hero", "categories", "best_sellers", "testimonials", "all_products", "promos", "about"], footer: "tinted", button: "pill-pink", heading: "soft" },
       name: "Beauty / Cosmetics",
       nameUr: "Beauty / Cosmetics",
       business: "Beauty, skincare, cosmetics store",
@@ -68,7 +68,7 @@
     {
       key: "electronics",
       layoutDesc: "Telemart style spec store — bara search bar, spec line har card par, deals upar",
-      layout: { hero: "compact", header: "search-first", grid: "standard", card: "spec", cats: "bar", deals: "grid", defaultOrder: ["hero", "deals", "categories", "best_sellers", "all_products", "hot", "about"] },
+      layout: { hero: "compact", header: "search-first", grid: "standard", card: "spec", cats: "bar", deals: "grid", defaultOrder: ["hero", "deals", "categories", "best_sellers", "all_products", "hot", "about"], footer: "dark", button: "sharp", heading: "condensed-upper" },
       name: "Electronics / Mobile",
       nameUr: "Electronics / Mobile",
       business: "Tech, mobile, gadgets store",
@@ -81,7 +81,7 @@
     {
       key: "food",
       layoutDesc: "Naheed/HumMart style grocery — dense grid, deals + budget upar, bar categories",
-      layout: { hero: "banner", header: "standard", grid: "dense", card: "compact", cats: "bar", deals: "grid", defaultOrder: ["hero", "categories", "deals", "budget", "best_sellers", "all_products", "about"] },
+      layout: { hero: "banner", header: "standard", grid: "dense", card: "compact", cats: "bar", deals: "grid", defaultOrder: ["hero", "categories", "deals", "budget", "best_sellers", "all_products", "about"], footer: "warm", button: "rounded", heading: "bold-rounded" },
       name: "Food / Bakery / Grocery",
       nameUr: "Food / Bakery / Grocery",
       business: "Food, bakery, grocery store",

@@ -138,7 +138,16 @@ const ADMIN_DEFAULT_SETTINGS = {
   checkout_fields: [],
   product_fields: [],
   /* V3: store admin ki theme choice (settings.data.theme) */
-  theme: ""
+  theme: "",
+  /* V3.2 Style Editor — storefront ke DEFAULT_SETTINGS.style se match;
+     khaali string = theme default (style kabhi theme ko wipe nahi karta). */
+  style: {
+    card: { radius: "", bg: "", border: "", shadow: "", titleColor: "", priceColor: "" },
+    sections: {},
+    buttons: { primaryBg: "", primaryColor: "", radius: "", secondaryColor: "", fontSize: "" },
+    page: { headerBg: "", footerBg: "", marqueeBg: "", pageBg: "", textColor: "" },
+    socialProof: { enabled: true, intervalSec: 20, durationSec: 5, demo: true }
+  }
 };
 
 /* ---------- Auth (magic link) + team gate ---------- */
@@ -280,7 +289,7 @@ function showDash(){
   $("#logoutBtn").classList.remove("hidden");
   /* Role gating (current store ki role par): staff ko Categories/Coupons/Team/Settings nahi; admin ko Team nahi. */
   $("#tabTeam").classList.toggle("hidden", effRole() !== "owner");
-  const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings", "tabHomepage", "tabAppearance"];
+  const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings", "tabHomepage", "tabAppearance", "tabStyle"];
   adminOnlyTabs.forEach(id => document.getElementById(id).classList.toggle("hidden", !isAdminPlus()));
   switchTab("dashboard");
   loadAll();
@@ -1000,6 +1009,45 @@ function mergeAdminSettings(raw){
     out.font_family = { ...FONTS[raw.font_family] };
   if (typeof raw.theme_color === "string") out.theme_color = raw.theme_color;
   if (typeof raw.theme === "string") out.theme = raw.theme.trim().toLowerCase();
+  /* V3.2 Style Editor — sirf validated values merge hoti hain; ghalat
+     rang/radius khaali (theme default) ban jata hai, kabhi raw save nahi hota. */
+  if (raw.style && typeof raw.style === "object"){
+    const st = raw.style;
+    out.style = JSON.parse(JSON.stringify(ADMIN_DEFAULT_SETTINGS.style));
+    if (st.card && typeof st.card === "object"){
+      out.style.card.radius = clampRadiusAdmin(st.card.radius);
+      out.style.card.bg = adminStyleColor(st.card.bg);
+      out.style.card.border = adminStyleColor(st.card.border);
+      out.style.card.shadow = ["", "none", "soft", "strong"].indexOf(String(st.card.shadow || "")) !== -1 ? String(st.card.shadow) : "";
+      out.style.card.titleColor = adminStyleColor(st.card.titleColor);
+      out.style.card.priceColor = adminStyleColor(st.card.priceColor);
+    }
+    if (st.sections && typeof st.sections === "object"){
+      STYLE_SECTION_KEYS_ADMIN.forEach(k => {
+        if (st.sections[k] && typeof st.sections[k] === "object")
+          out.style.sections[k] = { bg: adminStyleColor(st.sections[k].bg), heading: adminStyleColor(st.sections[k].heading) };
+      });
+    }
+    if (st.buttons && typeof st.buttons === "object"){
+      out.style.buttons.primaryBg = adminStyleColor(st.buttons.primaryBg);
+      out.style.buttons.primaryColor = adminStyleColor(st.buttons.primaryColor);
+      out.style.buttons.radius = clampRadiusAdmin(st.buttons.radius);
+      out.style.buttons.secondaryColor = adminStyleColor(st.buttons.secondaryColor);
+      out.style.buttons.fontSize = ["", "S", "M", "L"].indexOf(String(st.buttons.fontSize || "")) !== -1 ? String(st.buttons.fontSize) : "";
+    }
+    if (st.page && typeof st.page === "object"){
+      ["headerBg", "footerBg", "marqueeBg", "pageBg", "textColor"].forEach(k => { out.style.page[k] = adminStyleColor(st.page[k]); });
+    }
+    if (st.socialProof && typeof st.socialProof === "object"){
+      const sp = st.socialProof;
+      if (typeof sp.enabled === "boolean") out.style.socialProof.enabled = sp.enabled;
+      if (typeof sp.demo === "boolean") out.style.socialProof.demo = sp.demo;
+      const iv = parseInt(sp.intervalSec, 10);
+      if (Number.isFinite(iv)) out.style.socialProof.intervalSec = Math.max(5, iv);
+      const du = parseInt(sp.durationSec, 10);
+      if (Number.isFinite(du)) out.style.socialProof.durationSec = Math.max(1, du);
+    }
+  }
   if (typeof raw.logo_url === "string") out.logo_url = raw.logo_url;
   if (raw.socials && typeof raw.socials === "object") Object.keys(out.socials).forEach(k => { if (typeof raw.socials[k] === "string") out.socials[k] = raw.socials[k]; });
   const cleanLinks = arr => Array.isArray(arr) ? arr.filter(l => l && typeof l === "object").map(l => ({ label: String(l.label || ""), url: String(l.url || "") })) : [];
@@ -1115,6 +1163,7 @@ function fillSettings(s){
   /* V2 tabs bhi isi merged settings se bharte hain */
   seedHomepage(s);
   fillAppearance(s);
+  fillStyle(s);
 }
 async function loadSettings(){
   settingsLoaded = true;
@@ -1408,6 +1457,170 @@ function fillAppearance(s){
   renderFieldRows($("#checkoutFieldsWrap"), s.checkout_fields);
   renderFieldRows($("#productFieldsWrap"), s.product_fields);
 }
+/* ---------- V3.2: Style Editor (admin "Style" tab) ----------
+   Storage: settings.data.style (storefront ke shape se match). Save
+   shared persistAllSettings se hota hai — Style tab ki save doosre tabs
+   ki values ko wipe nahi karti (data SETTINGS_STATE clone se banta hai).
+   Validation: rang sirf #RRGGBB ya chhoti named allowlist, warna khaali
+   (theme default) — koi raw string kabhi save/storefront style nahi banti. */
+const STYLE_SECTION_KEYS_ADMIN = ["hero", "categories", "best_sellers", "all_products", "promos", "hot", "new_arrivals", "deals", "budget", "about", "how_to_order", "faq", "testimonials"];
+const STYLE_NAMED_ADMIN = ["white", "black", "red", "green", "blue", "pink", "orange", "purple", "navy", "teal", "maroon", "gold", "cream", "beige", "grey", "gray", "brown", "yellow", "transparent"];
+function isHexColor(v){ return /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()); }
+function adminStyleColor(v){
+  const t = String(v || "").trim();
+  if (!t) return "";
+  if (isHexColor(t)) return t;
+  const low = t.toLowerCase();
+  return STYLE_NAMED_ADMIN.indexOf(low) !== -1 ? low : "";
+}
+function clampRadiusAdmin(v){
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return "";
+  return Math.min(30, Math.max(0, n));
+}
+let styleFilled = false; /* fillStyle chala ho to hi readStyle DOM parhe — warna SETTINGS_STATE jaisa ka waisa rahe */
+function bindColorPair(colorEl, hexEl){
+  if (!colorEl || !hexEl) return;
+  colorEl.addEventListener("input", () => { hexEl.value = colorEl.value; });
+  hexEl.addEventListener("input", () => { if (isHexColor(hexEl.value.trim())) colorEl.value = hexEl.value.trim(); });
+}
+function setRadiusControl(sliderId, defId, valId, v){
+  const sl = document.getElementById(sliderId), df = document.getElementById(defId), val = document.getElementById(valId);
+  if (!sl || !df || !val) return;
+  if (v === "" || v === null || v === undefined){
+    df.checked = true; sl.disabled = true; sl.value = 18; val.textContent = "Theme default";
+  } else {
+    const r = clampRadiusAdmin(v);
+    df.checked = false; sl.disabled = false; sl.value = r === "" ? 18 : r; val.textContent = (r === "" ? "Theme default" : r + "px");
+  }
+}
+function bindRadiusControl(sliderId, defId, valId){
+  const sl = document.getElementById(sliderId), df = document.getElementById(defId), val = document.getElementById(valId);
+  if (!sl || !df || !val) return;
+  sl.addEventListener("input", () => { val.textContent = sl.value + "px"; });
+  df.addEventListener("change", () => {
+    sl.disabled = df.checked;
+    val.textContent = df.checked ? "Theme default" : sl.value + "px";
+  });
+}
+function renderStyleSections(sections){
+  const body = $("#styleSectionsBody");
+  if (!body) return;
+  body.innerHTML = STYLE_SECTION_KEYS_ADMIN.map(k => {
+    const def = SECTION_DEFS.find(d => d.key === k) || { label: k };
+    const s = (sections && sections[k]) || {};
+    return `<tr data-skey="${esc(k)}"><td><strong>${esc(def.label)}</strong></td>`
+      + `<td><div class="color-row"><input type="color" data-sbgc value="${isHexColor(s.bg) ? s.bg : "#ffffff"}"><input type="text" data-sbg placeholder="#RRGGBB ya khaali" value="${esc(s.bg || "")}"></div></td>`
+      + `<td><div class="color-row"><input type="color" data-shc value="${isHexColor(s.heading) ? s.heading : "#0A2B4E"}"><input type="text" data-sh placeholder="#RRGGBB ya khaali" value="${esc(s.heading || "")}"></div></td></tr>`;
+  }).join("");
+  body.querySelectorAll("tr").forEach(tr => {
+    bindColorPair(tr.querySelector("[data-sbgc]"), tr.querySelector("[data-sbg]"));
+    bindColorPair(tr.querySelector("[data-shc]"), tr.querySelector("[data-sh]"));
+  });
+}
+function fillStyle(s){
+  const st = (s && s.style) || ADMIN_DEFAULT_SETTINGS.style;
+  const setPair = (colorId, hexId, val) => {
+    const c = document.getElementById(colorId), h = document.getElementById(hexId);
+    if (!c || !h) return;
+    h.value = val || "";
+    if (isHexColor(val)) c.value = val;
+  };
+  setPair("styCardBgC", "styCardBg", st.card.bg);
+  setPair("styCardBorderC", "styCardBorder", st.card.border);
+  setPair("styCardTitleC", "styCardTitle", st.card.titleColor);
+  setPair("styCardPriceC", "styCardPrice", st.card.priceColor);
+  setPair("styBtnBgC", "styBtnBg", st.buttons.primaryBg);
+  setPair("styBtnColorC", "styBtnColor", st.buttons.primaryColor);
+  setPair("styBtnSecC", "styBtnSec", st.buttons.secondaryColor);
+  setPair("styPageHeaderC", "styPageHeader", st.page.headerBg);
+  setPair("styPageFooterC", "styPageFooter", st.page.footerBg);
+  setPair("styPageMarqueeC", "styPageMarquee", st.page.marqueeBg);
+  setPair("styPageBgC", "styPageBg", st.page.pageBg);
+  setPair("styPageTextC", "styPageText", st.page.textColor);
+  const shadow = document.getElementById("styCardShadow");
+  if (shadow) shadow.value = ["", "none", "soft", "strong"].indexOf(st.card.shadow) !== -1 ? st.card.shadow : "";
+  setRadiusControl("styCardRadius", "styCardRadiusDefault", "styCardRadiusVal", st.card.radius);
+  setRadiusControl("styBtnRadius", "styBtnRadiusDefault", "styBtnRadiusVal", st.buttons.radius);
+  const fs = document.getElementById("styBtnFontSize");
+  if (fs) fs.value = ["", "S", "M", "L"].indexOf(st.buttons.fontSize) !== -1 ? st.buttons.fontSize : "";
+  const spE = document.getElementById("stySpEnabled");
+  if (spE) spE.checked = st.socialProof.enabled !== false;
+  const spI = document.getElementById("stySpInterval");
+  if (spI) spI.value = st.socialProof.intervalSec || 20;
+  const spD = document.getElementById("stySpDuration");
+  if (spD) spD.value = st.socialProof.durationSec || 5;
+  const spDemo = document.getElementById("stySpDemo");
+  if (spDemo) spDemo.checked = st.socialProof.demo !== false;
+  renderStyleSections(st.sections || {});
+  styleFilled = true;
+}
+function readStyle(){
+  const base = JSON.parse(JSON.stringify((SETTINGS_STATE && SETTINGS_STATE.style) || ADMIN_DEFAULT_SETTINGS.style));
+  if (!styleFilled) return base; /* panel abhi bhara hi nahi — stored style ko chhero mat */
+  const hexVal = id => {
+    const el = document.getElementById(id);
+    if (!el) return undefined;
+    return adminStyleColor(el.value);
+  };
+  const put = (obj, key, id) => { const v = hexVal(id); if (v !== undefined) obj[key] = v; };
+  put(base.card, "bg", "styCardBg");
+  put(base.card, "border", "styCardBorder");
+  put(base.card, "titleColor", "styCardTitle");
+  put(base.card, "priceColor", "styCardPrice");
+  put(base.buttons, "primaryBg", "styBtnBg");
+  put(base.buttons, "primaryColor", "styBtnColor");
+  put(base.buttons, "secondaryColor", "styBtnSec");
+  put(base.page, "headerBg", "styPageHeader");
+  put(base.page, "footerBg", "styPageFooter");
+  put(base.page, "marqueeBg", "styPageMarquee");
+  put(base.page, "pageBg", "styPageBg");
+  put(base.page, "textColor", "styPageText");
+  const shadow = document.getElementById("styCardShadow");
+  if (shadow) base.card.shadow = ["", "none", "soft", "strong"].indexOf(shadow.value) !== -1 ? shadow.value : "";
+  const readRadius = (sliderId, defId) => {
+    const df = document.getElementById(defId), sl = document.getElementById(sliderId);
+    if (!df || !sl) return undefined;
+    return df.checked ? "" : clampRadiusAdmin(sl.value);
+  };
+  const cr = readRadius("styCardRadius", "styCardRadiusDefault");
+  if (cr !== undefined) base.card.radius = cr;
+  const br = readRadius("styBtnRadius", "styBtnRadiusDefault");
+  if (br !== undefined) base.buttons.radius = br;
+  const fs = document.getElementById("styBtnFontSize");
+  if (fs) base.buttons.fontSize = ["", "S", "M", "L"].indexOf(fs.value) !== -1 ? fs.value : "";
+  const body = document.getElementById("styleSectionsBody");
+  if (body){
+    body.querySelectorAll("tr[data-skey]").forEach(tr => {
+      const k = tr.dataset.skey;
+      const bg = tr.querySelector("[data-sbg]"), hd = tr.querySelector("[data-sh]");
+      base.sections[k] = {
+        bg: bg ? adminStyleColor(bg.value) : ((base.sections[k] && base.sections[k].bg) || ""),
+        heading: hd ? adminStyleColor(hd.value) : ((base.sections[k] && base.sections[k].heading) || "")
+      };
+    });
+  }
+  const spE = document.getElementById("stySpEnabled");
+  if (spE) base.socialProof.enabled = spE.checked;
+  const spI = document.getElementById("stySpInterval");
+  if (spI){ const v = parseInt(spI.value, 10); if (Number.isFinite(v)) base.socialProof.intervalSec = Math.max(5, v); }
+  const spD = document.getElementById("stySpDuration");
+  if (spD){ const v = parseInt(spD.value, 10); if (Number.isFinite(v)) base.socialProof.durationSec = Math.max(1, v); }
+  const spDemo = document.getElementById("stySpDemo");
+  if (spDemo) base.socialProof.demo = spDemo.checked;
+  return base;
+}
+/* Static Style pairs + radius controls: sirf ek dafa bind (fillStyle dobara
+   chalne par duplicate listeners nahi lagte — sections rows alag se bind hoti hain). */
+(function bindStyleStatic(){
+  [["styCardBgC", "styCardBg"], ["styCardBorderC", "styCardBorder"], ["styCardTitleC", "styCardTitle"], ["styCardPriceC", "styCardPrice"],
+   ["styBtnBgC", "styBtnBg"], ["styBtnColorC", "styBtnColor"], ["styBtnSecC", "styBtnSec"],
+   ["styPageHeaderC", "styPageHeader"], ["styPageFooterC", "styPageFooter"], ["styPageMarqueeC", "styPageMarquee"],
+   ["styPageBgC", "styPageBg"], ["styPageTextC", "styPageText"]].forEach(([c, h]) => bindColorPair(document.getElementById(c), document.getElementById(h)));
+  bindRadiusControl("styCardRadius", "styCardRadiusDefault", "styCardRadiusVal");
+  bindRadiusControl("styBtnRadius", "styBtnRadiusDefault", "styBtnRadiusVal");
+})();
+
 $("#appThemeColor").addEventListener("input", markSwatch);
 $("#appLogoUrl").addEventListener("input", e => updateLogoPreview(e.target.value.trim()));
 $("#appLogoFile").addEventListener("change", e => {
@@ -1430,7 +1643,7 @@ async function persistAllSettings(){
   const saveBtns = [...document.querySelectorAll(".js-save, #globalSaveBtn")];
   const savedLabels = saveBtns.map(b => b.innerHTML);
   saveBtns.forEach(b => { b.disabled = true; b.textContent = "Saving…"; });
-  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg") };
+  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg"), style: $("#styleMsg") };
   Object.values(msgEls).forEach(m => { if (m){ m.textContent = ""; m.className = "msg"; } });
   const topMsg = $("#topSaveMsg");
   if (topMsg) topMsg.textContent = "";
@@ -1521,6 +1734,9 @@ async function persistAllSettings(){
     /* Custom fields */
     data.checkout_fields = readFieldRows($("#checkoutFieldsWrap"));
     data.product_fields = readFieldRows($("#productFieldsWrap"));
+    /* V3.2 Style Editor — shared save ka hissa; baaki tabs ki tarah
+       SETTINGS_STATE clone se shuru hone ki wajah se koi tab wipe nahi hota. */
+    data.style = readStyle();
     /* Per-store settings: upsert store_id par hota hai (platform migration
        mein settings.store_id par unique index hai; id sequence se auto
        aata hai nayi row par). */
@@ -1638,6 +1854,7 @@ if (_domClear) _domClear.onclick = () => saveDomain(true);
 $("#saveSettingsBtn").onclick = persistAllSettings;
 $("#saveHomepageBtn").onclick = persistAllSettings;
 $("#saveAppearanceBtn").onclick = persistAllSettings;
+$("#saveStyleBtn").onclick = persistAllSettings;
 $("#globalSaveBtn").onclick = persistAllSettings;
 
 /* ---------- Tabs ---------- */
@@ -1650,10 +1867,11 @@ const TAB_VIEWS = {
   team: ["tabTeam", "teamPanel"],
   homepage: ["tabHomepage", "homepagePanel"],
   appearance: ["tabAppearance", "appearancePanel"],
+  style: ["tabStyle", "stylePanel"],
   settings: ["tabSettings", "settingsPanel"]
 };
 /* In tabs par topbar wala global Save button nazar aata hai. */
-const SAVEABLE_TABS = ["settings", "homepage", "appearance"];
+const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style"];
 Object.entries(TAB_VIEWS).forEach(([view, [tabId]]) => {
   document.getElementById(tabId).onclick = () => switchTab(view);
 });
