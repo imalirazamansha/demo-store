@@ -6,14 +6,16 @@
   --radius:18px; --shadow:0 14px 34px rgba(10,43,78,.12);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-/* V3.1 SCROLL FIX: body{overflow-x:hidden} body ko khud ek scroll container
+/* V3.1 SCROLL FIX (v2): body{overflow-x:hidden} body ko khud ek scroll container
    bana deta hai (kuch browsers mein) — phir window wheel/PageDown/End/
    touch-drag kaam nahi karta, sirf scrollIntoView jumps chalte hain.
-   overflow-x:clip koi scroll container nahi banata, is liye sticky header
-   aur window scrolling dono mehfooz rehte hain. */
-html{scroll-behavior:smooth;overflow-x:clip}
-body{font-family:var(--font-body,'Archivo',Arial,sans-serif);background:#fff;color:var(--ink);overflow-x:clip}
-@supports not (overflow-x:clip){html{overflow-x:hidden}body{overflow-x:visible}}
+   Pehla fix (overflow-x:clip) scroll to wapas laya lekin sticky header
+   tor diya (clip wale ancestor mein sticky nahi tikta). Aakhri sahi
+   pattern: hidden SIRF html par, body hamesha visible — viewport hi
+   scroll container rehta hai, is liye window scroll + sticky header
+   dono kaam karte hain. */
+html{scroll-behavior:smooth;overflow-x:hidden}
+body{font-family:var(--font-body,'Archivo',Arial,sans-serif);background:#fff;color:var(--ink);overflow-x:visible}
 h1,h2,h3,.logo,.section-title,.budget-tile strong{font-family:var(--font-head,'Oswald','Archivo',Arial,sans-serif);letter-spacing:.02em}
 button{font-family:inherit;cursor:pointer} input,select,textarea{font-family:inherit;font-size:16px}
 img{display:block;max-width:100%} a{color:inherit}
