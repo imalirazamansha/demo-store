@@ -299,3 +299,42 @@ body.no-anim .float-btn.whatsapp,body.no-anim .live-dot{animation:none!important
   .pdp-imgwrap>img{transition:none}
   .pdp-imgwrap>img.zooming{transform:none}
 }
+
+/* ================= V3: Themes =================
+   Theme vars (--theme-*) applyTheme() se set hoti hain. 'general' theme
+   ka look aaj jaisa hi hai (is liye neeche overrides :not(.theme-general)
+   par hain — general par stylesheet defaults hi chalte hain). */
+/* Header/marquee + footer + hero + deals: theme colors (general ke ilawa) */
+body:not(.theme-general) .marquee{background:var(--theme-header)}
+body:not(.theme-general) .footer{background:var(--theme-footer)}
+body:not(.theme-general) .hero-slide{background:linear-gradient(120deg,var(--theme-header) 0%,var(--theme-primary) 58%,var(--theme-accent) 100%)}
+body:not(.theme-general) .hero-slide.alt{background:linear-gradient(120deg,var(--theme-header),var(--theme-primary) 48%,var(--theme-accent) 100%)}
+body:not(.theme-general) .deals-section{background:linear-gradient(135deg,var(--theme-header),var(--theme-primary))}
+/* Prices + badges: theme colors (general ke ilawa) */
+body:not(.theme-general) .price strong, body:not(.theme-general) .pdp-price strong{color:var(--theme-price)}
+body:not(.theme-general) .discount-badge{background:var(--theme-badge)}
+body:not(.theme-general) .cat-tile.active img{border-color:var(--theme-accent)}
+/* Card styles */
+body.cards-sharp .card, body.cards-sharp .review-card, body.cards-sharp .budget-tile, body.cards-sharp .promo-card{border-radius:6px}
+body.cards-soft .card, body.cards-soft .review-card{border-radius:26px;box-shadow:0 18px 40px rgba(10,43,78,.10)}
+body.cards-soft .budget-tile{border-radius:26px}
+/* Hero styles */
+body.hero-banner .hero-slide{min-height:520px}
+body.hero-minimal .hero-slide{min-height:320px}
+body.hero-minimal .hero-img{height:280px}
+/* Category styles */
+body.cats-pills .cat-track{gap:10px}
+body.cats-pills .cat-tile{display:flex;align-items:center;gap:8px;background:var(--soft);border-radius:999px;padding:6px 14px 6px 6px;min-width:0}
+body.cats-pills .cat-tile img{width:58px;height:58px;margin:0;border-width:3px}
+body.cats-pills .cat-tile span{font-size:12px}
+body.cats-list .cat-track{flex-direction:column;gap:10px}
+body.cats-list .cat-tile{display:flex;align-items:center;gap:14px;text-align:left;min-width:0;width:100%}
+body.cats-list .cat-tile img{width:56px;height:56px;margin:0;border-width:3px}
+body.cats-list .cat-tile span{font-size:14px}
+
+/* V3 Part B: honeypot field (bots ke liye jaal — insaan ko kabhi nazar nahi aata) */
+.hp-field{position:absolute !important;left:-9999px !important;top:auto !important;width:1px !important;height:1px !important;opacity:0 !important;overflow:hidden !important;pointer-events:none !important}
+/* V3 Part B: track order result card */
+.track-card{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px;line-height:1.8}
+.track-card .pill{display:inline-block;background:#0A2B4E;color:#fff;border-radius:999px;padding:2px 12px;font-size:13px}
+.track-note{background:#fff;border:1px dashed #86efac;border-radius:8px;padding:8px 10px;margin-top:8px}

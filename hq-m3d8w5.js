@@ -10,6 +10,8 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = s => document.querySelector(s);
 const fmt = n => "Rs." + Number(n || 0).toLocaleString("en-PK");
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+/* V3 Part B security: escapeHtml = esc. */
+const escapeHtml = esc;
 
 let MY_EMAIL = null;
 let STORES = [];
@@ -99,6 +101,20 @@ async function checkPlatform(session){
   if (error || !data){ showNoAccess(email); return; }
   showDash();
 }
+/* V3 Part B: Platform audit log — best-effort, action ko kabhi nahi rokta.
+   platform_audit table par sirf platform admin ki policy hai (migration 5). */
+async function audit(action, store_id, details){
+  try {
+    await sb.from("platform_audit").insert({
+      actor_email: (typeof MY_EMAIL !== "undefined" && MY_EMAIL) || null,
+      store_id: store_id || null,
+      action,
+      details: details || {}
+    });
+  } catch (e) {
+    console.warn("Audit log fail (action phir bhi ho gaya):", e.message);
+  }
+}
 function showNoAccess(email){
   $("#loginView").classList.add("hidden");
   $("#dashView").classList.add("hidden");
@@ -175,7 +191,8 @@ function renderStores(){
         <div class="store-meta">
           🔗 Slug: <strong>${esc(s.slug)}</strong> • 👤 Owner: ${esc(s.owner_email || "—")}<br>
           📦 Plan: <strong>${esc(s.plan)}</strong> • 💰 Fee: <strong>${fmt(s.monthly_fee)}</strong>/month • 📅 Next due: <strong>${fmtDate(s.next_due)}</strong><br>
-          🌐 Domain: ${s.custom_domain ? `<strong>${esc(s.custom_domain)}</strong> (${esc(s.domain_status)})` : "koi nahi"} • 🗓 Banayi gayi: ${fmtDate((s.created_at || "").slice(0, 10))}
+          🌐 Domain: ${s.custom_domain ? `<strong>${esc(s.custom_domain)}</strong> (${esc(s.domain_status)})` : "koi nahi"} • 🗓 Banayi gayi: ${fmtDate((s.created_at || "").slice(0, 10))}<br>
+          🎨 Theme: <strong>${esc((window.SHOPNEST_THEME && window.SHOPNEST_THEME(s.theme || "general").name) || "General Store")}</strong> • ${(!Array.isArray(s.allowed_themes) || s.allowed_themes.length === 0) ? "sab themes allowed" : (s.allowed_themes.length + " themes allowed")}
         </div>
         <div class="linkrow">
           <a href="${esc(pageUrl("index.html", s.slug))}" target="_blank">🔗 Storefront</a>
@@ -205,6 +222,13 @@ function renderStores(){
         <div><label>🎨 Theme color (store ki pehchan)</label><input data-e="theme_color" type="color" value="${esc(theme || "#0A2B4E")}" style="width:100%;height:40px;border:1.5px solid var(--line);border-radius:8px;background:#fff;padding:3px">
           <span class="swatches">${THEME_SWATCHES.map(c => `<button type="button" class="swatch" data-eswatch="${c}" style="background:${c}" title="${c}"></button>`).join("")}</span></div>
         <div><label>🔤 Font family</label><select data-e="font_family">${FONT_NAMES.map(n => `<option value="${esc(n)}" ${n === fontNameOf(sset.font_family) ? "selected" : ""}>${n === "" ? "Default (system)" : esc(n)}</option>`).join("")}</select></div>
+        <div style="grid-column:1 / -1"><label>🎨 Themes — is store ko kon se themes milenge?</label>
+          <label class="checkline" style="border:0;padding:2px 0"><input type="checkbox" data-e="allow_all_themes" ${(!Array.isArray(s.allowed_themes) || s.allowed_themes.length === 0) ? "checked" : ""}> Sab themes allow karein (default)</label>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px">${(window.SHOPNEST_THEMES || []).map(t => `<label class="checkline" style="border:0;padding:2px 6px"><input type="checkbox" data-theme-check="${t.key}" ${(Array.isArray(s.allowed_themes) && s.allowed_themes.length > 0 && s.allowed_themes.indexOf(t.key) === -1) ? "" : "checked"}> ${esc(t.name)} <small>(${esc(t.business)})</small></label>`).join("")}</div>
+          <label style="margin-top:8px">Default theme (store ka active theme)</label>
+          <select data-e="theme"><option value="">General (default look)</option>${(window.SHOPNEST_THEMES || []).map(t => `<option value="${t.key}" ${t.key === s.theme ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>
+          <p class="hint" style="margin-top:4px">Store admin ko sirf allowed themes dikhengi. Default theme wohi hoga jo store kholte hi lagega — jab tak store admin khud koi aur allowed theme na chune.</p>
+        </div>
       </div>
       <button class="btn small" data-saveedit="${esc(s.id)}">💾 Save changes</button>
       <p class="msg" data-editmsg></p>
@@ -214,6 +238,7 @@ function renderStores(){
         2) Hosting Cloudflare Pages par shift hone ke baad, Super Admin Cloudflare mein domain add karega.<br>
         3) Client ko DNS mein CNAME record lagana hoga (details Cloudflare dega).<br>
         4) Yahan domain likh kar status 'live' karein.<br>
+        <strong>Verify:</strong> 'Live' sirf tab karein jab domain asal mein store khol raha ho (browser mein domain khol kar check karein) — warna customers ko band store milega.<br>
         <em>Note: Abhi hosting GitHub Pages par hai — domain tab kaam karega jab Phase 2 (Cloudflare) hoga. Slug links abhi se kaam karte hain.</em>
       </div>
     </div>
@@ -226,25 +251,37 @@ function bindStoreActions(wrap){
     const s = STORES.find(x => x.id === b.dataset.suspend);
     if (!confirm(`"${s.name}" ko SUSPEND kar dein? Storefront band ho jayega (data mehfooz rahega).`)) return;
     await storeUpdate(s.id, { status: "suspended" });
+    audit("store_suspended", s.id, { slug: s.slug });
   });
   wrap.querySelectorAll("[data-activate]").forEach(b => b.onclick = async () => {
+    const _as = STORES.find(x => x.id === b.dataset.activate);
     await storeUpdate(b.dataset.activate, { status: "active" });
+    audit("store_activated", b.dataset.activate, { slug: _as ? _as.slug : null });
   });
   wrap.querySelectorAll("[data-feepaid]").forEach(b => b.onclick = async () => {
     const s = STORES.find(x => x.id === b.dataset.feepaid);
     await storeUpdate(s.id, { fee_status: "paid", next_due: nextDueAfterPayment(s) });
+    audit("fee_paid", s.id, { slug: s.slug, monthly_fee: s.monthly_fee });
   });
   wrap.querySelectorAll("[data-feeunpaid]").forEach(b => b.onclick = async () => {
+    const _fu = STORES.find(x => x.id === b.dataset.feeunpaid);
     await storeUpdate(b.dataset.feeunpaid, { fee_status: "unpaid" });
+    audit("fee_unpaid", b.dataset.feeunpaid, { slug: _fu ? _fu.slug : null });
   });
   wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
     const s = STORES.find(x => x.id === b.dataset.del);
     if (!confirm(`"${s.name}" ko DELETE kar dein? Yeh soft delete hai — store har jagah se gayab ho jayegi, data database mein rahega.`)) return;
     await storeUpdate(s.id, { status: "deleted" });
+    audit("store_deleted", s.id, { slug: s.slug });
   });
   wrap.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {
     const panel = wrap.querySelector(`[data-editpanel="${CSS.escape(b.dataset.edit)}"]`);
     if (panel) panel.classList.toggle("hidden");
+  });
+  wrap.querySelectorAll('[data-e="allow_all_themes"]').forEach(cb => cb.onchange = () => {
+    if (!cb.checked) return;
+    const panel = cb.closest(".store-edit");
+    if (panel) panel.querySelectorAll("[data-theme-check]").forEach(c => { c.checked = true; });
   });
   wrap.querySelectorAll("[data-eswatch]").forEach(b => b.onclick = () => {
     const panel = b.closest(".store-edit");
@@ -257,17 +294,35 @@ function bindStoreActions(wrap){
     const get = k => panel.querySelector(`[data-e="${k}"]`).value;
     const msg = panel.querySelector("[data-editmsg]");
     const domain = get("custom_domain").trim();
+    const allowAll = panel.querySelector('[data-e="allow_all_themes"]') && panel.querySelector('[data-e="allow_all_themes"]').checked;
+    const checkedThemes = [...panel.querySelectorAll("[data-theme-check]:checked")].map(c => c.dataset.themeCheck);
+    const _old = STORES.find(x => x.id === id) || {};
+    const _newStatus = get("domain_status");
     const payload = {
       name: get("name").trim(),
       plan: get("plan"),
       monthly_fee: Math.max(0, parseInt(get("monthly_fee")) || 0),
       next_due: get("next_due") || null,
-      custom_domain: domain || null,
-      domain_status: get("domain_status")
+      /* V3 themes: [] = sab allowed; warna sirf checked keys. */
+      allowed_themes: allowAll ? [] : checkedThemes,
+      theme: get("theme") || null
     };
     if (!payload.name){ msg.textContent = "Store name khaali nahi ho sakta."; msg.className = "msg err"; return; }
     const { error } = await sb.from("stores").update(payload).eq("id", id);
     if (error){ msg.textContent = "Save fail: " + error.message; msg.className = "msg err"; return; }
+    /* V3 Part B: domain sirf set_store_domain RPC se (yehi waahid rasta) —
+       platform admin 'live' bhi isi se karta hai. */
+    let domainNote = "";
+    try {
+      const { error: de } = await sb.rpc("set_store_domain", { p_store_id: id, p_domain: domain, p_status: _newStatus });
+      if (de) throw de;
+      if (_old.domain_status !== "live" && _newStatus === "live")
+        audit("domain_live", id, { slug: _old.slug, domain: domain || null });
+      else if (_old.custom_domain !== (domain || null) || _old.domain_status !== _newStatus)
+        audit("domain_changed", id, { slug: _old.slug, domain: domain || null, domain_status: _newStatus });
+    } catch (de) {
+      domainNote = " (Domain save fail: " + de.message + " — baaki save ho gaya.)";
+    }
     /* Appearance: USI store ki settings row mein theme_color + font_family
        merge karke upsert (baaki settings mehfooz) — platform3 migration ki
        policy isay allow karti hai. */
@@ -280,7 +335,12 @@ function bindStoreActions(wrap){
       const { error: se } = await sb.from("settings").upsert({ store_id: id, data: merged }, { onConflict: "store_id" });
       if (se) throw se;
       STORE_SETTINGS[id] = merged;
-      msg.textContent = "✅ Save ho gaya (Appearance samet)."; msg.className = "msg ok";
+      /* V3 Part B: theme allocation ya default theme badla ho to audit. */
+      const _newAllowed = allowAll ? [] : checkedThemes;
+      const _oldAllowed = Array.isArray(_old.allowed_themes) ? _old.allowed_themes : [];
+      if (JSON.stringify([..._newAllowed].sort()) !== JSON.stringify([..._oldAllowed].sort()) || (_old.theme || null) !== (get("theme") || null))
+        audit("theme_allocation_changed", id, { slug: _old.slug, allowed_themes: _newAllowed, theme: get("theme") || null });
+      msg.textContent = "✅ Save ho gaya (Appearance samet)." + domainNote; msg.className = "msg ok";
     } catch (e) {
       msg.textContent = "Store save ho gaya, lekin Appearance save fail: " + e.message + " (platform3 migration run hai?)";
       msg.className = "msg err";
@@ -342,6 +402,7 @@ $("#csCreateBtn").onclick = async () => {
     if (e1) throw new Error("Store row: " + e1.message);
     const sid = store.id;
     steps.push("✅ Store ban gayi");
+    audit("store_created", sid, { slug, owner: ownerEmail });
 
     /* 2) Owner ko team mein owner role */
     const { error: e2 } = await sb.from("team").insert({ store_id: sid, email: ownerEmail, role: "owner" });
@@ -433,6 +494,7 @@ function renderBilling(){
   wrap.querySelectorAll("[data-bpaid]").forEach(b => b.onclick = async () => {
     const s = STORES.find(x => x.id === b.dataset.bpaid);
     await storeUpdate(s.id, { fee_status: "paid", next_due: nextDueAfterPayment(s) });
+    audit("fee_paid", s.id, { slug: s.slug, monthly_fee: s.monthly_fee, via: "billing" });
     $("#billingMsg").textContent = `✅ ${s.name} ki fee paid mark ho gayi — nayi due date ${fmtDate(nextDueAfterPayment(s))}.`;
     $("#billingMsg").className = "msg ok";
   });

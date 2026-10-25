@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>ShopNest Admin — Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -145,6 +146,16 @@
   .link-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
   .link-row input{border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;flex:1;min-width:140px;background:#fff}
   .swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:10px}
+.theme-card{border:2px solid var(--line);border-radius:14px;padding:13px;text-align:left;background:#fff;cursor:pointer}
+.theme-card:hover{border-color:var(--navy)}
+.theme-card.selected{border-color:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.theme-card.locked{opacity:.55;cursor:not-allowed}
+.theme-card h5{font-size:15px;margin:6px 0 3px}
+.theme-card p{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+.theme-card small{color:var(--muted);font-weight:700}
+.theme-dots{display:flex;gap:6px;margin-top:2px}
+.theme-dots i{width:22px;height:22px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
   .swatch{width:34px;height:34px;border-radius:10px;border:2px solid var(--line);cursor:pointer;padding:0}
   .swatch.active{border-color:var(--ink);box-shadow:0 0 0 2px #bbf7d0}
   .prod-thumb{width:56px;height:56px;object-fit:cover;border-radius:9px;background:#eef6fa}
@@ -224,6 +235,8 @@
       <div class="stat"><strong id="statProducts">–</strong><span>Products</span></div>
     </div>
 
+    <div class="card" id="dashLowStock" hidden></div>
+
     <div class="card">
       <h3 style="margin-bottom:4px">👥 Visitors <small style="color:var(--muted);font-weight:400">(pageviews — har session mein har page ek dafa count hota hai)</small></h3>
       <p class="msg" id="dashMsg"></p>
@@ -275,6 +288,7 @@
       </select>
     </div>
     <p class="msg" id="ordersMsg"></p>
+    <div style="margin-bottom:12px"><button class="btn small ghost" id="exportOrdersBtn" type="button">⬇ Orders CSV Export karein</button></div>
     <div id="ordersWrap"><p class="empty-note">Loading…</p></div>
   </div>
 
@@ -285,6 +299,8 @@
     <button class="btn" id="addProductBtn" style="margin-bottom:16px">＋ Add New Product</button>
     <datalist id="catList"></datalist>
     <div id="productFormWrap" class="hidden" style="margin-bottom:18px"></div>
+    <div id="lowStockBanner" hidden></div>
+    <div style="margin-bottom:12px"><button class="btn small ghost" id="exportProductsBtn" type="button">⬇ Products CSV Export karein</button></div>
     <div class="searchrow">
       <input type="search" id="prodSearch" placeholder="🔍 Product naam ya category se search karein…">
       <span id="prodCount" style="align-self:center;color:var(--muted);font-size:13.5px;font-weight:600"></span>
@@ -424,6 +440,29 @@
       <label>Contact Us text</label><textarea data-pol="contact" rows="3"></textarea>
     </div>
 
+    <div class="settings-box" style="margin-top:14px">
+      <h4>🔍 Store SEO (Google mein nazar aane ke liye)</h4>
+      <label>SEO title (browser tab + Google result — khaali ho to store name chalega)</label><input id="setSeoTitle" placeholder="e.g. Sasta Bazaar — Pakistan Ka Smart Store">
+      <label>SEO description (Google ke neeche wali line)</label><textarea id="setSeoDesc" rows="2" placeholder="e.g. Kapre, electronics aur grocery — Cash on Delivery, 3–5 din mein delivery."></textarea>
+    </div>
+
+    <div class="settings-box" style="margin-top:14px">
+      <h4>🌐 Apna Domain Connect Karein</h4>
+      <p class="hint" id="domCurrent">Domain load ho raha hai…</p>
+      <label>Apna domain likhein (e.g. shop.meridukaan.com — https:// ya / nahi)</label><input id="domInput" placeholder="shop.example.com">
+      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:8px"><button class="btn small" id="domSaveBtn" type="button">💾 Domain Save karein</button><button class="btn small ghost" id="domClearBtn" type="button">Domain hatayein</button></div>
+      <p class="msg" id="domMsg"></p>
+      <div class="hint" style="margin-top:8px;line-height:1.7">
+        <strong>DNS instructions:</strong><br>
+        1) Apne domain provider (Namecheap/Hostinger) mein jayein.<br>
+        2) CNAME record banayein: Host '@' ya 'www' → Target 'imalirazamansha.github.io' (GitHub Pages par abhi).<br>
+        <em>Note: Cloudflare shift ke baad target badlega aur Super Admin aap ko naya target dega.</em><br>
+        3) DNS propagate hone mein 1–24 ghante lag sakte hain.<br>
+        4) Jab domain khulne lage, Super Admin status 'live' karega.<br>
+        <strong>Abhi hosting GitHub Pages par hai — custom domain tab live hoga jab Phase 2 (Cloudflare) complete hoga; tab tak domain 'pending' rahega.</strong>
+      </div>
+    </div>
+
     <button class="btn js-save" id="saveSettingsBtn" style="margin-top:16px">💾 Save Settings</button>
     <p class="msg" id="settingsMsg"></p>
   </div>
@@ -444,6 +483,13 @@
   <div class="card hidden" id="appearancePanel">
     <h3 style="margin-bottom:6px">🎨 Appearance</h3>
     <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Store ka <strong>font</strong>, <strong>theme color</strong>, <strong>logo</strong>, <strong>social links</strong>, <strong>header menu</strong> aur <strong>footer</strong> yahan se change karein — aur neeche checkout/products ke liye <strong>custom fields</strong> bhi bana sakte hain. Save ke baad store par changes live honge.</p>
+
+    <div class="settings-box" style="margin-bottom:14px">
+      <h4>🎨 Store Theme — sirf look badlega (products/sections wahi rahenge)</h4>
+      <p class="hint">Apne business ke hisaab se theme chunein. Super Admin ne jo themes allow nahi ki hon, woh lock nazar aayengi.</p>
+      <div class="theme-grid" id="themeGrid"></div>
+      <p class="hint" id="themeNote"></p>
+    </div>
 
     <div class="settings-grid">
       <div class="settings-box">
@@ -539,6 +585,7 @@
       <div><label>Status</label><select id="oeStatus"></select></div>
     </div>
     <label>Address</label><textarea id="oeAddress" rows="2"></textarea>
+    <label>Tracking note (courier/shipping note — customer ko tracking mein dikhega)</label><input id="oeTrackNote" placeholder="e.g. Parcel TCS ko de diya gaya — tracking #12345">
     <label>Items</label>
     <div class="oe-head"><span>Product</span><span>Qty</span><span>Price</span><span>Delivery</span><span></span></div>
     <div id="oeItems"></div>
@@ -557,6 +604,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="themes.js"></script>
 <script src="p-x7k94f.js"></script>
 </body>
 </html>

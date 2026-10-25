@@ -285,6 +285,7 @@
         <label class="radio-row"><input type="radio" name="pay" value="cod" checked> <span><strong>Cash on Delivery (COD)</strong><small>Product milne par payment karein.</small></span></label>
         <label class="radio-row disabled"><input type="radio" name="pay" value="advance" disabled> <span><strong>Pay Advance Payment</strong><small>Jald aa raha hai</small></span></label>
       </fieldset>
+      <input class="hp-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button class="btn primary big" type="submit" id="placeOrderBtn"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> ORDER PLACE KAREIN</button>
       <p class="form-error" id="checkoutError"></p>
       <p class="muted center"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Aapki details sirf delivery ke liye istemal hongi.</p>
@@ -317,6 +318,7 @@
     <p id="successText">Shukriya! Aapka order save ho gaya hai.</p>
     <p class="order-id" id="successOrderId"></p>
     <p>Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai — pehle product, phir payment.</p>
+    <button class="btn outline big" id="trackOrderBtn" type="button">📦 Track Order</button>
     <button class="btn primary big" id="continueBtn" type="button"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg> SHOPPING JAARI RAKHEIN</button>
   </div>
 </section>
@@ -332,6 +334,7 @@
       <button type="button" data-policy="refund">Refund Policy</button>
       <button type="button" data-policy="privacy">Privacy Policy</button>
       <button type="button" data-policy="terms">Terms of Service</button>
+      <button type="button" id="trackOrderLink">📦 Track Order</button>
     </div></div>
     <div><h3>Let's Get In Touch</h3><div class="footer-contact" id="footerContact" hidden></div><p>New deals aur smart products ki updates sab se pehle paayein.</p><form class="subscribe" id="subForm"><input type="email" id="subEmail" placeholder="Your email address" required><button class="btn primary" type="submit">SUBSCRIBE</button></form><p class="sub-msg" id="subMsg"></p></div>
   </div>
@@ -343,10 +346,12 @@
   <button class="float-btn back-top" id="backTop" type="button" aria-label="Back to top"><svg class="ic" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
 </div>
 
+<div class="modal" id="trackModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" id="trackCloseBtn" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><h2>📦 Track Order</h2><p class="muted" style="margin-bottom:12px">Apna order ID aur wohi mobile number likhein jo order karte waqt diya tha.</p><form id="trackForm"><label>Order ID<input id="trackOrderId" type="number" min="1" placeholder="e.g. 12" required></label><label>Mobile number<input id="trackPhone" type="text" placeholder="03XX-XXXXXXX" required></label><button class="btn primary big" type="submit" style="margin-top:10px">TRACK KAREIN</button></form><div id="trackResult" style="margin-top:14px"></div></div></div>
 <div class="modal" id="policyModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" data-close type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><h2 id="policyTitle">Policy</h2><div class="policy-body" id="policyBody"></div></div></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="themes.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

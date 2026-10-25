@@ -10,6 +10,19 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const fmt = n => "Rs." + Number(n || 0).toLocaleString("en-PK");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+/* V3 Part B security: escapeHtml = esc (wahi naam jo admin files mein hai).
+   safeUrl: sirf http(s) ya relative URLs ko jaane deta hai — javascript:,
+   data:text/html, vbscript: jaise schemes ko khaali kar deta hai, taa ke
+   admin se aayi image/link values se XSS na ho. */
+const escapeHtml = esc;
+function safeUrl(u){
+  const t = String(u || "").trim();
+  if (!t) return "";
+  if (/^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) return t;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t; /* relative path, koi scheme nahi */
+  return "";
+}
 
 /* ---------- SVG icons (sprite index.html mein hai: #i-* stroke, #b-* brand) ---------- */
 const icon = (name, cls) => `<svg class="ic ${cls || ""}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -96,7 +109,9 @@ const DEFAULT_SETTINGS = {
   custom_sections: [],
   checkout_fields: [],
   product_fields: [],
-  animations: true
+  animations: true,
+  /* --- V3 theme (store admin ki choice; settings.data.theme) --- */
+  theme: ""
 };
 let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
@@ -220,6 +235,10 @@ function mergeSettings(raw){
   out.checkout_fields = cleanFields(raw.checkout_fields);
   out.product_fields = cleanFields(raw.product_fields);
   if (typeof raw.animations === "boolean") out.animations = raw.animations;
+  if (typeof raw.theme === "string") out.theme = raw.theme.trim().toLowerCase();
+  /* V3 Part B: SEO — Settings tab se (admin). */
+  if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title.trim();
+  if (typeof raw.seo_description === "string") out.seo_description = raw.seo_description.trim();
   return out;
 }
 async function loadSettings(){
@@ -242,7 +261,11 @@ async function loadSettings(){
 }
 function applySettings(){
   const name = SETTINGS.store_name || DEFAULT_SETTINGS.store_name;
-  document.title = name + " — Pakistan Ka Smart Store";
+  /* V3 Part B SEO: admin ka seo_title ho to wohi title; warna default. */
+  document.title = (SETTINGS.seo_title && SETTINGS.seo_title.trim()) ? SETTINGS.seo_title.trim() : name + " — Pakistan Ka Smart Store";
+  let metaDesc = document.querySelector('meta[name="description"]');
+  if (!metaDesc){ metaDesc = document.createElement("meta"); metaDesc.name = "description"; document.head.appendChild(metaDesc); }
+  metaDesc.content = (SETTINGS.seo_description && SETTINGS.seo_description.trim()) ? SETTINGS.seo_description.trim() : (name + " — Pakistan ka smart online store. Cash on Delivery, fast delivery 3–5 days.");
   $("#logoName").textContent = name;
   $("#footerLogoName").textContent = name;
   $("#copyStoreName").textContent = name;
@@ -251,18 +274,19 @@ function applySettings(){
   const logoUrl = (SETTINGS.logo_url || (SETTINGS.profile && SETTINGS.profile.logo_url) || "").trim();
   const logoImg = $("#logoImg");
   if (logoImg){
-    if (logoUrl){ logoImg.src = logoUrl; logoImg.alt = name; logoImg.hidden = false; $("#logoHome").classList.add("has-logo"); }
+    if (logoUrl){ logoImg.src = safeUrl(logoUrl); logoImg.alt = name; logoImg.hidden = false; $("#logoHome").classList.add("has-logo"); }
     else { logoImg.hidden = true; logoImg.removeAttribute("src"); $("#logoHome").classList.remove("has-logo"); }
   }
   const footLogoImg = $("#footerLogoImg");
   if (footLogoImg){
-    if (logoUrl){ footLogoImg.src = logoUrl; footLogoImg.alt = name; footLogoImg.hidden = false; }
+    if (logoUrl){ footLogoImg.src = safeUrl(logoUrl); footLogoImg.alt = name; footLogoImg.hidden = false; }
     else { footLogoImg.hidden = true; footLogoImg.removeAttribute("src"); }
     const bag = $("#footerBagIcon"); if (bag) bag.hidden = !!logoUrl;
   }
-  /* V2 appearance: font, theme color, animations, socials, nav/footer links */
-  applyFont();
+  /* V3: pehle theme (ACTIVE_THEME resolve + classes/vars), phir font
+     (explicit font_family ho to wohi, warna theme ka font). */
   applyTheme();
+  applyFont();
   applyAnimations();
   renderSocials();
   renderNav();
@@ -277,7 +301,7 @@ function applySettings(){
     <article class="hero-slide ${i % 2 === 1 ? "alt" : ""}">
       <div class="hero-inner">
         <div class="hero-content"><span class="hero-pill">${esc(s.pill)}</span><h1>${esc(s.title)}</h1><p>${esc(s.subtitle)}</p><button class="btn primary" type="button" data-hero-target="${i === 0 ? "bestSection" : "dealsSection"}">${esc(s.button)}</button></div>
-        <img class="hero-img" src="${esc(s.image)}" alt="${esc(s.title)}">
+        <img class="hero-img" src="${safeUrl(s.image)}" alt="${esc(s.title)}">
       </div>
     </article>`).join("");
   $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join("");
@@ -314,41 +338,93 @@ function applySettings(){
   watchReveals();
 }
 
-/* ---------- V2: Appearance (font / theme / animations) ---------- */
-function applyFont(){
-  const ff = SETTINGS.font_family || {};
-  const root = document.documentElement;
-  let link = document.getElementById("storeFontLink");
-  if (ff.google){
-    if (!link){
-      link = document.createElement("link");
-      link.id = "storeFontLink"; link.rel = "stylesheet";
-      document.head.appendChild(link);
-    }
-    link.href = "https://fonts.googleapis.com/css2?family=" + ff.google + "&display=swap";
-  } else if (link) link.remove();
-  if (ff.stack){
-    root.style.setProperty("--font-body", ff.stack);
-    root.style.setProperty("--font-head", ff.stack);
+/* ---------- V3: Themes (look) + Appearance (font / accent) ----------
+   ACTIVE THEME precedence:
+     1) settings.data.theme (store admin ki choice) — agar allowed + known
+     2) STORE.theme (super admin ka default)      — agar allowed + known
+     3) "general" (fallback — aaj ka look, palette/fonts default jaisay)
+   allowed_themes: [] / missing = SAB themes allowed.
+   Explicit settings.data.theme_color hamesha theme palette ke accent par
+   jeet-ta hai (buttons/badges par). */
+let ACTIVE_THEME = null;
+function resolveActiveTheme(){
+  var getTheme = window.SHOPNEST_THEME;
+  var getAllowed = window.SHOPNEST_ALLOWED_THEMES;
+  var known = window.SHOPNEST_THEME_KNOWN;
+  if (!getTheme || !known){
+    ACTIVE_THEME = null;
+    return null;
+  }
+  var allowedKeys = getAllowed ? getAllowed(STORE ? STORE.allowed_themes : null).map(function(t){ return t.key; }) : ["general", "fashion", "beauty", "electronics", "food"];
+  var pick = function(k){ return (k && allowedKeys.indexOf(k) !== -1 && known(k)) ? k : null; };
+  var key = pick(SETTINGS.theme) || pick(STORE && STORE.theme) || "general";
+  ACTIVE_THEME = getTheme(key);
+  return ACTIVE_THEME;
+}
+function applyTheme(){
+  var root = document.documentElement;
+  var t = resolveActiveTheme();
+  /* Body classes: pichli theme ki classes saaf, nayi lagayen. */
+  ["general", "fashion", "beauty", "electronics", "food"].forEach(function(k){ document.body.classList.remove("theme-" + k); });
+  ["slider", "banner", "minimal"].forEach(function(x){ document.body.classList.remove("hero-" + x); });
+  ["rounded", "sharp", "soft"].forEach(function(x){ document.body.classList.remove("cards-" + x); });
+  ["tiles", "pills", "list"].forEach(function(x){ document.body.classList.remove("cats-" + x); });
+  if (t){
+    document.body.classList.add("theme-" + t.key, "hero-" + t.heroStyle, "cards-" + t.cardStyle, "cats-" + t.categoryStyle);
+    var p = t.palette || {};
+    var setOrRemove = function(v, val){ if (val) root.style.setProperty(v, val); else root.style.removeProperty(v); };
+    setOrRemove("--theme-primary", p.primary);
+    setOrRemove("--theme-accent", p.accent);
+    setOrRemove("--theme-header", p.header);
+    setOrRemove("--theme-footer", p.footer);
+    setOrRemove("--theme-price", p.price);
+    setOrRemove("--theme-badge", p.badge);
   } else {
-    root.style.removeProperty("--font-body");
-    root.style.removeProperty("--font-head");
+    ["--theme-primary", "--theme-accent", "--theme-header", "--theme-footer", "--theme-price", "--theme-badge"].forEach(function(v){ root.style.removeProperty(v); });
+  }
+  /* Accent: explicit theme_color jeetta hai, warna theme palette ka accent.
+     (theme_color na ho to purana behaviour: stylesheet defaults.) */
+  var tc = String(SETTINGS.theme_color || "").trim();
+  var accent = (/^#[0-9a-fA-F]{6}$/.test(tc)) ? tc : (t && t.palette ? t.palette.accent : "");
+  if (accent){
+    root.style.setProperty("--green", accent);
+    root.style.setProperty("--mint", shade(accent, 0.3));
+    root.style.setProperty("--green-dark", shade(accent, -0.3));
+    root.style.setProperty("--accent", accent);
+  } else {
+    ["--green", "--mint", "--green-dark", "--accent"].forEach(function(v){ root.style.removeProperty(v); });
   }
 }
-/* theme_color = single accent: GREEN accent ki jagah (primary buttons, badges,
-   prices ke accents, hovers). Navy headers/footer wesay ke wesay rehte hain.
-   Hover shade JS mein derive hoti hai (darken). */
-function applyTheme(){
-  const root = document.documentElement;
-  const tc = String(SETTINGS.theme_color || "").trim();
-  if (/^#[0-9a-fA-F]{6}$/.test(tc)){
-    root.style.setProperty("--green", tc);
-    root.style.setProperty("--mint", shade(tc, 0.3));
-    root.style.setProperty("--green-dark", shade(tc, -0.3));
-    root.style.setProperty("--accent", tc);
-  } else {
-    ["--green", "--mint", "--green-dark", "--accent"].forEach(v => root.style.removeProperty(v));
+function setFontLink(id, google){
+  var link = document.getElementById(id);
+  if (!google){
+    if (link) link.remove();
+    return;
   }
+  if (!link){
+    link = document.createElement("link");
+    link.id = id; link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }
+  link.href = "https://fonts.googleapis.com/css2?family=" + google + "&display=swap";
+}
+/* Font precedence: explicit font_family > theme fonts > stylesheet defaults.
+   Theme ke head/body alag ho sakte hain (e.g. Playfair head + Inter body). */
+function applyFont(){
+  var root = document.documentElement;
+  var explicit = SETTINGS.font_family || {};
+  var bodyF = null, headF = null;
+  if (explicit.name){
+    bodyF = explicit; headF = explicit;
+  } else if (ACTIVE_THEME && ACTIVE_THEME.fonts){
+    bodyF = ACTIVE_THEME.fonts.body; headF = ACTIVE_THEME.fonts.head;
+  }
+  setFontLink("storeFontLink", bodyF && bodyF.google ? bodyF.google : "");
+  setFontLink("storeFontHeadLink", (headF && headF.google && headF.google !== (bodyF && bodyF.google)) ? headF.google : "");
+  if (bodyF && bodyF.stack) root.style.setProperty("--font-body", bodyF.stack);
+  else root.style.removeProperty("--font-body");
+  if (headF && headF.stack) root.style.setProperty("--font-head", headF.stack);
+  else root.style.removeProperty("--font-head");
 }
 /* settings.animations === false ho to marquee + reveals band. */
 function applyAnimations(){
@@ -366,7 +442,7 @@ function renderSocials(){
   const s = SETTINGS.socials || {};
   const html = SOCIAL_DEFS.map(([key, label]) => {
     const u = String(s[key] || "").trim();
-    return u ? `<a class="soc-btn" href="${esc(u)}" target="_blank" rel="noopener" aria-label="${label}">${brandIcon(key)}</a>` : "";
+    return u ? `<a class="soc-btn" href="${safeUrl(u)}" target="_blank" rel="noopener" aria-label="${label}">${brandIcon(key)}</a>` : "";
   }).join("");
   wrap.innerHTML = html;
   wrap.hidden = !html;
@@ -380,7 +456,7 @@ function navLinkHTML(l){
   const label = esc(l.label || url);
   if (!url) return "";
   if (url.startsWith("#")) return `<button type="button" data-menu-anchor="${esc(url.slice(1))}">${label}</button>`;
-  return `<a href="${esc(url)}">${label}</a>`;
+  return `<a href="${safeUrl(url) || "#"}">${label}</a>`;
 }
 function bindAnchors(root){
   if (!root) return;
@@ -425,8 +501,8 @@ function buildCustomSection(def){
   const sec = document.createElement("section");
   sec.className = "section wrap custom-section reveal";
   sec.dataset.customSection = String(def.id);
-  const btn = def.btn_label ? `<a class="btn primary" href="${esc(def.btn_link || "#")}">${esc(def.btn_label)}</a>` : "";
-  sec.innerHTML = `${def.img ? `<div class="custom-media"><img src="${esc(def.img)}" alt="${esc(def.heading || "")}" loading="lazy"></div>` : ""}
+  const btn = def.btn_label ? `<a class="btn primary" href="${safeUrl(def.btn_link) || "#"}">${esc(def.btn_label)}</a>` : "";
+  sec.innerHTML = `${def.img ? `<div class="custom-media"><img src="${safeUrl(def.img)}" alt="${esc(def.heading || "")}" loading="lazy"></div>` : ""}
     <div class="custom-body">${def.heading ? `<h2 class="section-title left">${esc(def.heading)}</h2>` : ""}${def.text ? `<p>${esc(def.text)}</p>` : ""}${btn}</div>`;
   if (def.img) sec.classList.add("has-img");
   return sec;
@@ -528,7 +604,7 @@ function renderCats(){
     const row = CATEGORIES.find(x => x.name === c);
     const p = PRODUCTS.find(x => x.cat === c);
     const tileImg = (row && row.image) || (p ? p.img : "");
-    return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${esc(tileImg)}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
+    return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${safeUrl(tileImg)}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
   }).join("");
   $("#catTiles").innerHTML = `<div class="cat-rail">${tiles}${tiles}</div>`;
   $$("[data-tile-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.tileCat, maxPrice: null }));
@@ -570,7 +646,7 @@ function cardHTML(p, opts = {}){
       ? `<button class="mini-btn order" type="button" data-order="${p.id}">BUY NOW</button>`
       : `<button class="mini-btn add" type="button" data-add="${p.id}">Add to Cart</button><button class="mini-btn order" type="button" data-order="${p.id}">Order Now</button>`);
   return `<article class="card reveal ${out ? "is-oos" : ""}">
-    <div class="card-imgwrap" data-view="${p.id}"><img src="${esc(p.img || "")}" alt="${esc(p.name)}" loading="lazy">${badge}${oosBadge}</div>
+    <div class="card-imgwrap" data-view="${p.id}"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}" loading="lazy">${badge}${oosBadge}</div>
     <div class="card-body">
       <h3 class="card-title" data-view="${p.id}">${esc(p.name)}</h3>
       <p class="stars">${stars(p.rating)} <small>${ratingOf(p).toFixed(1)} (${reviewsOf(p)})</small></p>
@@ -653,7 +729,7 @@ const DEMO_NAMES = ["Ahmed Raza — Lahore", "Fatima Khan — Karachi", "Usman A
 function renderReviews(){
   const top = [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 6);
   $("#reviewTrack").innerHTML = top.map((p, i) => `<article class="review-card reveal">
-    <div class="review-product"><img src="${esc(p.img || "")}" alt="${esc(p.name)}"><strong>${esc(p.name)}</strong></div>
+    <div class="review-product"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}"><strong>${esc(p.name)}</strong></div>
     <p class="stars">${stars(p.rating)} <small>${ratingOf(p).toFixed(1)}</small></p>
     <p>${esc(DEMO_REVIEWS[i % DEMO_REVIEWS.length])}</p>
     <p class="verified">✓ Verified Purchase</p><p class="reviewer">${esc(DEMO_NAMES[i % DEMO_NAMES.length])}</p>
@@ -746,8 +822,8 @@ function dateText(days){
 function openProduct(id){
   const p = findP(id); if (!p) return;
   pdpId = id; pdpQty = 1;
-  $("#pdpImg").src = p.img || ""; $("#pdpImg").alt = p.name;
-  $("#pdpThumb").src = p.img || ""; $("#pdpThumb").alt = p.name;
+  $("#pdpImg").src = safeUrl(p.img || ""); $("#pdpImg").alt = p.name;
+  $("#pdpThumb").src = safeUrl(p.img || ""); $("#pdpThumb").alt = p.name;
   $("#pdpCrumbCat").textContent = p.cat;
   $("#pdpCrumbName").textContent = p.name;
   $("#pdpTitle").textContent = p.name;
@@ -917,7 +993,7 @@ function renderCart(){
   $("#cartRows").innerHTML = entries.map(([id,q]) => {
     const p = findP(id); if (!p) return "";
     return `<div class="cart-row">
-      <img src="${esc(p.img || "")}" alt="${esc(p.name)}">
+      <img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}">
       <div><h3>${esc(p.name)}</h3><p>${fmt(p.price)} each • ${delivText(p)}</p>
         <div class="cart-controls"><button class="qty-btn" type="button" data-cdec="${p.id}">−</button><strong>${q}</strong><button class="qty-btn" type="button" data-cinc="${p.id}">+</button><button class="remove-link" type="button" data-crem="${p.id}">Remove</button></div>
       </div><strong class="line-total">${fmt(Number(p.price) * q)}</strong>
@@ -954,7 +1030,7 @@ function renderCheckoutSummary(){
   const entries = checkoutState ? checkoutState.entries : [];
   $("#coItems").innerHTML = entries.map(([id,q]) => {
     const p = findP(id); if (!p) return "";
-    return `<div class="co-item"><img src="${esc(p.img || "")}" alt=""><div class="co-item-info"><h4>${esc(p.name)}</h4><p>${fmt(p.price)} × ${q} • ${delivText(p)}</p></div><strong>${fmt(Number(p.price) * q)}</strong></div>`;
+    return `<div class="co-item"><img src="${safeUrl(p.img || "")}" alt=""><div class="co-item-info"><h4>${esc(p.name)}</h4><p>${fmt(p.price)} × ${q} • ${delivText(p)}</p></div><strong>${fmt(Number(p.price) * q)}</strong></div>`;
   }).join("");
   const { sub, fee, discount, total } = checkoutTotals();
   $("#coSubtotal").textContent = fmt(sub);
@@ -1043,6 +1119,9 @@ $("#checkoutForm").onsubmit = async e => {
   e.preventDefault();
   if (!checkoutState || !checkoutState.entries.length) return;
   const btn = $("#placeOrderBtn");
+  /* V3 Part B: double-submit guard + honeypot (bot bhara to chupchaap rok dein). */
+  if (btn.disabled) return;
+  if (String(new FormData(e.target).get("website") || "").trim() !== ""){ btn.disabled = false; btn.textContent = "ORDER PLACE KAREIN"; return; }
   const err = $("#checkoutError");
   err.textContent = "";
   const f = new FormData(e.target);
@@ -1100,6 +1179,49 @@ $("#checkoutForm").onsubmit = async e => {
   $("#successText").textContent = "Shukriya! Aapka order save ho gaya hai — hum jald call karke confirm karein ge.";
   $("#successOrderId").textContent = "Total (COD): " + fmt(total);
   showPage("successPage");
+};
+
+/* ---------- V3 Part B: Order tracking (customer) ----------
+   Sirf order ID + phone se status milta hai — naam/address kabhi
+   public nahi hote. Server par get_order_status RPC phone verify
+   karke hi row deta hai; galat phone par zero rows. */
+function openTrackModal(){
+  const m = $("#trackModal");
+  if (!m) return;
+  $("#trackResult").innerHTML = "";
+  m.classList.add("open");
+}
+function closeTrackModal(){ const m = $("#trackModal"); if (m) m.classList.remove("open"); }
+const _trackLink = document.getElementById("trackOrderLink");
+if (_trackLink) _trackLink.onclick = e => { e.preventDefault(); openTrackModal(); };
+const _trackBtn = document.getElementById("trackOrderBtn");
+if (_trackBtn) _trackBtn.onclick = openTrackModal;
+const _trackClose = document.getElementById("trackCloseBtn");
+if (_trackClose) _trackClose.onclick = closeTrackModal;
+const _trackModal = document.getElementById("trackModal");
+if (_trackModal) _trackModal.addEventListener("click", e => { if (e.target.id === "trackModal") closeTrackModal(); });
+const _trackForm = document.getElementById("trackForm");
+if (_trackForm) _trackForm.onsubmit = async e => {
+  e.preventDefault();
+  const res = $("#trackResult");
+  const oid = parseInt($("#trackOrderId").value.trim(), 10);
+  const phone = $("#trackPhone").value.trim();
+  if (!oid || !phone){ res.innerHTML = `<p class="form-error">Order ID aur phone number dono lazmi hain.</p>`; return; }
+  res.innerHTML = `<p class="muted center">Check ho raha hai…</p>`;
+  try {
+    const { data, error } = await sb.rpc("get_order_status", { p_order_id: oid, p_phone: phone });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row){ res.innerHTML = `<p class="form-error">Order nahi mila — ID ya phone number dobara check karein.</p>`; return; }
+    const d = new Date(row.created_at).toLocaleString("en-PK", { day: "numeric", month: "short", year: "numeric" });
+    res.innerHTML = `<div class="track-card">
+      <p><strong>Order #${oid}</strong> — <span class="pill">${escapeHtml(row.status)}</span></p>
+      <p>Total: <strong>${fmt(row.total)}</strong> • Items: <strong>${row.item_count}</strong> • Date: ${escapeHtml(d)}</p>
+      ${row.tracking_note ? `<p class="track-note">📦 ${escapeHtml(row.tracking_note)}</p>` : ""}
+    </div>`;
+  } catch (err) {
+    res.innerHTML = `<p class="form-error">Track nahi ho saka — thori der baad dobara try karein.</p>`;
+  }
 };
 
 /* ---------- Header, filters, footer, misc ---------- */

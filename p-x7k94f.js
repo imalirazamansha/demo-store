@@ -63,6 +63,17 @@ const SECTION_DEFS = [
 ];
 const LEGACY_SEC = { best_sellers: "best", promos: "promos", hot: "hot", new_arrivals: "arrivals", deals: "deals", budget: "budget", about: "about", how_to_order: "howto", faq: "faq", testimonials: "reviews" };
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+/* V3 Part B security: escapeHtml = esc (storefront ke naam se match). */
+const escapeHtml = esc;
+/* V3 Part B security: safeUrl — sirf http(s)/relative image URLs. */
+function safeUrl(u){
+  const t = String(u || "").trim();
+  if (!t) return "";
+  if (/^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) return t;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;
+  return "";
+}
 
 let settingsLoaded = false;
 let MY_EMAIL = null;
@@ -92,6 +103,8 @@ const isAdminPlus = () => effRole() === "owner" || effRole() === "admin";
 /* Storefront defaults — script.js ke DEFAULT_SETTINGS se match. */
 const ADMIN_DEFAULT_SETTINGS = {
   store_name: "ShopNest",
+  seo_title: "",
+  seo_description: "",
   announcements: [
     "⚡ {STORE} — PAKISTAN KA SMART STORE",
     "💵 CASH ON DELIVERY ALL OVER PAKISTAN",
@@ -123,7 +136,9 @@ const ADMIN_DEFAULT_SETTINGS = {
   sections_order: null,
   custom_sections: [],
   checkout_fields: [],
-  product_fields: []
+  product_fields: [],
+  /* V3: store admin ki theme choice (settings.data.theme) */
+  theme: ""
 };
 
 /* ---------- Auth (magic link) + team gate ---------- */
@@ -167,7 +182,7 @@ async function checkAccess(session){
     const teamRows = teamRes.data || [];
     /* Stores ki list bhi RLS-scoped hai: team member ko sirf apni stores,
        platform admin ko SAARI stores milti hain. */
-    const { data: storeRows, error: storeErr } = await sb.from("stores").select("id, slug, name, status");
+    const { data: storeRows, error: storeErr } = await sb.from("stores").select("id, slug, name, status, allowed_themes");
     if (storeErr) throw storeErr;
     const byId = {};
     (storeRows || []).forEach(s => { byId[s.id] = s; });
@@ -202,7 +217,9 @@ async function checkAccess(session){
     showNoAccess(email);
   }
 }
+let STORE_ALLOWED_THEMES = null; /* is store ke liye allowed theme keys ([] = sab) */
 function enterStore(store){
+  STORE_ALLOWED_THEMES = store.allowed_themes;
   STORE_ID = store.id;
   STORE_SLUG = store.slug;
   STORE_NAME = store.name;
@@ -274,6 +291,7 @@ $("#refreshBtn").onclick = loadAll;
 async function loadAll(){
   await Promise.all([loadOrders(), loadProducts(), loadCategories()]);
   await loadDashboard();
+  if (isAdminPlus()) loadDomain();
   if (isAdminPlus()) loadCoupons();
   if (effRole() === "owner") loadTeam();
 }
@@ -410,6 +428,8 @@ function openOrderEdit(id){
   $("#oePhone").value = o.phone || "";
   $("#oeCity").value = o.city || "";
   $("#oeAddress").value = o.address || "";
+  /* V3 Part B: tracking note (orders.tracking_note) */
+  if ($("#oeTrackNote")) $("#oeTrackNote").value = o.tracking_note || "";
   $("#oeStatus").innerHTML = STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("");
   $("#oeDiscount").value = meta.discount || 0;
   $("#oeItems").innerHTML = "";
@@ -483,6 +503,7 @@ $("#oeSaveBtn").onclick = async () => {
     phone: $("#oePhone").value.trim(),
     city: $("#oeCity").value.trim(),
     address: $("#oeAddress").value.trim(),
+    tracking_note: $("#oeTrackNote") ? $("#oeTrackNote").value.trim() : undefined,
     status: $("#oeStatus").value,
     items,
     total: Math.max(0, parseInt($("#oeTotal").value) || 0)
@@ -510,6 +531,7 @@ async function loadProducts(){
   if (error){ wrap.innerHTML = `<p class="empty-note">Products load nahi ho sakay: ${esc(error.message)}</p>`; return; }
   PRODUCTS_CACHE = data || [];
   $("#statProducts").textContent = PRODUCTS_CACHE.length;
+  renderLowStock();
   refreshCatList();
   renderProductsList();
   /* Edit form khula ho to usay fresh data se dobara bhar dein (save ke baad). */
@@ -531,7 +553,7 @@ function renderProductsList(){
   wrap.innerHTML = `<table>
     <thead><tr><th>Photo</th><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Live</th><th>Featured</th><th></th></tr></thead>
     <tbody>${list.map(p => `<tr>
-      <td><img class="prod-thumb" src="${esc(p.img || PLACEHOLDER_IMG)}" alt=""></td>
+      <td><img class="prod-thumb" src="${safeUrl(p.img || PLACEHOLDER_IMG)}" alt=""></td>
       <td><strong>${esc(p.name || "")}</strong><br><small style="color:var(--muted)">#${p.id}</small></td>
       <td>${esc(p.cat || "General")}</td>
       <td><strong>${fmt(p.price)}</strong>${p.old ? `<br><small style="color:var(--muted);text-decoration:line-through">${fmt(p.old)}</small>` : ""}</td>
@@ -579,7 +601,7 @@ function refreshCatList(){
 function prodCard(p){
   const out = p.stock === "out";
   return `<div class="prod" data-id="${p.id}">
-    <img class="img-preview" data-preview src="${esc(p.img || PLACEHOLDER_IMG)}" alt="">
+    <img class="img-preview" data-preview src="${safeUrl(p.img || PLACEHOLDER_IMG)}" alt="">
     <div class="badges-row">${p.featured ? `<span class="pill green">⭐ Featured</span>` : ""}${out ? `<span class="pill grey">⛔ Out of Stock</span>` : `<span class="pill green">✅ In Stock</span>`}</div>
     <label>Product name</label><input data-f="name" value="${esc(p.name||"")}">
     <div class="row2">
@@ -710,7 +732,7 @@ async function loadCategories(){
   wrap.innerHTML = `<table>
     <thead><tr><th>Image</th><th>Name</th><th>Products</th><th>Sort</th><th>Visible</th><th>Image URL / Upload</th><th></th></tr></thead>
     <tbody>${CATEGORIES_CACHE.map(c => { const count = PRODUCTS_CACHE.filter(p => p.cat === c.name).length; return `<tr data-cid="${c.id}">
-      <td><img class="thumb-sm" data-cprev src="${esc(c.image || PLACEHOLDER_IMG)}" alt=""></td>
+      <td><img class="thumb-sm" data-cprev src="${safeUrl(c.image || PLACEHOLDER_IMG)}" alt=""></td>
       <td><input type="text" data-cname value="${esc(c.name)}"></td>
       <td>${count}</td>
       <td><input type="number" data-csort value="${c.sort ?? 0}" style="max-width:76px"></td>
@@ -867,7 +889,7 @@ function barChart(el, values, labels, opts = {}){
   if (!el) return;
   const max = Math.max(...values, 0);
   if (max <= 0){ el.innerHTML = `<p class="empty-note">${opts.empty || "Abhi tak koi data record nahi."}</p>`; return; }
-  el.innerHTML = `<div class="bars">${values.map((v, i) => `<div class="bar-col"><span class="bar-val">${opts.format ? opts.format(v) : v}</span><div class="bar ${opts.sales ? "sales" : ""}" style="height:${Math.max(3, Math.round(v / max * 100))}%"></div><span class="bar-lab">${labels[i]}</span></div>`).join("")}</div>`;
+  el.innerHTML = `<div class="bars">${values.map((v, i) => `<div class="bar-col"><span class="bar-val">${opts.format ? opts.format(v) : v}</span><div class="bar ${opts.sales ? "sales" : ""}" style="height:${Math.max(3, Math.round(v / max * 100))}%"></div><span class="bar-lab">${escapeHtml(labels[i])}</span></div>`).join("")}</div>`;
 }
 async function loadDashboard(){
   /* Visits: sirf pichle 30 din fetch hote hain (performance). */
@@ -965,6 +987,9 @@ function mergeAdminSettings(raw){
   if (typeof raw.about_heading === "string" && raw.about_heading.trim()) out.about_heading = raw.about_heading.trim();
   if (typeof raw.about_text === "string" && raw.about_text.trim()) out.about_text = raw.about_text.trim();
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
+  /* V3 Part B: SEO fields */
+  if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
+  if (typeof raw.seo_description === "string") out.seo_description = raw.seo_description;
   if (raw.sections && typeof raw.sections === "object") Object.keys(out.sections).forEach(k => { if (typeof raw.sections[k] === "boolean") out.sections[k] = raw.sections[k]; });
   if (raw.policies && typeof raw.policies === "object") Object.keys(out.policies).forEach(k => { if (typeof raw.policies[k] === "string") out.policies[k] = raw.policies[k]; });
   if (raw.profile && typeof raw.profile === "object") Object.keys(out.profile).forEach(k => { if (typeof raw.profile[k] === "string") out.profile[k] = raw.profile[k]; });
@@ -974,6 +999,7 @@ function mergeAdminSettings(raw){
   else if (typeof raw.font_family === "string" && FONTS[raw.font_family])
     out.font_family = { ...FONTS[raw.font_family] };
   if (typeof raw.theme_color === "string") out.theme_color = raw.theme_color;
+  if (typeof raw.theme === "string") out.theme = raw.theme.trim().toLowerCase();
   if (typeof raw.logo_url === "string") out.logo_url = raw.logo_url;
   if (raw.socials && typeof raw.socials === "object") Object.keys(out.socials).forEach(k => { if (typeof raw.socials[k] === "string") out.socials[k] = raw.socials[k]; });
   const cleanLinks = arr => Array.isArray(arr) ? arr.filter(l => l && typeof l === "object").map(l => ({ label: String(l.label || ""), url: String(l.url || "") })) : [];
@@ -1065,6 +1091,9 @@ $("#addSlideBtn").onclick = () => {
 function fillSettings(s){
   $("#setStoreName").value = s.store_name;
   $("#setWhatsapp").value = s.whatsapp_number;
+  /* V3 Part B: SEO */
+  if ($("#setSeoTitle")) $("#setSeoTitle").value = s.seo_title || "";
+  if ($("#setSeoDesc")) $("#setSeoDesc").value = s.seo_description || "";
   s.announcements.forEach((a,i) => { document.getElementById("setAnn" + (i + 1)).value = a; });
   heroState = JSON.parse(JSON.stringify(s.hero));
   renderHeroEditor();
@@ -1332,7 +1361,35 @@ function readFieldRows(wrap){
     };
   }).filter(f => f.label);
 }
+/* ---------- V3: Theme picker (Appearance tab, TOP) ----------
+   Allowed list = store ki allowed_themes (Super Admin se); [] = sab.
+   Disallowed themes lock ke saath dikhti hain, click nahi hoti. */
+let ADMIN_THEME_SELECTED = "";
+function renderThemePicker(){
+  var wrap = $("#themeGrid");
+  if (!wrap) return;
+  var themes = window.SHOPNEST_THEMES || [];
+  var allowed = window.SHOPNEST_ALLOWED_THEMES ? window.SHOPNEST_ALLOWED_THEMES(STORE_ALLOWED_THEMES) : themes;
+  var allowedKeys = allowed.map(function(t){ return t.key; });
+  wrap.innerHTML = themes.map(function(t){
+    var ok = allowedKeys.indexOf(t.key) !== -1;
+    var sel = ADMIN_THEME_SELECTED === t.key;
+    var dots = `<span class="theme-dots"><i style="background:${t.palette.primary}"></i><i style="background:${t.palette.accent}"></i><i style="background:${t.palette.header}"></i></span>`;
+    return `<button type="button" class="theme-card ${sel ? "selected" : ""} ${ok ? "" : "locked"}" data-theme="${t.key}" ${ok ? "" : "disabled"}>${dots}<h5>${t.name} <small>(${t.nameUr})</small></h5><p>${t.tagline}</p><p><small>${t.business}</small></p>${sel ? "<p><strong>✓ Selected</strong></p>" : ""}${ok ? "" : "<p><strong>🔒 Super Admin ne ye theme allow nahi ki</strong></p>"}</button>`;
+  }).join("");
+  wrap.querySelectorAll("[data-theme]").forEach(function(b){
+    b.onclick = function(){ ADMIN_THEME_SELECTED = b.dataset.theme; renderThemePicker(); };
+  });
+  var note = $("#themeNote");
+  if (note){
+    var cur = themes.find(function(t){ return t.key === ADMIN_THEME_SELECTED; });
+    note.textContent = cur ? ("Selected theme: " + cur.name + " — Save dabane par store par lag jayega.")
+      : "Koi theme select nahi — store default (General) look par chalega.";
+  }
+}
 function fillAppearance(s){
+  ADMIN_THEME_SELECTED = (s.theme && window.SHOPNEST_THEME_KNOWN && window.SHOPNEST_THEME_KNOWN(s.theme)) ? s.theme : "";
+  renderThemePicker();
   $("#appFont").value = fontNameOf(s.font_family);
   $("#appThemeColor").value = /^#[0-9a-fA-F]{6}$/.test(s.theme_color || "") ? s.theme_color : "#0A2B4E";
   renderSwatches();
@@ -1395,6 +1452,9 @@ async function persistAllSettings(){
     data.about_heading = $("#setAboutHeading").value.trim();
     data.about_text = $("#setAboutText").value.trim();
     data.whatsapp_number = $("#setWhatsapp").value.trim();
+    /* V3 Part B: SEO */
+    data.seo_title = $("#setSeoTitle") ? $("#setSeoTitle").value.trim() : "";
+    data.seo_description = $("#setSeoDesc") ? $("#setSeoDesc").value.trim() : "";
     const secToggles = {};
     document.querySelectorAll("[data-sec]").forEach(cb => { secToggles[cb.dataset.sec] = cb.checked; });
     data.sections = secToggles;
@@ -1435,6 +1495,8 @@ async function persistAllSettings(){
       if ($("#profLogo").value.trim() !== data.logo_url) $("#profLogo").value = data.logo_url;
     }
     data.font_family = fontObjFromName($("#appFont").value);
+    /* V3 theme: sirf known key save ho, warna khaali (general fallback) */
+    data.theme = (window.SHOPNEST_THEME_KNOWN && window.SHOPNEST_THEME_KNOWN(ADMIN_THEME_SELECTED)) ? ADMIN_THEME_SELECTED : "";
     data.theme_color = $("#appThemeColor").value || "";
     data.socials = {
       facebook: $("#socFacebook").value.trim(),
@@ -1477,6 +1539,102 @@ async function persistAllSettings(){
     saveBtns.forEach((b, i) => { b.disabled = false; b.innerHTML = savedLabels[i]; });
   }
 }
+/* ---------- V3 Part B: CSV export + Low-stock alerts + Domain ---------- */
+function downloadCSV(filename, rows){
+  const escCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = rows.map(r => r.map(escCell).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function csvDate(){
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+const _expO = $("#exportOrdersBtn");
+if (_expO) _expO.onclick = () => {
+  const rows = [["Order ID", "Date", "Customer", "Phone", "City", "Address", "Items", "Total", "Status"]];
+  ORDERS_CACHE.forEach(o => {
+    const lines = orderLines(o);
+    rows.push([o.id, new Date(o.created_at).toLocaleString("en-PK"), o.customer_name || "", o.phone || "", o.city || "", o.address || "",
+      lines.map(i => `${i.name} x${i.qty}`).join("; "), o.total || 0, o.status || ""]);
+  });
+  downloadCSV(`orders-${STORE_SLUG || "store"}-${csvDate()}.csv`, rows);
+};
+const _expP = $("#exportProductsBtn");
+if (_expP) _expP.onclick = () => {
+  const rows = [["ID", "Name", "Category", "Price", "Old Price", "Stock", "Live", "Featured"]];
+  PRODUCTS_CACHE.forEach(pr => {
+    rows.push([pr.id, pr.name || "", pr.cat || "", pr.price || 0, pr.old || "", pr.stock || "", pr.active ? "yes" : "no", pr.featured ? "yes" : "no"]);
+  });
+  downloadCSV(`products-${STORE_SLUG || "store"}-${csvDate()}.csv`, rows);
+};
+/* Low-stock: stock === 'out' wali products ki list — Products tab banner + Dashboard card. */
+function renderLowStock(){
+  const out = (PRODUCTS_CACHE || []).filter(pr => pr.stock === "out");
+  const banner = $("#lowStockBanner");
+  if (banner){
+    if (out.length){
+      banner.hidden = false;
+      banner.innerHTML = `<p class="msg err" style="margin:0">⚠️ <strong>${out.length} product(s) out of stock</strong> — ${out.map(pr => escapeHtml(pr.name || ("#" + pr.id))).join(", ")}</p>`;
+    } else { banner.hidden = true; banner.innerHTML = ""; }
+  }
+  const dash = $("#dashLowStock");
+  if (dash){
+    if (out.length){
+      dash.hidden = false;
+      dash.innerHTML = `<h3 style="margin-bottom:6px">⚠️ Low Stock Alert</h3><p class="msg err" style="margin:0"><strong>${out.length} product(s) out of stock:</strong> ${out.map(pr => escapeHtml(pr.name || ("#" + pr.id))).join(", ")}</p>`;
+    } else { dash.hidden = true; dash.innerHTML = ""; }
+  }
+}
+/* Domain section (Settings tab, admin+): current domain dikhao, RPC se save karo. */
+async function loadDomain(){
+  const cur = $("#domCurrent");
+  const inp = $("#domInput");
+  if (!cur || !inp) return;
+  try {
+    const { data, error } = await sb.from("stores").select("custom_domain,domain_status").eq("id", STORE_ID).single();
+    if (error) throw error;
+    const d = (data && data.custom_domain) || "";
+    const st = (data && data.domain_status) || "none";
+    cur.textContent = d ? `Current domain: ${d} — status: ${st}` : "Abhi koi domain connect nahi hai (status: none).";
+    inp.value = d;
+  } catch (e) {
+    cur.textContent = "Domain load nahi ho saka: " + e.message;
+  }
+}
+function validDomain(d){
+  return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(d);
+}
+async function saveDomain(clear){
+  const msg = $("#domMsg");
+  const inp = $("#domInput");
+  const domain = clear ? "" : inp.value.trim().toLowerCase();
+  if (!clear && !validDomain(domain)){
+    msg.textContent = "Domain ghalat hai — sirf aisa likhein: shop.example.com (https:// ya / ke baghair).";
+    msg.className = "msg err"; return;
+  }
+  msg.textContent = "Save ho raha hai…"; msg.className = "msg";
+  try {
+    /* set_store_domain RPC: sirf domain + status badalta hai, baaki store
+       fields ko chhoo nahi sakta — is liye team member bhi safe tareeqay
+       se apna domain save kar sakta hai. */
+    const { error } = await sb.rpc("set_store_domain", { p_store_id: STORE_ID, p_domain: domain, p_status: domain ? "pending" : "none" });
+    if (error) throw error;
+    msg.textContent = clear ? "✅ Domain hata diya gaya." : "✅ Domain save ho gaya — status 'pending'. DNS lagane ke baad Super Admin isay 'live' karega.";
+    msg.className = "msg ok";
+    loadDomain();
+  } catch (e) {
+    msg.textContent = "Domain save fail: " + e.message; msg.className = "msg err";
+  }
+}
+const _domSave = $("#domSaveBtn");
+if (_domSave) _domSave.onclick = () => saveDomain(false);
+const _domClear = $("#domClearBtn");
+if (_domClear) _domClear.onclick = () => saveDomain(true);
+
 $("#saveSettingsBtn").onclick = persistAllSettings;
 $("#saveHomepageBtn").onclick = persistAllSettings;
 $("#saveAppearanceBtn").onclick = persistAllSettings;
