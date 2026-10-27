@@ -152,7 +152,7 @@ const DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
-  /* --- V2 keys (Part A admin contract) --- */
+  /* --- V3.6 Playful Pop layout: Instagram reels + blog (Content tab se) --- */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* --- V2 keys (Part A admin contract) --- */
   font_family: { name: "", stack: "", google: "" },
   theme_color: "",
   logo_url: "",
@@ -241,7 +241,7 @@ function delivText(p){
   return f === 0 ? `${icon("truck", "ic-inline")} FREE Delivery` : `${icon("truck", "ic-inline")} Delivery: ${fmt(f)}`;
 }
 
-/* ---------- Settings ---------- */
+/* ---------- V3.6 Playful Pop layout helpers ---------- */ function isPlayful(){ return !!(ACTIVE_THEME && ACTIVE_THEME.key === "playful"); } /* Product ki gallery: Supabase products.gallery (jsonb array) ya comma wali string — dono support, taa ke purana data bhi chale. */ function galleryOf(p){ const g = p && p.gallery; if (Array.isArray(g)) return g.map(v => String(v || "").trim()).filter(Boolean); if (typeof g === "string") return g.split(",").map(s => s.trim()).filter(Boolean); return []; } /* Fun-hero ke products: Featured pehle, warna top-reviewed; max 4. */ function funHeroItems(){ const live = PRODUCTS.filter(p => p.active !== false); const feats = live.filter(p => p.featured).sort((a, b) => reviewsOf(b) - reviewsOf(a)); const pool = feats.length ? feats : [...live].sort((a, b) => reviewsOf(b) - reviewsOf(a)); return pool.slice(0, 4); } let PLAYFUL_HERO = false; let funHeroTimer = null; let funHeroIndex = 0; function stopFunHero(){ if (funHeroTimer){ clearInterval(funHeroTimer); funHeroTimer = null; } } function showFunHero(i){ const items = document.querySelectorAll("#heroTrack .fh-item"); if (!items.length) return; funHeroIndex = (i + items.length) % items.length; items.forEach((el, j) => el.classList.toggle("active", j === funHeroIndex)); document.querySelectorAll("#heroDots [data-fh-dot]").forEach((b, j) => b.classList.toggle("active", j === funHeroIndex)); const bg = document.querySelector("#heroTrack .fun-hero-bg"); if (bg) bg.className = "fun-hero-bg fh-bg-" + (funHeroIndex % 4); } function startFunHero(){ stopFunHero(); if (SETTINGS.animations === false || REDUCED_MOTION) return; funHeroTimer = setInterval(() => { if (!document.hidden) showFunHero(funHeroIndex + 1); }, 3500); } /* ---------- Settings ---------- */
 function mergeSettings(raw){
   const out = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
   if (!raw || typeof raw !== "object") return out;
@@ -271,7 +271,7 @@ function mergeSettings(raw){
     return { product: cleanStr(x.product), name: cleanStr(x.name), city: cleanStr(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cleanStr(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cleanStr(x.label), amount: cleanStr(x.amount), note: cleanStr(x.note), budget: cleanStr(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), sub: cleanStr(x.sub) }));
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), sub: cleanStr(x.sub) })); /* V3.6: Instagram reels + blog — key maujood ho to wahi (khaali = delete). */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ video: cleanStr(x.video), poster: cleanStr(x.poster), title: cleanStr(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), excerpt: cleanStr(x.excerpt), img: cleanStr(x.img), link: cleanStr(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog;
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* Deep merge: sections toggles */
   if (raw.sections && typeof raw.sections === "object")
@@ -409,19 +409,8 @@ function applySettings(){
   const group = `<div class="marquee-group">${messages.map(m => `<span>${m}</span>`).join("")}</div>`;
   $("#announceTrack").innerHTML = group + group;
   /* Sirf visible slides render hoti hain; koi slide na ho to hero section hide. */
-  HERO_SLIDES = SETTINGS.hero.filter(s => s.visible !== false);
-  $("#heroSection").hidden = HERO_SLIDES.length === 0;
-  $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `
-    <article class="hero-slide ${i % 2 === 1 ? "alt" : ""}">
-      <div class="hero-inner">
-        <div class="hero-content"><span class="hero-pill">${esc(s.pill)}</span><h1>${esc(s.title)}</h1><p>${esc(s.subtitle)}</p><button class="btn primary" type="button" data-hero-target="${i === 0 ? "bestSection" : "dealsSection"}">${esc(s.button)}</button></div>
-        <img class="hero-img" src="${safeUrl(s.image)}" alt="${esc(s.title)}">
-      </div>
-    </article>`).join("");
-  $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join("");
-  $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot));
-  $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget));
-  if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); }
+  HERO_SLIDES = SETTINGS.hero.filter(s => s.visible !== false); renderHero();
+  
   $("#promoGrid").innerHTML = SETTINGS.promo.map((p, i) => `
     <article class="promo-card reveal"><small>${esc(p.kicker)}</small><h3>${esc(p.heading)}</h3><p>${esc(p.text)}</p><button class="btn white" type="button" data-promo-cat="${esc(p.category)}">SHOP NOW</button></article>`).join("");
   $$("[data-promo-cat]").forEach(b => b.onclick = () => {
@@ -459,7 +448,7 @@ function applySettings(){
   renderBudget();
   renderSteps();
   renderFaq();
-  renderReviews();
+  renderReviews(); renderReels(); renderBlog();
   watchReveals();
   syncHeaderOffset();
   applyStyleSettings();
@@ -691,7 +680,7 @@ function renderFooterLinks(){
 }
 
 /* ---------- V2: Homepage sections order + custom sections ---------- */
-const SECTION_NODE_IDS = { hero: "heroSection", trust: "trustSection", categories: "categoriesSection", best_sellers: "bestSection", all_products: "shop", promos: "promoSection", hot: "hotSection", new_arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", how_to_order: "howSection", faq: "faqSection", testimonials: "reviewsSection" };
+const SECTION_NODE_IDS = { hero: "heroSection", trust: "trustSection", categories: "categoriesSection", best_sellers: "bestSection", featured: "featuredSection", reels: "reelsSection", blog: "blogSection", all_products: "shop", promos: "promoSection", hot: "hotSection", new_arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", how_to_order: "howSection", faq: "faqSection", testimonials: "reviewsSection" }; /* V3.6: ye 3 sections sirf Playful Pop theme ka hissa hain — doosre theme par in ka content chhupa rehta hai, chahe Homepage builder mein visible hon. */ const PLAYFUL_ONLY_SECTIONS = ["featured", "reels", "blog"];
 const SECTION_DEFAULT_KEYS = Object.keys(SECTION_NODE_IDS);
 function buildCustomSection(def){
   const sec = document.createElement("section");
@@ -723,7 +712,7 @@ function applySections(){
     const SECTION_IDS = { best: "bestSection", hot: "hotSection", arrivals: "newSection", deals: "dealsSection", budget: "budgetSection", about: "aboutSection", howto: "howSection", faq: "faqSection", reviews: "reviewsSection", promos: "promoSection" };
     Object.entries(SECTION_IDS).forEach(([key, id]) => {
       const el = document.getElementById(id);
-      if (el) el.hidden = SETTINGS.sections[key] === false;
+      if (el) el.hidden = SETTINGS.sections[key] === false || PLAYFUL_ONLY_SECTIONS.includes(key); /* V3.6: legacy path par bhi Playful-only sections hamesha chhupi rahein. */
     });
     return;
   }
@@ -743,19 +732,19 @@ function applySections(){
     }
     const el = document.getElementById(SECTION_NODE_IDS[e.key] || "");
     if (!el || seen.has(e.key)) return;
-    el.hidden = e.visible === false || (e.key === "hero" && HERO_SLIDES.length === 0);
+    el.hidden = e.visible === false || (e.key === "hero" && HERO_SLIDES.length === 0 && !PLAYFUL_HERO) || (PLAYFUL_ONLY_SECTIONS.includes(e.key) && !playfulOn);
     seq.push(el); seen.add(e.key);
   });
   SECTION_DEFAULT_KEYS.forEach(k => {
     if (seen.has(k)) return;
     const el = document.getElementById(SECTION_NODE_IDS[k]);
     if (!el) return;
-    el.hidden = k === "hero" && HERO_SLIDES.length === 0;
+    el.hidden = (k === "hero" && HERO_SLIDES.length === 0 && !PLAYFUL_HERO) || (PLAYFUL_ONLY_SECTIONS.includes(k) && !playfulOn);
     seq.push(el);
   });
   seq.forEach(el => home.appendChild(el));
 }
-function setHero(i){
+/* V3.6: hero render (applySettings + products load dono se chalta hai, taa ke Fun-hero ko products ka wait na karna pare — boot race fix). */ function renderHero(){ PLAYFUL_HERO = false; stopFunHero(); if (isPlayful() && funHeroItems().length){ PLAYFUL_HERO = true; clearInterval(heroTimer); const items = funHeroItems(); const head = HERO_SLIDES[0] || {}; const hTitle = (head.title || "").trim() || (SETTINGS.store_name || "ShopNest"); const hSub = (head.subtitle || "").trim() || "Quality checked products — Cash on Delivery ke saath, poore Pakistan mein."; $("#heroSection").hidden = false; $("#heroTrack").innerHTML = `<article class="fun-hero"><div class="fun-hero-bg fh-bg-0"></div><div class="fun-hero-inner"><div class="fun-hero-copy"><h1>${esc(hTitle)}</h1><p>${esc(hSub)}</p></div><div class="fh-stage">${items.map((p, i) => `<div class="fh-item ${i === 0 ? "active" : ""}"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}"><div class="fh-meta"><strong>${esc(p.name)}</strong><span>${fmt(p.price)}</span></div></div>`).join("")}</div><div class="fh-ctas"><button class="btn primary" type="button" data-hero-target="bestSection">Shop Now</button><button class="btn outline-light" type="button" data-hero-target="budgetSection">Shop by Budget</button></div></div></article>`; $("#heroDots").innerHTML = items.map((_, i) => `<button type="button" data-fh-dot="${i}" class="${i === 0 ? "active" : ""}" aria-label="Hero product ${i + 1}"></button>`).join(""); $$("[data-fh-dot]").forEach(b => b.onclick = () => showFunHero(+b.dataset.fhDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); $$("#heroTrack .fh-item").forEach((el, i) => el.onclick = () => openProduct(items[i].id)); funHeroIndex = 0; startFunHero(); } else { $("#heroSection").hidden = HERO_SLIDES.length === 0; $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `<article class="hero-slide ${i % 2 === 1 ? "alt" : ""}"><div class="hero-inner"><div class="hero-content"><span class="hero-pill">${esc(s.pill)}</span><h1>${esc(s.title)}</h1><p>${esc(s.subtitle)}</p><button class="btn primary" type="button" data-hero-target="${i === 0 ? "bestSection" : "dealsSection"}">${esc(s.button)}</button></div><img class="hero-img" src="${safeUrl(s.image)}" alt="${esc(s.title)}"></div></article>`).join(""); $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join(""); $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); } } } function setHero(i){
   if (!HERO_SLIDES.length) return;
   heroIndex = (i + HERO_SLIDES.length) % HERO_SLIDES.length;
   $("#heroTrack").style.transform = `translateX(-${heroIndex * 100}%)`;
@@ -799,7 +788,7 @@ async function loadProducts(){
      (un ke products All Products grid mein phir bhi aate hain). */
   const visibleCats = CATEGORIES.filter(c => c.visible !== false).map(c => c.name).filter(Boolean);
   CAT_LIST = visibleCats.length ? visibleCats : [...new Set(PRODUCTS.map(p => p.cat).filter(Boolean))];
-  renderCats(); renderProductSections(); renderGrid(); renderCart();
+  renderCats(); renderHero(); applySections(); renderProductSections(); renderGrid(); renderCart();
   startSocialProof();
 }
 function renderCats(){
@@ -828,7 +817,7 @@ function setupCatRail(){
   if (!vp || !rail) return;
   vp.classList.remove("marquee-on");
   rail.style.animationDuration = "";
-  const off = SETTINGS.animations === false || REDUCED_MOTION;
+  const off = SETTINGS.animations === false || REDUCED_MOTION; /* V3.6: Playful Pop par categories hamesha auto-slide (chahe content viewport se bara ho ya na ho) — FunBug wali manual swipe nahi. */ if (!off && document.body.classList.contains("theme-playful") && CAT_LIST.length > 1){ vp.classList.add("marquee-on"); rail.style.animationDuration = Math.max(14, Math.round(rail.scrollWidth / 2 / 55)) + "s"; return; }
   const half = rail.scrollWidth / 2;
   if (!off && half > vp.clientWidth + 10){
     vp.classList.add("marquee-on");
@@ -855,8 +844,8 @@ function cardHTML(p, opts = {}){
      ~60 chars, escaped; desc khaali ho to line hi nahi banti. */
   const spec = (ACTIVE_THEME && ACTIVE_THEME.layout && ACTIVE_THEME.layout.card === "spec" && String(p.desc || "").trim())
     ? `<p class="card-spec">${esc(String(p.desc).slice(0, 60))}</p>` : "";
-  return `<article class="card reveal ${out ? "is-oos" : ""}">
-    <div class="card-imgwrap" data-view="${p.id}"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}" loading="lazy">${badge}${oosBadge}</div>
+  /* V3.6: gallery ho (main + extra images) to card image swipeable carousel banti hai — dots + touch swipe + auto-rotate. */ const imgs = [String(p.img || "").trim(), ...galleryOf(p)].filter(Boolean); const imgArea = imgs.length > 1 ? `<div class="card-gallery" data-gallery><div class="cg-track">${imgs.map((u, i) => `<img src="${safeUrl(u)}" alt="${esc(p.name)}" loading="lazy" class="${i === 0 ? "on" : ""}">`).join("")}</div><div class="cg-dots">${imgs.map((_, i) => `<button type="button" data-cg-dot="${i}" class="${i === 0 ? "on" : ""}" aria-label="Image ${i + 1}"></button>`).join("")}</div></div>` : `<img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}" loading="lazy">`; return `<article class="card reveal ${out ? "is-oos" : ""}">
+    <div class="card-imgwrap" data-view="${p.id}">${imgArea}${badge}${oosBadge}</div>
     <div class="card-body">
       <h3 class="card-title" data-view="${p.id}">${esc(p.name)}</h3>${spec}
       <p class="stars">${stars(p.rating)} <small>${ratingOf(p).toFixed(1)} (${reviewsOf(p)})</small></p>
@@ -865,11 +854,11 @@ function cardHTML(p, opts = {}){
       <div class="card-actions">${actions}</div>
     </div></article>`;
 }
-function bindCards(root){
+function cgShow(g, i){ const imgs = g.querySelectorAll(".cg-track img"); if (!imgs.length) return; const n = (i + imgs.length) % imgs.length; imgs.forEach((im, j) => im.classList.toggle("on", j === n)); g.querySelectorAll("[data-cg-dot]").forEach((d, j) => d.classList.toggle("on", j === n)); g.dataset.cg = String(n); } /* V3.6: saari card galleries ka EK shared auto-rotate timer (sirf nazar aane wali galleries, sirf jab tab khula ho aur animations on hon). */ let cgTimer = null; function startCardGalleries(){ if (cgTimer) return; cgTimer = setInterval(() => { if (document.hidden || SETTINGS.animations === false || REDUCED_MOTION) return; document.querySelectorAll("[data-gallery]").forEach(g => { const r = g.getBoundingClientRect(); if (r.bottom < 0 || r.top > window.innerHeight) return; cgShow(g, +(g.dataset.cg || 0) + 1); }); }, 3500); } function bindCards(root){
   if (!root) return;
   root.querySelectorAll("[data-add]").forEach(b => b.onclick = e => { e.stopPropagation(); addToCart(+b.dataset.add, 1); });
   root.querySelectorAll("[data-order]").forEach(b => b.onclick = e => { e.stopPropagation(); buyNow(+b.dataset.order, 1); });
-  root.querySelectorAll("[data-view]").forEach(el => el.onclick = () => openProduct(+el.dataset.view));
+  root.querySelectorAll("[data-view]").forEach(el => el.onclick = () => openProduct(+el.dataset.view)); /* V3.6 card gallery: dots + touch swipe (click card kholne se nahi takrata). */ root.querySelectorAll("[data-gallery]").forEach(g => { g.querySelectorAll("[data-cg-dot]").forEach(d => d.onclick = e => { e.stopPropagation(); cgShow(g, +d.dataset.cgDot); }); let sx = null; g.addEventListener("touchstart", e => { sx = e.touches[0].clientX; }, { passive: true }); g.addEventListener("touchend", e => { if (sx === null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 30) cgShow(g, +(g.dataset.cg || 0) + (dx < 0 ? 1 : -1)); sx = null; }, { passive: true }); });
 }
 function renderInto(id, list, opts){
   const el = document.getElementById(id);
@@ -881,8 +870,8 @@ function renderProductSections(){
   renderInto("bestGrid", [...PRODUCTS].sort((a,b) => ((b.featured ? 1 : 0) - (a.featured ? 1 : 0)) || reviewsOf(b) - reviewsOf(a)).slice(0, 8));
   renderInto("hotTrack", [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 10));
   renderInto("newGrid", [...PRODUCTS].sort((a,b) => b.id - a.id).slice(0, 8), { newBadge: true });
-  renderInto("dealGrid", PRODUCTS.filter(p => effectivePct(p) >= 20).sort((a,b) => effectivePct(b) - effectivePct(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 8));
-  renderReviews();
+  renderInto("dealGrid", PRODUCTS.filter(p => effectivePct(p) >= 20).sort((a,b) => effectivePct(b) - effectivePct(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 8)); renderFeatured(); renderReels(); renderBlog(); startCardGalleries();
+  renderReviews(); renderReels(); renderBlog(); renderFeatured(); renderReels(); renderBlog(); startCardGalleries();
   const hot = [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a))[0];
   $("#hotOrderBtn").disabled = !hot;
   $("#hotOrderBtn").onclick = () => { if (hot) openProduct(hot.id); };
@@ -947,13 +936,14 @@ function renderReviews(){
   </article>`;
   }).join("");
 }
-/* V3.3: Trust strip, budget tiles, how-to steps — sab settings-driven. */
+/* ---------- V3.6: Featured pick + Instagram reels + Blog ---------- */ function renderFeatured(){ const el = document.getElementById("featuredSection"); if (!el) return; if (!isPlayful()){ el.hidden = true; return; } const pool = PRODUCTS.filter(p => p.active !== false); const pick = pool.find(p => p.featured) || [...pool].sort((a, b) => reviewsOf(b) - reviewsOf(a))[0]; if (!pick){ el.hidden = true; return; } el.hidden = false; const bullets = String(pick.desc || "").split(/
+/).map(s => s.trim()).filter(Boolean).slice(0, 4); document.getElementById("featuredBand").innerHTML = `<div class="fb-band"><div class="fb-media"><img src="${safeUrl(pick.img || "")}" alt="${esc(pick.name)}"></div><div class="fb-body"><p class="eyebrow">FEATURED PICK</p><h3>${esc(pick.name)}</h3>${bullets.length ? `<ul>${bullets.map(b => `<li>✓ ${esc(b)}</li>`).join("")}</ul>` : ""}<p class="stars">${stars(pick.rating)} <small>${ratingOf(pick).toFixed(1)} (${reviewsOf(pick)})</small></p><div class="price"><strong>${fmt(pick.price)}</strong>${Number(pick.old) > Number(pick.price) ? `<del>${fmt(pick.old)}</del>` : ""}</div><p class="deliv">${delivText(pick)}</p><div class="fb-actions"><button class="btn primary" type="button" data-fb-add="${pick.id}">Add to Cart</button><button class="btn" type="button" data-fb-view="${pick.id}">See full details →</button></div></div></div>`; const add = document.querySelector("[data-fb-add]"); const view = document.querySelector("[data-fb-view]"); if (add) add.onclick = () => addToCart(pick.id, 1); if (view) view.onclick = () => openProduct(pick.id); } function renderReels(){ const el = document.getElementById("reelsSection"); if (!el) return; const list = (SETTINGS && Array.isArray(SETTINGS.instaReels)) ? SETTINGS.instaReels : []; const show = isPlayful() && SETTINGS.showReels !== false && list.length > 0; el.hidden = !show; if (!show) return; const handle = String(SETTINGS.instaHandle || "").replace(/^@/, "").trim(); document.getElementById("reelsFollow").innerHTML = handle ? `<a class="btn outline-light" href="https://instagram.com/${encodeURIComponent(handle)}" target="_blank" rel="noopener">Follow @${esc(handle)}</a>` : ""; document.getElementById("reelsRow").innerHTML = list.map(r => { const v = String(r.video || "").trim(); const media = /\.mp4(\?|$)/i.test(v) ? `<video src="${safeUrl(v)}" poster="${safeUrl(r.poster || "")}" muted loop playsinline preload="metadata"></video>` : `<a href="${safeUrl(v) || "#"}" target="_blank" rel="noopener"><img src="${safeUrl(r.poster || "")}" alt="${esc(r.title || "")}"></a>`; return `<article class="reel-card">${media}<p>${esc(r.title || "")}</p></article>`; }).join(""); document.querySelectorAll("#reelsRow video").forEach(v => { try { const pr = v.play(); if (pr) pr.catch(() => {}); } catch (e) {} }); } function renderBlog(){ const el = document.getElementById("blogSection"); if (!el) return; const list = (SETTINGS && Array.isArray(SETTINGS.blogPosts)) ? SETTINGS.blogPosts : []; const show = isPlayful() && SETTINGS.showBlog !== false && list.length > 0; el.hidden = !show; if (!show) return; document.getElementById("blogGrid").innerHTML = list.map(b => `<article class="blog-card">${b.img ? `<img src="${safeUrl(b.img)}" alt="${esc(b.title)}">` : ""}<h3>${esc(b.title)}</h3><p>${esc(b.excerpt)}</p>${b.link ? `<a href="${safeUrl(b.link)}" target="_blank" rel="noopener">Read more →</a>` : ""}</article>`).join(""); } /* V3.3: Trust strip, budget tiles, how-to steps — sab settings-driven. */
 const TRUST_ICONS = ["cash", "truck", "shield", "returns"];
 function renderTrust(){
   const wrap = document.querySelector("#trustSection .trust-grid");
   if (!wrap) return;
   const list = (SETTINGS && Array.isArray(SETTINGS.trustItems)) ? SETTINGS.trustItems : [];
-  wrap.innerHTML = list.map((t, i) => `<div>${icon(TRUST_ICONS[i % TRUST_ICONS.length])}<strong>${esc(t.title)}</strong><span>${esc(t.sub)}</span></div>`).join("");
+  const html = list.map((t, i) => `<div>${icon(TRUST_ICONS[i % TRUST_ICONS.length])}<strong>${esc(t.title)}</strong><span>${esc(t.sub)}</span></div>`).join(""); /* V3.6: Playful Pop par trust strip auto-scrolling marquee hai (seamless loop ke liye items do dafa); baaqi themes par wahi purana grid. */ wrap.innerHTML = (isPlayful() && list.length > 1) ? html + html : html;
 }
 function bindBudgetTiles(){
   $$("#budgetSection [data-budget]").forEach(b => b.onclick = () => {
@@ -965,14 +955,14 @@ function renderBudget(){
   const wrap = document.querySelector("#budgetSection .budget-grid");
   if (!wrap) return;
   const list = (SETTINGS && Array.isArray(SETTINGS.budgetTiles)) ? SETTINGS.budgetTiles : [];
-  wrap.innerHTML = list.map(b => `<button class="budget-tile${b.budget === "top" ? " top-pick" : ""}" type="button" data-budget="${esc(b.budget)}"><span>${b.budget === "top" ? icon("star", "ic-inline") + " " : ""}${esc(b.label)}</span><strong>${esc(b.amount)}</strong><small>${esc(b.note)}</small></button>`).join("");
+  const html = list.map(b => `<button class="budget-tile${b.budget === "top" ? " top-pick" : ""}" type="button" data-budget="${esc(b.budget)}"><span>${b.budget === "top" ? icon("star", "ic-inline") + " " : ""}${esc(b.label)}</span><strong>${esc(b.amount)}</strong><small>${esc(b.note)}</small></button>`).join("");
   bindBudgetTiles();
 }
 function renderSteps(){
   const wrap = document.querySelector("#howSection .steps-grid");
   if (!wrap) return;
   const list = (SETTINGS && Array.isArray(SETTINGS.howSteps)) ? SETTINGS.howSteps : [];
-  wrap.innerHTML = list.map((st, i) => `<div><span>${String(i + 1).padStart(2, "0")}</span><h3>${esc(st.title)}</h3><p>${esc(st.text)}</p></div>`).join("");
+  const html = list.map((st, i) => `<div><span>${String(i + 1).padStart(2, "0")}</span><h3>${esc(st.title)}</h3><p>${esc(st.text)}</p></div>`).join("");
 }
 
 /* ---------- Scroll-reveal animations ----------
@@ -1482,7 +1472,7 @@ $("#searchToggle").onclick = () => {
    lagayen (resize + settings apply par dobara). */
 function syncHeaderOffset(){
   const h = $("#siteHeader") || document.querySelector(".site-header");
-  if (h) document.body.style.paddingTop = h.offsetHeight + "px";
+  if (!h) return; /* V3.6: Playful Pop ka header sticky NAHI hai (FunBug ki tarah upar scroll ho jata hai), is liye body par header jitni padding nahi chahiye. */ document.body.style.paddingTop = document.body.classList.contains("theme-playful") ? "0px" : h.offsetHeight + "px";
 }
 window.addEventListener("resize", syncHeaderOffset);
 $("#searchBtn").onclick = () => { showPage("homeView"); renderGrid(); requestAnimationFrame(() => scrollToId("shop")); };
