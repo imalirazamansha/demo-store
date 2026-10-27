@@ -719,7 +719,7 @@ function applySections(){
   /* sections_order precedence: order + visibility yahi se. Jo key list mein
      nahi, woh default order ke end par, visible rehti hai. */
   const seen = new Set();
-  const seq = [];
+  const seq = []; const playfulOn = document.body.classList.contains("theme-playful");
   order.forEach(e => {
     if (typeof e.key !== "string") return;
     if (e.key.startsWith("custom:")){
