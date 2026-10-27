@@ -446,7 +446,7 @@ function applySettings(){
      dobara chalta hai, is liye yahan re-render hi sahi source hai. */
   renderTrust();
   renderBudget();
-  renderSteps();
+  renderSteps(); renderFeatured();
   renderFaq();
   renderReviews(); renderReels(); renderBlog();
   watchReveals();
