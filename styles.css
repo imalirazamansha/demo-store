@@ -648,3 +648,73 @@ body.theme-playful .footer h3{color:#FFC53D}
 body.theme-playful .arrow-btn{border-color:#241A4D;color:#241A4D}
 body.theme-playful .arrow-btn:hover{background:#241A4D;color:#fff}
 body.no-anim.theme-playful .card:hover{transform:none}
+/* ============================================================
+   V3.6 — Playful Pop: POORA ALAG LAYOUT (FunBug mobile flow)
+   Sirf body.theme-playful par lagta hai — baaqi themes bilkul waisi ki waisi.
+   ============================================================ */
+body.theme-playful .site-header{position:static;background:#fff;box-shadow:0 2px 14px rgba(36,26,77,.08)}
+body.theme-playful .header-pill{box-shadow:none;border-color:#EDE7FF}
+body.theme-playful .logo, body.theme-playful .logo-name, body.theme-playful #logoName{color:#1B1440}
+body.theme-playful .catnav button, body.theme-playful .catnav a{color:#241A4D}
+body.theme-playful .catnav button.active{background:#FFE1C2;color:#1B1440}
+body.theme-playful .fun-hero{position:relative;min-width:100%;overflow:hidden;background:#1B1440;color:#fff}
+body.theme-playful .fun-hero-bg{position:absolute;inset:0;transition:opacity .8s ease}
+body.theme-playful .fh-bg-0{background:radial-gradient(60% 90% at 78% 40%,rgba(181,55,166,.55),transparent 70%),linear-gradient(115deg,#1B1440,#4C2A85 55%,#1B1440)}
+body.theme-playful .fh-bg-1{background:radial-gradient(60% 90% at 78% 40%,rgba(14,159,138,.55),transparent 70%),linear-gradient(115deg,#1B1440,#0E5F6B 55%,#1B1440)}
+body.theme-playful .fh-bg-2{background:radial-gradient(60% 90% at 78% 40%,rgba(255,122,26,.5),transparent 70%),linear-gradient(115deg,#1B1440,#7A3E12 55%,#1B1440)}
+body.theme-playful .fh-bg-3{background:radial-gradient(60% 90% at 78% 40%,rgba(76,42,133,.6),transparent 70%),linear-gradient(115deg,#1B1440,#3B2A7A 55%,#1B1440)}
+body.theme-playful .fun-hero-inner{position:relative;max-width:1180px;margin:0 auto;padding:34px 20px 46px;display:grid;grid-template-columns:1.05fr .95fr;grid-template-areas:"copy stage" "ctas stage";gap:10px 24px;align-items:center}
+body.theme-playful .fun-hero-copy{grid-area:copy}
+body.theme-playful .fun-hero-copy h1{font-size:clamp(34px,6vw,62px);line-height:1;text-transform:uppercase;margin:0 0 12px}
+body.theme-playful .fun-hero-copy p{font-size:clamp(14px,2vw,18px);line-height:1.55;color:#E7E2FF;max-width:52ch}
+body.theme-playful .fh-stage{grid-area:stage;position:relative;min-height:320px;cursor:pointer}
+body.theme-playful .fh-item{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;opacity:0;transition:opacity .8s ease;pointer-events:none}
+body.theme-playful .fh-item.active{opacity:1;pointer-events:auto}
+body.theme-playful .fh-item img{max-width:100%;max-height:270px;object-fit:contain;filter:drop-shadow(0 26px 30px rgba(0,0,0,.4))}
+body.theme-playful .fh-meta{text-align:center}
+body.theme-playful .fh-meta strong{display:block;font-size:19px}
+body.theme-playful .fh-meta span{color:#FFB800;font-weight:800;font-size:17px}
+body.theme-playful .fh-ctas{grid-area:ctas;display:flex;gap:12px;flex-wrap:wrap}
+body.theme-playful .btn.outline-light{border:2px solid rgba(255,255,255,.85);color:#fff;background:transparent}
+body.theme-playful .btn.outline-light:hover{background:rgba(255,255,255,.14)}
+@media(max-width:760px){ body.theme-playful .fun-hero-inner{grid-template-columns:1fr;grid-template-areas:"copy" "stage" "ctas";padding-top:26px} body.theme-playful .fh-stage{min-height:280px} body.theme-playful .fh-item img{max-height:230px} }
+body.theme-playful .trust-strip{overflow:hidden}
+body.theme-playful .trust-grid{display:flex;width:max-content;animation:trustScroll linear infinite}
+body.theme-playful .trust-grid div{min-width:240px;border:0;padding:6px 18px}
+body.theme-playful .trust-strip:hover .trust-grid, body.theme-playful .trust-strip:active .trust-grid{animation-play-state:paused}
+@keyframes trustScroll{to{transform:translateX(-50%)}}
+body.theme-playful .trust-grid{animation-duration:24s}
+body.theme-playful .card-gallery{position:relative;aspect-ratio:1/1;overflow:hidden;background:#f8fafc}
+body.theme-playful .card-imgwrap .card-gallery img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease}
+body.theme-playful .card-imgwrap .card-gallery img.on{opacity:1}
+body.theme-playful .cg-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;z-index:2}
+body.theme-playful .cg-dots button{width:7px;height:7px;border-radius:50%;border:0;background:rgba(255,255,255,.65);padding:0}
+body.theme-playful .cg-dots button.on{background:#FF7A1A;width:20px;border-radius:99px}
+body.theme-playful #featuredSection{background:#FFF8D6}
+body.theme-playful .fb-band{display:grid;grid-template-columns:1fr 1fr;gap:26px;background:#fff;border-radius:24px;padding:22px;box-shadow:0 14px 34px rgba(36,26,77,.12);align-items:center}
+body.theme-playful .fb-media img{width:100%;border-radius:18px;object-fit:cover;aspect-ratio:1/1}
+body.theme-playful .fb-body h3{font-size:clamp(22px,3.4vw,32px);color:#241A4D;margin:6px 0 10px}
+body.theme-playful .fb-body ul{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:7px;color:#3D3566}
+body.theme-playful .fb-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+@media(max-width:760px){body.theme-playful .fb-band{grid-template-columns:1fr}}
+body.theme-playful #reelsSection{background:#1B1440;color:#fff}
+body.theme-playful #reelsSection .section-title{color:#fff}
+body.theme-playful #reelsFollow{margin-bottom:14px}
+body.theme-playful #reelsRow{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:12px}
+body.theme-playful .reel-card{min-width:200px;max-width:200px;scroll-snap-align:start}
+body.theme-playful .reel-card video, body.theme-playful .reel-card img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:18px;background:#241A4D}
+body.theme-playful .reel-card p{margin-top:8px;font-size:13.5px;font-weight:700;color:#E7E2FF}
+body.theme-playful #blogGrid{display:flex;gap:16px;overflow-x:auto;padding-bottom:12px}
+body.theme-playful .blog-card{min-width:270px;max-width:270px;background:#fff;border:1px solid #EDE7FF;border-radius:18px;overflow:hidden;box-shadow:0 10px 26px rgba(36,26,77,.1)}
+body.theme-playful .blog-card img{width:100%;aspect-ratio:16/10;object-fit:cover}
+body.theme-playful .blog-card h3{font-size:17px;color:#241A4D;margin:12px 14px 6px}
+body.theme-playful .blog-card p{font-size:13.5px;color:#5B547A;margin:0 14px 10px;line-height:1.5}
+body.theme-playful .blog-card a{display:inline-block;margin:0 14px 14px;color:#B537A6;font-weight:800;text-decoration:none}
+body.theme-playful .budget-grid{display:flex;background:#1B1440;border-radius:999px;padding:6px;gap:6px;overflow-x:auto}
+body.theme-playful .budget-tile{background:transparent!important;border:0;box-shadow:none;flex:1 0 auto;border-radius:999px;padding:12px 16px;text-align:center;color:#fff}
+body.theme-playful .budget-tile span{color:#FFB800}
+body.theme-playful .budget-tile strong{font-size:17px;margin:2px 0 0}
+body.theme-playful .budget-tile small{display:none}
+body.theme-playful .budget-tile.top-pick{background:#4C2A85!important}
+body.theme-playful .review-card{border-radius:18px}
+body.no-anim.theme-playful .trust-grid{animation:none}
