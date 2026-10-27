@@ -619,3 +619,32 @@ body.cats-pills #categoriesSection .cat-tile,body.layout-cats-bar #categoriesSec
   body.layout-deals-strip .promo-grid{scroll-snap-type:x mandatory}
   body.layout-deals-strip .promo-card{flex:0 0 100%;min-width:0;max-width:none;scroll-snap-align:start}
 }
+
+body.theme-playful .hero-slide{background:linear-gradient(115deg,#1B1440 0%,#4C2A85 42%,#B537A6 72%,#0E9F8A 100%)}
+body.theme-playful .hero-slide.alt{background:linear-gradient(115deg,#1B1440,#4C2A85 48%,#0E9F8A 100%)}
+body.theme-playful .deals-section{background:linear-gradient(135deg,#1B1440,#4C2A85)}
+body.theme-playful .promo-card{background:linear-gradient(130deg,#241A4D,#B537A6)}
+body.theme-playful .promo-card:nth-child(2){background:linear-gradient(130deg,#241A4D,#0E9F8A)}
+body.theme-playful .marquee{background:#1B1440}
+body.theme-playful .marquee-group span::after{content:"✦";color:#FF7A1A;padding-left:34px}
+body:not(.no-anim).theme-playful .marquee-track{animation-duration:18s}
+body.theme-playful .card{border-radius:18px;border-color:#EDE7FF}
+body.theme-playful .card:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(36,26,77,.18)}
+body.theme-playful .card-title{color:#241A4D}
+body.theme-playful .card-title:hover{color:#B537A6}
+body.theme-playful .mini-btn.add{border-color:#241A4D;color:#241A4D}
+body.theme-playful .mini-btn.order{background:linear-gradient(135deg,#FF7A1A,#FFB800);color:#1B1440}
+body.theme-playful .btn.primary{background:linear-gradient(135deg,#FF7A1A,#FFB800);color:#1B1440;box-shadow:0 8px 20px rgba(255,122,26,.35)}
+body.theme-playful .cat-tile img{border-color:#FFE1C2}
+body.theme-playful .cat-tile.active img{border-color:#FF7A1A}
+body.theme-playful .trust-strip{background:#FFF4D6;color:#241A4D}
+body.theme-playful .trust-grid div{border-color:rgba(36,26,77,.15)}
+body.theme-playful .trust-grid span{color:#6B6390}
+body.theme-playful .budget-tile{background:linear-gradient(135deg,#241A4D,#3B2A7A);color:#fff;border:0}
+body.theme-playful .budget-tile span{color:#FFB800}
+body.theme-playful .budget-tile small{color:#CFC6F5}
+body.theme-playful .budget-tile.top-pick{background:linear-gradient(135deg,#1B1440,#4C2A85)}
+body.theme-playful .footer h3{color:#FFC53D}
+body.theme-playful .arrow-btn{border-color:#241A4D;color:#241A4D}
+body.theme-playful .arrow-btn:hover{background:#241A4D;color:#fff}
+body.no-anim.theme-playful .card:hover{transform:none}
