@@ -49,9 +49,9 @@ const SECTION_DEFS = [
   { key: "hero", label: "Hero Slider", sub: "Bara banner slider" },
   { key: "trust", label: "Trust Strip", sub: "COD / Fast Delivery wali patti" },
   { key: "categories", label: "Shop by Category", sub: "Category tiles" },
-  { key: "best_sellers", label: "Best Sellers", sub: "Sab se zyada bikne wale products" },
+  { key: "best_sellers", label: "Best Sellers", sub: "Sab se zyada bikne wale products" }, { key: "featured", label: "Featured Pick", sub: "Bari featured product band (Playful Pop)" },
   { key: "all_products", label: "All Products", sub: "Poori products list + filters" },
-  { key: "promos", label: "Promo Banners", sub: "Do bare promo cards" },
+  { key: "promos", label: "Promo Banners", sub: "Do bare promo cards" }, { key: "reels", label: "Reels & Videos", sub: "Instagram reels row (Playful Pop)" },
   { key: "hot", label: "Hot Selling", sub: "Trending carousel" },
   { key: "new_arrivals", label: "New Arrivals", sub: "Naye products" },
   { key: "deals", label: "Mega Deals", sub: "Limited time deals" },
@@ -59,7 +59,7 @@ const SECTION_DEFS = [
   { key: "about", label: "About", sub: "Store ke baare mein" },
   { key: "how_to_order", label: "How to Order", sub: "Order karne ke steps" },
   { key: "faq", label: "FAQ", sub: "Aksar pooche jane wale sawalat" },
-  { key: "testimonials", label: "Happy Customers", sub: "Customer reviews" }
+  { key: "testimonials", label: "Happy Customers", sub: "Customer reviews" }, { key: "blog", label: "Blog & Guides", sub: "Buying guide cards (Playful Pop)" }
 ];
 const LEGACY_SEC = { best_sellers: "best", promos: "promos", hot: "hot", new_arrivals: "arrivals", deals: "deals", budget: "budget", about: "about", how_to_order: "howto", faq: "faq", testimonials: "reviews" };
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -154,7 +154,7 @@ const ADMIN_DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
-  sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
+  /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
   policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
   profile: { logo_url: "", email: "", phone: "", address: "" },
   /* V2 keys — storefront inhein consume karega (Part B) */
@@ -670,7 +670,7 @@ function prodCard(p){
     <label>📷 Product image upload</label><input data-file="imgfile" type="file" accept="image/*">
     <p class="upload-msg" data-upload-msg>File select karein to Save dabane par image upload hogi. Koi file na ho to neeche wala URL use hoga.</p>
     <label>Ya image URL paste karein</label><input data-f="img" value="${esc(p.img||"")}" placeholder="https://…">
-    <label>Description</label><textarea data-f="desc" rows="6">${esc(p.desc||"")}</textarea>
+    <label>🖼️ Extra images (card par swipe hongi — V3.6 gallery)</label><input data-f="gallery1" value="${esc((Array.isArray(p.gallery) ? p.gallery[0] : "") || "")}" placeholder="Extra image 1 URL (optional)"><input data-f="gallery2" value="${esc((Array.isArray(p.gallery) ? p.gallery[1] : "") || "")}" placeholder="Extra image 2 URL (optional)"><input data-f="gallery3" value="${esc((Array.isArray(p.gallery) ? p.gallery[2] : "") || "")}" placeholder="Extra image 3 URL (optional)"><p class="hint">Extra image ho to product card par image swipe hogi (dots + auto-rotate) — FunBug ke bestseller cards ki tarah. Khaali chor dein to sirf main image dikhegi.</p><label>Description</label><textarea data-f="desc" rows="6">${esc(p.desc||"")}</textarea>
     <p class="hint">Ye text product page par 'Product Details' mein nazar aayega — khaali line chorne se naya paragraph banta hai.</p>
     <div class="actions">
       <button class="btn small" data-save="${p.id}">💾 Save</button>
@@ -729,7 +729,7 @@ function bindProdCards(wrap){
       delivery_fee: Math.max(0, parseInt(get("delivery_fee")) || 0),
       discount_pct: (!discountNum || discountNum <= 0) ? null : Math.min(90, Math.round(discountNum)),
       active: get("active") === "true",
-      img: imageUrl,
+      img: imageUrl, gallery: [get("gallery1").trim(), get("gallery2").trim(), get("gallery3").trim()].filter(Boolean),
       desc: get("desc").trim(),
     };
     const { error } = await sb.from("products").update(payload).eq("id", +b.dataset.save).eq("store_id", STORE_ID);
@@ -752,7 +752,7 @@ function bindProdCards(wrap){
 $("#addProductBtn").onclick = async () => {
   const { data, error } = await sb.from("products").insert({
     store_id: STORE_ID,
-    name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, discount_pct: null, stock: "in", featured: false, img: "", desc: "", active: false,
+    name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, discount_pct: null, stock: "in", featured: false, img: "", gallery: [], desc: "", active: false,
   }).select("id").single();
   if (error) alert("Add fail: " + error.message);
   else {
@@ -1036,7 +1036,7 @@ function mergeAdminSettings(raw){
     return { product: cs(x.product), name: cs(x.name), city: cs(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cs(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cs(x.label), amount: cs(x.amount), note: cs(x.note), budget: cs(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) }));
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog;
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
@@ -1688,7 +1688,7 @@ const FAQ_FIELDS = [["q", "Sawal", "text"], ["a", "Jawab", "textarea"]];
 const REVIEW_FIELDS = [["product", "Product (store jaisa naam)", "text"], ["name", "Customer naam", "text"], ["city", "Sheher", "text"], ["rating", "Rating (1–5)", "number"], ["text", "Review text", "textarea"]];
 const BUDGET_FIELDS = [["label", "Label (UNDER / ★ TOP PICKS)", "text"], ["amount", "Amount (Rs.1,499 / HIGHEST RATED)", "text"], ["note", "Note", "text"], ["budget", "Budget value (1499 ya top)", "text"]];
 const TRUST_FIELDS = [["title", "Title", "text"], ["sub", "Sub text", "text"]];
-const SP_FIELDS = [["name", "Naam", "text"], ["product", "Product", "text"], ["city", "Sheher", "text"], ["amount", "Amount", "text"], ["timeText", "Waqt exact", "text"]];
+const SP_FIELDS = [["name", "Naam", "text"], ["product", "Product", "text"], ["city", "Sheher", "text"], ["amount", "Amount", "text"], ["timeText", "Waqt exact", "text"]]; /* V3.6: Instagram reels + blog (Content tab) */ const REEL_FIELDS = [["video", "Video link (MP4 ya Instagram reel link)", "text"], ["poster", "Poster/thumbnail image URL", "text"], ["title", "Title", "text"]]; const BLOG_FIELDS = [["title", "Post title", "text"], ["excerpt", "Short excerpt", "textarea"], ["img", "Image URL", "text"], ["link", "Read-more link (optional)", "text"]];
 function escAttr(v){ return String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 function cntRowHtml(fields, row, rowClass){
   let h = `<div class="${rowClass || "cnt-row"}">`;
@@ -1734,7 +1734,7 @@ function fillContent(s){
   renderCntList("cntFaqWrap", s.faqs || [], FAQ_FIELDS);
   renderCntList("cntReviewsWrap", s.reviews || [], REVIEW_FIELDS);
   renderCntList("cntBudgetWrap", s.budgetTiles || [], BUDGET_FIELDS);
-  renderCntList("cntTrustWrap", s.trustItems || [], TRUST_FIELDS);
+  renderCntList("cntTrustWrap", s.trustItems || [], TRUST_FIELDS); /* V3.6: Instagram + blog (checkboxes: stored false ho to uncheck). */ if (g("cntInstaHandle")) g("cntInstaHandle").value = s.instaHandle || ""; if (g("cntShowReels")) g("cntShowReels").checked = s.showReels !== false; if (g("cntShowBlog")) g("cntShowBlog").checked = s.showBlog !== false; renderCntList("cntReelsWrap", s.instaReels || [], REEL_FIELDS); renderCntList("cntBlogWrap", s.blogPosts || [], BLOG_FIELDS);
   contentFilled = true;
 }
 function addCntRow(wrapId, fields, rowClass){
@@ -1747,7 +1747,7 @@ $("#addCntHowBtn").onclick = () => addCntRow("cntHowWrap", HOW_FIELDS);
 $("#addCntFaqBtn").onclick = () => addCntRow("cntFaqWrap", FAQ_FIELDS);
 $("#addCntReviewsBtn").onclick = () => addCntRow("cntReviewsWrap", REVIEW_FIELDS);
 $("#addCntBudgetBtn").onclick = () => addCntRow("cntBudgetWrap", BUDGET_FIELDS);
-$("#addCntTrustBtn").onclick = () => addCntRow("cntTrustWrap", TRUST_FIELDS);
+$("#addCntTrustBtn").onclick = () => addCntRow("cntTrustWrap", TRUST_FIELDS); $("#addCntReelsBtn").onclick = () => addCntRow("cntReelsWrap", REEL_FIELDS); $("#addCntBlogBtn").onclick = () => addCntRow("cntBlogWrap", BLOG_FIELDS);
 $("#addSpEntryBtn").onclick = () => addCntRow("spEntriesWrap", SP_FIELDS, "sp-row cnt-row");
 function renderSpEntries(entries){
   renderCntList("spEntriesWrap", entries || [], SP_FIELDS, "sp-row cnt-row");
@@ -1870,7 +1870,7 @@ async function persistAllSettings(){
         return { ...r, rating: Number.isFinite(v) ? Math.min(5, Math.max(1, v)) : 5 };
       });
       data.budgetTiles = readCntList("cntBudgetWrap", BUDGET_FIELDS);
-      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS);
+      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
     }
     /* Per-store settings: upsert store_id par hota hai (platform migration
        mein settings.store_id par unique index hai; id sequence se auto
