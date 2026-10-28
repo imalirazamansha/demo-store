@@ -1500,17 +1500,8 @@ function renderHomepage(){
     const ed = inp.closest(".custom-editor");
     const msg = ed.querySelector("[data-cmsg]");
     try {
-      const take = files.slice(0, 10);
-        setUploadMsg(msg, take.length + " image" + (take.length > 1 ? "s" : "") + " upload ho rahi " + (take.length > 1 ? "hain" : "hai") + "…");
-        let totalBefore = 0, totalAfter = 0;
-        const urls = [];
-        for (const f of take){
-          totalBefore += f.size;
-          urls.push(await uploadImage(f, `products/${b.dataset.save}`));
-          if (LAST_UPLOAD_INFO) totalAfter += LAST_UPLOAD_INFO.after;
-        }
-        if (take.length === 1){
-      const url = await uploadImage(file, "custom-sections");
+            setUploadMsg(msg, "Image upload ho rahi hai…");
+       const url = await uploadImage(file, "custom-sections");
       ed.querySelector('[data-cf="img"]').value = url;
       setUploadMsg(msg, "✅ Image upload ho gayi — Save karna na bhoolein.", "ok");
     } catch (err) {
