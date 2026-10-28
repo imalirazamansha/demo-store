@@ -412,6 +412,18 @@ function setUploadMsg(el, text, kind = ""){
   el.textContent = text;
   el.className = "upload-msg" + (kind ? " " + kind : "");
 }
+/* ---------- Global toast (har kaam par khoobsurat success/fail popup) ---------- */
+function showToast(msg, kind = "ok"){
+  let wrap = document.getElementById("toastWrap");
+  if (!wrap){ wrap = document.createElement("div"); wrap.id = "toastWrap"; document.body.appendChild(wrap); }
+  const el = document.createElement("div");
+  el.className = "toast " + (kind === "err" ? "err" : kind === "info" ? "info" : "ok");
+  const icon = kind === "err" ? "❌" : kind === "info" ? "ℹ️" : "✅";
+  el.innerHTML = `<span>${icon}</span><span style="flex:1">${esc(String(msg))}</span><button type="button" aria-label="Band karein">✕</button>`;
+  el.querySelector("button").onclick = () => el.remove();
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), kind === "err" ? 7000 : 4500);
+}
 
 /* ---------- Orders ---------- */
 /* Naye orders mein items ek OBJECT hai { lines, coupon, discount };
@@ -637,9 +649,42 @@ async function loadProducts(){
     if (p) fillProductForm(p); else closeProductForm();
   }
 }
+/* ---------- Bulk delete + Storage cleanup ---------- */
+let BULK_SELECTED = new Set();
+/* Product row delete + us ki (ghair-shared) images Storage se delete.
+   Storage fail ho to bhi product delete hi rehta hai — sirf us image ki
+   file reh jati hai (dobara delete par phir try hogi). Kisi doosre product
+   mein lagi image kabhi delete nahi hoti (shared-image guard). */
+async function deleteProductAndImages(id){
+  const p = PRODUCTS_CACHE.find(x => x.id === id);
+  const { error } = await sb.from("products").delete().eq("id", id).eq("store_id", STORE_ID);
+  if (error) throw error;
+  if (!p) return { images: 0 };
+  const urls = [];
+  if (p.img) urls.push(p.img);
+  if (Array.isArray(p.gallery)) urls.push(...p.gallery);
+  const own = [];
+  for (const u of urls){
+    const i = String(u).indexOf("/product-images/");
+    if (i >= 0) own.push({ url: u, path: String(u).slice(i + "/product-images/".length).split("?")[0] });
+  }
+  if (!own.length) return { images: 0 };
+  let others = PRODUCTS_CACHE.filter(x => x.id !== id);
+  try {
+    const { data, error: qErr } = await sb.from("products").select("id,img,gallery").neq("id", id);
+    if (!qErr && Array.isArray(data)) others = data;
+  } catch (e) {}
+  const drop = own.filter(o => !others.some(x => x.img === o.url || (Array.isArray(x.gallery) && x.gallery.includes(o.url))));
+  const paths = [...new Set(drop.map(o => o.path))];
+  if (!paths.length) return { images: 0 };
+  const { error: sErr } = await sb.storage.from("product-images").remove(paths);
+  if (sErr) return { images: 0, storageWarn: true };
+  return { images: paths.length };
+}
 /* Products LIST (Shopify-style table) — Edit par upar wala card form khulta hai. */
 function renderProductsList(){
   const wrap = $("#productsWrap");
+    BULK_SELECTED = new Set([...BULK_SELECTED].filter(id => PRODUCTS_CACHE.some(p => p.id === id)));
   const q = ($("#prodSearch").value || "").trim().toLowerCase();
   const list = PRODUCTS_CACHE.filter(p => !q
     || String(p.name || "").toLowerCase().includes(q)
@@ -647,9 +692,10 @@ function renderProductsList(){
   $("#prodCount").textContent = PRODUCTS_CACHE.length ? `${list.length} / ${PRODUCTS_CACHE.length} products` : "";
   if (!PRODUCTS_CACHE.length){ wrap.innerHTML = `<p class="empty-note">Abhi koi product nahi hai — upar "Add New Product" se pehla product banayein.</p>`; return; }
   if (!list.length){ wrap.innerHTML = `<p class="empty-note">Is search par koi product nahi mila.</p>`; return; }
-  wrap.innerHTML = `<table>
-    <thead><tr><th>Photo</th><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Live</th><th>Featured</th><th></th></tr></thead>
+  wrap.innerHTML = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:600;font-size:14px"><input type="checkbox" id="bulkCheckAll"> Sab select karein</label><span id="bulkCount" style="color:var(--muted);font-size:13.5px;font-weight:600"></span><button class="btn small danger" id="bulkDelBtn" type="button" disabled>🗑 Selected delete karein</button></div><table>
+    <thead><tr><th></th><th>Photo</th><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Live</th><th>Featured</th><th></th></tr></thead>
     <tbody>${list.map(p => `<tr>
+      <td><input type="checkbox" data-bulk-check="${p.id}" ${BULK_SELECTED.has(p.id) ? "checked" : ""}></td>
       <td><img class="prod-thumb" src="${safeUrl(p.img || PLACEHOLDER_IMG)}" alt=""></td>
       <td><strong>${esc(p.name || "")}</strong><br><small style="color:var(--muted)">#${p.id}</small></td>
       <td>${esc(p.cat || "General")}</td>
@@ -660,12 +706,61 @@ function renderProductsList(){
       <td style="white-space:nowrap"><button class="btn small" data-edit-prod="${p.id}">✎ Edit</button> <button class="btn small danger" data-del-prod="${p.id}">Delete</button></td>
     </tr>`).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-edit-prod]").forEach(b => b.onclick = () => openProductForm(+b.dataset.editProd));
+  /* Bulk select wiring — selection search badalne par bhi mehfooz rehti hai. */
+  const bulkCount = wrap.querySelector("#bulkCount");
+  const bulkBtn = wrap.querySelector("#bulkDelBtn");
+  const checkAll = wrap.querySelector("#bulkCheckAll");
+  const syncBulk = () => {
+    const n = BULK_SELECTED.size;
+    bulkCount.textContent = n ? `${n} selected` : "";
+    bulkBtn.disabled = !n;
+    bulkBtn.textContent = n ? `🗑 ${n} selected delete karein` : "🗑 Selected delete karein";
+    const boxes = [...wrap.querySelectorAll("[data-bulk-check]")];
+    checkAll.checked = boxes.length > 0 && boxes.every(b => BULK_SELECTED.has(+b.dataset.bulkCheck));
+    checkAll.indeterminate = boxes.some(b => BULK_SELECTED.has(+b.dataset.bulkCheck)) && !checkAll.checked;
+  };
+  wrap.querySelectorAll("[data-bulk-check]").forEach(cb => cb.addEventListener("change", () => {
+    const id = +cb.dataset.bulkCheck;
+    if (cb.checked) BULK_SELECTED.add(id); else BULK_SELECTED.delete(id);
+    syncBulk();
+  }));
+  checkAll.addEventListener("change", () => {
+    wrap.querySelectorAll("[data-bulk-check]").forEach(cb => {
+      const id = +cb.dataset.bulkCheck;
+      if (checkAll.checked) BULK_SELECTED.add(id); else BULK_SELECTED.delete(id);
+      cb.checked = checkAll.checked;
+    });
+    syncBulk();
+  });
+  bulkBtn.onclick = async () => {
+    const ids = [...BULK_SELECTED];
+    if (!ids.length) return;
+    if (!confirm(`${ids.length} products delete kar dein? Ye wapas nahi aayega — un ki images bhi Storage se delete ho jayengi (jo kisi doosre product mein lagi hon wo mehfooz rahengi).`)) return;
+    bulkBtn.disabled = true; bulkBtn.textContent = "Deleting…";
+    let ok = 0, fail = 0, imgs = 0;
+    for (const id of ids){
+      try {
+        const r = await deleteProductAndImages(id);
+        ok++; imgs += r.images;
+        PRODUCTS_CACHE = PRODUCTS_CACHE.filter(x => x.id !== id);
+        if (EDITING_PRODUCT_ID === id) closeProductForm();
+      } catch (e) { fail++; }
+    }
+    BULK_SELECTED.clear();
+    loadProducts();
+    if (fail) showToast(`${ok} products delete huin, ${fail} fail huin.` + (imgs ? ` ${imgs} images bhi Storage se delete huin (space wapas mili).` : ""), (fail && !ok) ? "err" : "info");
+    else showToast(`✅ ${ok} products delete ho gayin.` + (imgs ? ` ${imgs} images bhi Storage se delete huin — space wapas mil gayi.` : ""), "ok");
+  };
+  syncBulk();
   wrap.querySelectorAll("[data-del-prod]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh product delete kar dein?")) return;
     const id = +b.dataset.delProd;
-    const { error } = await sb.from("products").delete().eq("id", id).eq("store_id", STORE_ID);
-    if (error) alert("Delete fail: " + error.message);
-    else { if (EDITING_PRODUCT_ID === id) closeProductForm(); loadProducts(); }
+    try {
+      const r = await deleteProductAndImages(id);
+      if (EDITING_PRODUCT_ID === id) closeProductForm();
+      loadProducts();
+      showToast("✅ Product delete ho gaya." + (r.images ? ` ${r.images} image${r.images > 1 ? "s" : ""} bhi Storage se delete huin — space wapas mil gayi.` : ""), "ok");
+    } catch (e) { showToast("Delete fail: " + e.message, "err"); }
   });
 }
 $("#prodSearch").addEventListener("input", renderProductsList);
@@ -894,18 +989,22 @@ function bindProdCards(wrap){
     const { error } = await sb.from("products").update(payload).eq("id", +b.dataset.save).eq("store_id", STORE_ID);
     if (error) {
       setUploadMsg(msg, "Product save fail: " + error.message, "err");
-      alert("Save fail: " + error.message);
+      showToast("Save fail: " + error.message, "err");
       b.disabled = false; b.textContent = oldLabel;
     } else {
       fileInput.value = "";
       b.textContent = "✅ Saved!";
       loadProducts();
+      showToast("✅ Product save ho gaya — store par live hai.", "ok");
     }
   });
   wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh product delete kar dein?")) return;
-    const { error } = await sb.from("products").delete().eq("id", +b.dataset.del).eq("store_id", STORE_ID);
-    if (error) alert("Delete fail: " + error.message); else loadProducts();
+    try {
+      const r = await deleteProductAndImages(+b.dataset.del);
+      loadProducts();
+      showToast("✅ Product delete ho gaya." + (r.images ? ` ${r.images} image${r.images > 1 ? "s" : ""} bhi Storage se delete huin — space wapas mil gayi.` : ""), "ok");
+    } catch (e) { showToast("Delete fail: " + e.message, "err"); }
   });
 }
 $("#addProductBtn").onclick = async () => {
