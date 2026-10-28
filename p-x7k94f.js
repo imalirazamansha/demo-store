@@ -1320,7 +1320,7 @@ async function collectHeroSlides(){
     const get = f => box.querySelector(`[data-hf="${f}"]`).value.trim();
     let image = get("image");
     const file = box.querySelector("[data-hfile]").files[0];
-    if (files.length){
+    if (file){
       const msg = box.querySelector("[data-hmsg]");
       setUploadMsg(msg, "Hero image upload ho rahi hai…");
       image = await uploadImage(file, `hero/slide-${slides.length + 1}`);
