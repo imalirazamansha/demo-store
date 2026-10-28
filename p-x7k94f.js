@@ -710,6 +710,16 @@ function renderProductsList(){
   const bulkCount = wrap.querySelector("#bulkCount");
   const bulkBtn = wrap.querySelector("#bulkDelBtn");
   const checkAll = wrap.querySelector("#bulkCheckAll");
+  /* Bulk edit controls — selection par stock/live/featured/price ek saath. */
+  const editField = wrap.querySelector("#bulkEditField");
+  const editVal = wrap.querySelector("#bulkEditVal");
+  const editBtn = wrap.querySelector("#bulkEditBtn");
+  const syncEditBtn = () => {
+    const f = editField.value;
+    const needPct = f === "price-up" || f === "price-down";
+    editVal.style.display = needPct ? "" : "none";
+    editBtn.disabled = !f || !BULK_SELECTED.size || (needPct && !(parseFloat(editVal.value) > 0));
+  };
   const syncBulk = () => {
     const n = BULK_SELECTED.size;
     bulkCount.textContent = n ? `${n} selected` : "";
@@ -718,6 +728,7 @@ function renderProductsList(){
     const boxes = [...wrap.querySelectorAll("[data-bulk-check]")];
     checkAll.checked = boxes.length > 0 && boxes.every(b => BULK_SELECTED.has(+b.dataset.bulkCheck));
     checkAll.indeterminate = boxes.some(b => BULK_SELECTED.has(+b.dataset.bulkCheck)) && !checkAll.checked;
+    syncEditBtn();
   };
   wrap.querySelectorAll("[data-bulk-check]").forEach(cb => cb.addEventListener("change", () => {
     const id = +cb.dataset.bulkCheck;
@@ -732,6 +743,38 @@ function renderProductsList(){
     });
     syncBulk();
   });
+  editField.addEventListener("change", syncEditBtn);
+  editVal.addEventListener("input", syncEditBtn);
+  editBtn.onclick = async () => {
+    const ids = [...BULK_SELECTED];
+    const f = editField.value;
+    if (!ids.length || !f) return;
+    const pct = parseFloat(editVal.value) || 0;
+    const label = editField.options[editField.selectedIndex].text;
+    if (!confirm(`${ids.length} products par ye lagayein: ${label}${(f === "price-up" || f === "price-down") ? " (" + pct + "%)" : ""}?`)) return;
+    editBtn.disabled = true; editBtn.textContent = "Applying…";
+    let ok = 0, fail = 0;
+    for (const id of ids){
+      const p = PRODUCTS_CACHE.find(x => x.id === id);
+      let patch = null;
+      if (f === "stock-in") patch = { stock: "in" };
+      else if (f === "stock-out") patch = { stock: "out" };
+      else if (f === "live-on") patch = { active: true };
+      else if (f === "live-off") patch = { active: false };
+      else if (f === "featured-on") patch = { featured: true };
+      else if (f === "featured-off") patch = { featured: false };
+      else if ((f === "price-up" || f === "price-down") && p){
+        const np = Math.max(0, Math.round((p.price || 0) * (f === "price-up" ? (1 + pct / 100) : (1 - pct / 100))));
+        patch = { price: np };
+      }
+      if (!patch){ fail++; continue; }
+      const { error } = await sb.from("products").update(patch).eq("id", id).eq("store_id", STORE_ID);
+      if (error) fail++; else ok++;
+    }
+    loadProducts();
+    if (fail) showToast(`${ok} products update huin, ${fail} fail huin.`, (fail && !ok) ? "err" : "info");
+    else showToast(`✅ ${ok} products update ho gayin (${label}).`, "ok");
+  };
   bulkBtn.onclick = async () => {
     const ids = [...BULK_SELECTED];
     if (!ids.length) return;
@@ -2180,6 +2223,104 @@ if (_expP) _expP.onclick = () => {
   });
   downloadCSV(`products-${STORE_SLUG || "store"}-${csvDate()}.csv`, rows);
 };
+/* ---------- CSV Import (products) ---------- */
+/* Quotes + commas wali CSV theek se parse karta hai. Header ho to columns
+   naam se pehchani jati hain (ID column ho to ignore hoti hai); header na
+   ho to export wali tartib maani jati hai. Import hamesha NAYE products
+   banata hai (purani ko overwrite nahi karta), hidden haalat mein taa ke
+   client pehle check karke phir live kare. */
+function parseCSV(text){
+  const rows = [];
+  let row = [], cur = "", inQ = false;
+  const s = String(text).replace(/^\uFEFF/, "");
+  for (let i = 0; i < s.length; i++){
+    const c = s[i];
+    if (inQ){
+      if (c === '"'){
+        if (s[i+1] === '"'){ cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else if (c === '"'){ inQ = true; }
+    else if (c === ','){ row.push(cur); cur = ""; }
+    else if (c === '\n'){ row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (c !== '\r'){ cur += c; }
+  }
+  if (cur !== "" || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(v => String(v).trim() !== ""));
+}
+function csvColIdx(headers, names){
+  const h = headers.map(x => String(x).trim().toLowerCase());
+  for (const n of names){
+    const i = h.indexOf(n);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+const _impP = $("#importProductsFile");
+if (_impP) _impP.addEventListener("change", async () => {
+  const file = _impP.files && _impP.files[0];
+  _impP.value = "";
+  if (!file) return;
+  const msg = $("#importMsg");
+  const setMsg = (t, kind) => { if (msg){ msg.textContent = t; msg.style.color = kind === "err" ? "var(--red)" : "var(--muted)"; } };
+  try {
+    const rows = parseCSV(await file.text());
+    if (!rows.length){ setMsg("CSV khaali hai.", "err"); return; }
+    const first = rows[0].map(x => String(x).trim().toLowerCase());
+    const hasHeader = first.includes("name") || first.includes("product");
+    const dataRows = hasHeader ? rows.slice(1) : rows;
+    const idx = hasHeader ? {
+      name: csvColIdx(rows[0], ["name", "product"]),
+      cat: csvColIdx(rows[0], ["category", "cat"]),
+      price: csvColIdx(rows[0], ["price"]),
+      old: csvColIdx(rows[0], ["old price", "old"]),
+      stock: csvColIdx(rows[0], ["stock"]),
+      live: csvColIdx(rows[0], ["live", "active"]),
+      featured: csvColIdx(rows[0], ["featured"]),
+      img: csvColIdx(rows[0], ["image", "img", "image url"]),
+      gallery: csvColIdx(rows[0], ["gallery", "extra images"]),
+      desc: csvColIdx(rows[0], ["description", "desc"]),
+      rating: csvColIdx(rows[0], ["rating"]),
+      reviews: csvColIdx(rows[0], ["reviews"]),
+      fee: csvColIdx(rows[0], ["delivery fee", "delivery_fee"]),
+      disc: csvColIdx(rows[0], ["discount %", "discount", "discount_pct"]),
+    } : { name: 1, cat: 2, price: 3, old: 4, stock: 5, live: 6, featured: 7, img: -1, gallery: -1, desc: -1, rating: -1, reviews: -1, fee: -1, disc: -1 };
+    const get = (r, i) => (i >= 0 && r[i] != null ? String(r[i]).trim() : "");
+    const yes = v => ["yes", "true", "1", "y", "live", "show"].includes(v.toLowerCase());
+    const valid = [], bad = [];
+    dataRows.forEach((r, n) => {
+      const name = get(r, idx.name);
+      const price = parseFloat(get(r, idx.price));
+      if (!name || isNaN(price)){ bad.push(n + (hasHeader ? 2 : 1)); return; }
+      const stockRaw = get(r, idx.stock).toLowerCase();
+      valid.push({
+        store_id: STORE_ID,
+        name,
+        cat: get(r, idx.cat) || "General",
+        price: Math.max(0, Math.round(price)),
+        old: get(r, idx.old) ? Math.max(0, Math.round(parseFloat(get(r, idx.old)) || 0)) : null,
+        stock: (stockRaw === "out" || stockRaw === "out of stock") ? "out" : "in",
+        active: idx.live >= 0 ? yes(get(r, idx.live)) : false,
+        featured: idx.featured >= 0 ? yes(get(r, idx.featured)) : false,
+        img: get(r, idx.img),
+        gallery: get(r, idx.gallery) ? get(r, idx.gallery).split("|").map(s => s.trim()).filter(Boolean) : [],
+        desc: get(r, idx.desc),
+        rating: idx.rating >= 0 ? Math.min(5, Math.max(0, parseFloat(get(r, idx.rating)) || 4.5)) : 4.5,
+        reviews: idx.reviews >= 0 ? Math.max(0, parseInt(get(r, idx.reviews)) || 0) : 0,
+        delivery_fee: idx.fee >= 0 ? Math.max(0, parseInt(get(r, idx.fee)) || 0) : 0,
+        discount_pct: idx.disc >= 0 && get(r, idx.disc) !== "" ? Math.min(90, Math.max(0, Math.round(parseFloat(get(r, idx.disc)) || 0))) : null,
+      });
+    });
+    if (!valid.length){ setMsg(`Koi theek row nahi mili (${bad.length} rows mein naam/price ka masla).`, "err"); return; }
+    if (!confirm(`${valid.length} products import ho jayenge (naye products, hidden haalat mein — live karne se pehle check kar lein).${bad.length ? ` ${bad.length} rows chhoot jayengi (naam/price ghalat).` : ""} Jaari rakhein?`)) return;
+    setMsg("Import ho raha hai…");
+    const { error } = await sb.from("products").insert(valid);
+    if (error){ setMsg("Import fail: " + error.message, "err"); showToast("Import fail: " + error.message, "err"); return; }
+    setMsg(`✅ ${valid.length} products import ho gayin.${bad.length ? ` ${bad.length} rows chhoot gayin (rows: ${bad.slice(0, 10).join(", ")}).` : ""}`);
+    showToast(`✅ ${valid.length} products import ho gayin (hidden — live karne se pehle check kar lein).`, "ok");
+    loadProducts();
+  } catch (e) { setMsg("Import fail: " + e.message, "err"); showToast("Import fail: " + e.message, "err"); }
+});
 /* Low-stock: stock === 'out' wali products ki list — Products tab banner + Dashboard card. */
 function renderLowStock(){
   const out = (PRODUCTS_CACHE || []).filter(pr => pr.stock === "out");
