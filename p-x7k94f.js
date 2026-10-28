@@ -192,8 +192,8 @@ $("#sendLinkBtn").onclick = async () => {
     email,
     options: { emailRedirectTo: window.location.href.split("#")[0] },
   });
-  if (error){ msg.textContent = "Error: " + error.message; msg.className = "msg err"; }
-  else { msg.textContent = "✅ Link bhej diya gaya hai — apna email inbox check karein aur link par click karein."; msg.className = "msg ok"; }
+  if (error){ msg.textContent = "Error: " + error.message; msg.className = "msg err"; showToast("Error: " + error.message, "err"); }
+  else { msg.textContent = "✅ Link bhej diya gaya hai — apna email inbox check karein aur link par click karein."; msg.className = "msg ok"; showToast("✅ Login link bhej diya gaya — inbox check karein.", "ok"); }
 };
 $("#logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 $("#noAccessLogout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
@@ -422,7 +422,7 @@ function showToast(msg, kind = "ok"){
   el.innerHTML = `<span>${icon}</span><span style="flex:1">${esc(String(msg))}</span><button type="button" aria-label="Band karein">✕</button>`;
   el.querySelector("button").onclick = () => el.remove();
   wrap.appendChild(el);
-  setTimeout(() => el.remove(), kind === "err" ? 7000 : 4500);
+  setTimeout(() => el.remove(), (kind === "err" || kind === "info") ? 7000 : 4500);
 }
 
 /* ---------- Orders ---------- */
@@ -490,7 +490,7 @@ function renderOrders(){
   wrap.querySelectorAll("[data-edit-order]").forEach(b => b.onclick = () => openOrderEdit(+b.dataset.editOrder));
   wrap.querySelectorAll("[data-status]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("orders").update({ status: sel.value }).eq("id", +sel.dataset.status).eq("store_id", STORE_ID);
-    if (error) alert("Status update fail: " + error.message); else { await loadOrders(); loadDashboard(); }
+    if (error) showToast("Status update fail: " + error.message, "err"); else { await loadOrders(); loadDashboard(); showToast("✅ Order status update ho gaya.", "ok"); }
   });
   wrap.querySelectorAll("[data-del-order]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh order delete kar dein?")) return;
@@ -505,10 +505,11 @@ function renderOrders(){
       if (error) throw error;
       if (!deleted || deleted.length === 0) throw new Error("Koi row delete nahi hui — Supabase ki orders delete RLS policy ya team access check karein.");
       msg.textContent = `✅ Order #${id} delete ho gaya.`; msg.className = "msg ok";
+      showToast(`✅ Order #${id} delete ho gaya.`, "ok");
       await loadOrders(); loadDashboard();
     } catch (e) {
       msg.textContent = "Delete fail: " + e.message; msg.className = "msg err";
-      alert("Delete fail: " + e.message);
+      showToast("Delete fail: " + e.message, "err");
       b.disabled = false; b.textContent = "Delete";
     }
   });
@@ -625,9 +626,11 @@ $("#oeSaveBtn").onclick = async () => {
     $("#orderEditModal").classList.add("hidden");
     const om = $("#ordersMsg");
     om.textContent = `✅ Order #${OE_ID} update ho gaya.`; om.className = "msg ok";
+    showToast(`✅ Order #${OE_ID} update ho gaya.`, "ok");
     await loadOrders(); loadDashboard();
   } catch (e) {
     msg.textContent = "Order save fail: " + e.message; msg.className = "msg err";
+    showToast("Order save fail: " + e.message, "err");
   } finally {
     btn.disabled = false; btn.textContent = "💾 Order Save karein";
   }
@@ -1007,7 +1010,7 @@ function bindProdCards(wrap){
         setUploadMsg(msg, doneNote, "ok");
       } catch (e) {
         setUploadMsg(msg, "Upload fail: " + e.message, "err");
-        alert("Image upload fail — product save nahi kiya gaya: " + e.message);
+        showToast("Image upload fail — product save nahi kiya gaya: " + e.message, "err");
         b.disabled = false; b.textContent = oldLabel;
         return;
       }
@@ -1055,11 +1058,11 @@ $("#addProductBtn").onclick = async () => {
     store_id: STORE_ID,
     name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, discount_pct: null, stock: "in", featured: false, img: "", gallery: [], desc: "", active: false,
   }).select("id").single();
-  if (error) alert("Add fail: " + error.message);
+  if (error) showToast("Add fail: " + error.message, "err");
   else {
     await loadProducts();
     if (data && data.id) openProductForm(data.id);
-    alert("Naya product ban gaya hai (abhi hidden hai) — khule hue form mein details aur image file bhar kar, 'Show on store' = Yes karke Save karein.");
+    showToast("Naya product ban gaya hai (abhi hidden hai) — form mein details aur image bhar kar, 'Show on store' = Yes karke Save karein.", "info");
   }
 };
 
@@ -1086,14 +1089,14 @@ async function loadCategories(){
     const id = +cb.closest("tr").dataset.cid;
     const { error } = await sb.from("categories").update({ visible: cb.checked }).eq("id", id).eq("store_id", STORE_ID);
     const msg = $("#catMsg");
-    if (error){ msg.textContent = "Visible update fail: " + error.message; msg.className = "msg err"; cb.checked = !cb.checked; }
-    else { msg.textContent = cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi (products phir bhi All Products mein rahenge)."; msg.className = "msg ok"; loadCategories(); }
+    if (error){ msg.textContent = "Visible update fail: " + error.message; msg.className = "msg err"; cb.checked = !cb.checked; showToast("Visible update fail: " + error.message, "err"); }
+    else { msg.textContent = cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi (products phir bhi All Products mein rahenge)."; msg.className = "msg ok"; showToast(cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi.", "ok"); loadCategories(); }
   });
   wrap.querySelectorAll("[data-csave]").forEach(b => b.onclick = async () => {
     const tr = b.closest("tr");
     const id = +b.dataset.csave;
     const name = tr.querySelector("[data-cname]").value.trim();
-    if (!name){ alert("Category ka naam khaali nahi ho sakta."); return; }
+    if (!name){ showToast("Category ka naam khaali nahi ho sakta.", "err"); return; }
     let image = tr.querySelector("[data-cimg]").value.trim();
     const file = tr.querySelector("[data-cfile]").files[0];
     const old = b.textContent; b.disabled = true; b.textContent = "Saving…";
@@ -1102,15 +1105,16 @@ async function loadCategories(){
       const { error } = await sb.from("categories").update({ name, image, sort: parseInt(tr.querySelector("[data-csort]").value) || 0 }).eq("id", id).eq("store_id", STORE_ID);
       if (error) throw error;
       $("#catMsg").textContent = "✅ Category save ho gayi."; $("#catMsg").className = "msg ok";
+      showToast("✅ Category save ho gayi.", "ok");
       loadCategories(); loadProducts();
-    } catch (e) { alert("Category save fail: " + e.message); }
+    } catch (e) { showToast("Category save fail: " + e.message, "err"); }
     b.disabled = false; b.textContent = old;
   });
   wrap.querySelectorAll("[data-cdel]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh category delete kar dein?\n\nNote: is category ke PRODUCTS delete NAHI honge — un par category ka text waisa hi rahega, sirf category nav/tiles/footer se gayab hogi.")) return;
     const { error } = await sb.from("categories").delete().eq("id", +b.dataset.cdel).eq("store_id", STORE_ID);
-    if (error) alert("Delete fail: " + error.message);
-    else { $("#catMsg").textContent = "✅ Category delete ho gayi (products mehfooz hain)."; $("#catMsg").className = "msg ok"; loadCategories(); }
+    if (error) showToast("Delete fail: " + error.message, "err");
+    else { $("#catMsg").textContent = "✅ Category delete ho gayi (products mehfooz hain)."; $("#catMsg").className = "msg ok"; showToast("✅ Category delete ho gayi.", "ok"); loadCategories(); }
   });
 }
 $("#addCategoryBtn").onclick = async () => {
@@ -1128,9 +1132,11 @@ $("#addCategoryBtn").onclick = async () => {
     if (error) throw error;
     $("#catNewName").value = ""; $("#catNewImage").value = ""; $("#catNewImageFile").value = "";
     msg.textContent = `✅ Category "${name}" add ho gayi.`; msg.className = "msg ok";
+    showToast(`✅ Category "${name}" add ho gayi.`, "ok");
     loadCategories();
   } catch (e) {
     msg.textContent = "Category add fail: " + e.message; msg.className = "msg err";
+    showToast("Category add fail: " + e.message, "err");
   } finally { btn.disabled = false; btn.textContent = "＋ Add Category"; }
 };
 
@@ -1151,12 +1157,12 @@ async function loadCoupons(){
     </tr>`).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-cpn-active]").forEach(cb => cb.onchange = async () => {
     const { error } = await sb.from("coupons").update({ active: cb.checked }).eq("id", +cb.dataset.cpnActive).eq("store_id", STORE_ID);
-    if (error){ alert("Coupon update fail: " + error.message); cb.checked = !cb.checked; }
+    if (error){ showToast("Coupon update fail: " + error.message, "err"); cb.checked = !cb.checked; } else showToast("✅ Coupon " + (cb.checked ? "active ho gaya." : "inactive ho gaya."), "ok");
   });
   wrap.querySelectorAll("[data-cpn-del]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh coupon delete kar dein?")) return;
     const { error } = await sb.from("coupons").delete().eq("id", +b.dataset.cpnDel).eq("store_id", STORE_ID);
-    if (error) alert("Delete fail: " + error.message); else loadCoupons();
+    if (error) showToast("Delete fail: " + error.message, "err"); else { loadCoupons(); showToast("✅ Coupon delete ho gaya.", "ok"); }
   });
 }
 $("#addCouponBtn").onclick = async () => {
@@ -1166,9 +1172,10 @@ $("#addCouponBtn").onclick = async () => {
   if (!code){ msg.textContent = "Coupon code likhein."; msg.className = "msg err"; return; }
   if (!pct){ msg.textContent = "Discount % 1–90 ke darmiyan likhein."; msg.className = "msg err"; return; }
   const { error } = await sb.from("coupons").insert({ store_id: STORE_ID, code, pct, active: true });
-  if (error){ msg.textContent = "Coupon add fail: " + error.message; msg.className = "msg err"; return; }
+  if (error){ msg.textContent = "Coupon add fail: " + error.message; msg.className = "msg err"; showToast("Coupon add fail: " + error.message, "err"); return; }
   $("#cpnCode").value = ""; $("#cpnPct").value = "";
   msg.textContent = `✅ Coupon ${code} (${pct}% OFF) ban gaya.`; msg.className = "msg ok";
+  showToast(`✅ Coupon ${code} (${pct}% OFF) ban gaya.`, "ok");
   loadCoupons();
 };
 
@@ -1186,13 +1193,13 @@ async function loadTeam(){
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-trole]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("team").update({ role: sel.value }).eq("store_id", STORE_ID).eq("email", sel.dataset.trole);
-    if (error){ alert("Role update fail: " + error.message); loadTeam(); }
-    else { $("#teamMsg").textContent = "✅ Role update ho gaya."; $("#teamMsg").className = "msg ok"; }
+    if (error){ showToast("Role update fail: " + error.message, "err"); loadTeam(); }
+    else { $("#teamMsg").textContent = "✅ Role update ho gaya."; $("#teamMsg").className = "msg ok"; showToast("✅ Role update ho gaya.", "ok"); }
   });
   wrap.querySelectorAll("[data-tdel]").forEach(b => b.onclick = async () => {
     if (!confirm(`${b.dataset.tdel} ko team se remove kar dein? Unka dashboard access foran band ho jayega.`)) return;
     const { error } = await sb.from("team").delete().eq("store_id", STORE_ID).eq("email", b.dataset.tdel);
-    if (error) alert("Remove fail: " + error.message); else loadTeam();
+    if (error) showToast("Remove fail: " + error.message, "err"); else { loadTeam(); showToast("✅ Member team se remove ho gaya.", "ok"); }
   });
 }
 $("#addTeamBtn").onclick = async () => {
@@ -1201,9 +1208,10 @@ $("#addTeamBtn").onclick = async () => {
   const msg = $("#teamMsg");
   if (!email || !email.includes("@")){ msg.textContent = "Sahi email likhein."; msg.className = "msg err"; return; }
   const { error } = await sb.from("team").insert({ store_id: STORE_ID, email, role });
-  if (error){ msg.textContent = "Member add fail: " + error.message; msg.className = "msg err"; return; }
+  if (error){ msg.textContent = "Member add fail: " + error.message; msg.className = "msg err"; showToast("Member add fail: " + error.message, "err"); return; }
   $("#teamEmail").value = "";
   msg.textContent = `✅ ${email} team mein add ho gaya (${role}). Woh magic link se login kar sakte hain — agar link na aaye to pehle Supabase Auth mein unka user banana hoga.`; msg.className = "msg ok";
+  showToast(`✅ ${email} team mein add ho gaya (${role}).`, "ok");
   loadTeam();
 };
 
@@ -1476,7 +1484,7 @@ async function collectHeroSlides(){
 }
 $("#addSlideBtn").onclick = () => {
   syncHeroFromDom();
-  if (heroState.length >= 4){ alert("Zyada se zyada 4 hero slides ho sakti hain."); return; }
+  if (heroState.length >= 4){ showToast("Zyada se zyada 4 hero slides ho sakti hain.", "err"); return; }
   heroState.push({ pill: "", title: "", subtitle: "", button: "SHOP NOW", image: "", visible: true });
   renderHeroEditor();
 };
@@ -2182,11 +2190,12 @@ async function persistAllSettings(){
     renderHeroEditor();
     const okText = "✅ Save ho gaya — store reload karke changes dekhein.";
     Object.values(msgEls).forEach(m => { if (m){ m.textContent = okText; m.className = "msg ok"; } });
+    showToast("✅ Save ho gaya — store reload karke changes dekhein.", "ok");
     if (topMsg){ topMsg.textContent = "✅ Save ho gaya"; setTimeout(() => { topMsg.textContent = ""; }, 3500); }
   } catch (e) {
     Object.values(msgEls).forEach(m => { if (m){ m.textContent = "Save fail: " + e.message; m.className = "msg err"; } });
     if (topMsg) topMsg.textContent = "";
-    alert("Save fail: " + e.message);
+    showToast("Save fail: " + e.message, "err");
   } finally {
     saveBtns.forEach((b, i) => { b.disabled = false; b.innerHTML = savedLabels[i]; });
   }
@@ -2375,9 +2384,11 @@ async function saveDomain(clear){
     if (error) throw error;
     msg.textContent = clear ? "✅ Domain hata diya gaya." : "✅ Domain save ho gaya — status 'pending'. DNS lagane ke baad Super Admin isay 'live' karega.";
     msg.className = "msg ok";
+    showToast(clear ? "✅ Domain hata diya gaya." : "✅ Domain save ho gaya.", "ok");
     loadDomain();
   } catch (e) {
     msg.textContent = "Domain save fail: " + e.message; msg.className = "msg err";
+    showToast("Domain save fail: " + e.message, "err");
   }
 }
 const _domSave = $("#domSaveBtn");
