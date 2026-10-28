@@ -338,14 +338,56 @@ async function loadAll(){
 }
 
 /* ---------- Image upload (Supabase Storage: product-images) ---------- */
+/* V3.6c: upload se pehle auto-compress — phone ki bari photo khud chhoti
+   hokar upload hoti hai (lambi side max 1200px, JPEG quality 82%), taa ke
+      Supabase storage + bandwidth ~10 guna kam lage. PNG ki transparency
+         mehfooz rehti hai; GIF/SVG ko haath nahi lagaya jata. FAIL-OPEN: kisi
+            bhi masle par original file hi upload hoti hai, upload kabhi nahi rukta. */
+async function compressImage(file){
+   const MAX = 1200, QUALITY = 0.82;
+   try {
+      if (!file || !String(file.type || "").startsWith("image/")) return file;
+      if (file.type === "image/gif" || file.type === "image/svg+xml") return file;
+      let src = null, w = 0, h = 0, objUrl = "";
+      try {
+         src = await createImageBitmap(file, { imageOrientation: "from-image" });
+         w = src.width; h = src.height;
+      } catch (e) {
+         const img = await new Promise((resolve, reject) => {
+            const im = new Image();
+            im.onload = () => resolve(im);
+            im.onerror = () => reject(new Error("img"));
+            objUrl = URL.createObjectURL(file);
+            im.src = objUrl;
+         });
+         src = img; w = img.naturalWidth; h = img.naturalHeight;
+      }
+      if (!w || !h) return file;
+      const scale = Math.min(1, MAX / Math.max(w, h));
+      const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+      const cv = document.createElement("canvas");
+      cv.width = cw; cv.height = ch;
+      const ctx = cv.getContext("2d");
+      if (file.type !== "image/png"){ ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch); }
+      ctx.drawImage(src, 0, 0, cw, ch);
+      if (src && src.close) src.close();
+      if (objUrl) URL.revokeObjectURL(objUrl);
+      const outType = file.type === "image/png" ? "image/png" : "image/jpeg";
+      const blob = await new Promise(res => cv.toBlob(res, outType, QUALITY));
+      if (!blob || blob.size >= file.size) return file;
+      const ext = outType === "image/png" ? "png" : "jpg";
+      return new File([blob], file.name.replace(/\.[^.]+$/, "") + "." + ext, { type: outType });
+   } catch (e) { return file; }
+}
 async function uploadImage(file, folder){
   if (!file) throw new Error("Koi image file select nahi hui.");
   if (!String(file.type || "").startsWith("image/")) throw new Error("Sirf image file select karein.");
-  const match = String(file.name || "").match(/\.([a-zA-Z0-9]+)$/);
+   const up = await compressImage(file);
+  const match = String(up.name || "").match(/\.([a-zA-Z0-9]+)$/);
   const ext = match ? "." + match[1].toLowerCase() : "";
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
   const path = `${folder}/${uniqueName}`;
-  const { error } = await sb.storage.from("product-images").upload(path, file, { upsert: true, contentType: file.type });
+  const { error } = await sb.storage.from("product-images").upload(path, up, { upsert: true, contentType: up.type });
   if (error) throw error;
   const { data } = sb.storage.from("product-images").getPublicUrl(path);
   if (!data || !data.publicUrl) throw new Error("Upload ke baad public URL nahi mila.");
