@@ -321,7 +321,7 @@
     <datalist id="catList"></datalist>
     <div id="productFormWrap" class="hidden" style="margin-bottom:18px"></div>
     <div id="lowStockBanner" hidden></div>
-    <div style="margin-bottom:12px"><button class="btn small ghost" id="exportProductsBtn" type="button">⬇ Products CSV Export karein</button></div>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small ghost" id="exportProductsBtn" type="button">⬇ Products CSV Export karein</button><label class="btn small ghost" style="cursor:pointer">⬆ CSV Import karein<input type="file" id="importProductsFile" accept=".csv,text/csv" hidden></label><span id="importMsg" style="color:var(--muted);font-size:13px"></span></div>
     <div class="searchrow">
       <input type="search" id="prodSearch" placeholder="🔍 Product naam ya category se search karein…">
       <span id="prodCount" style="align-self:center;color:var(--muted);font-size:13.5px;font-weight:600"></span>
