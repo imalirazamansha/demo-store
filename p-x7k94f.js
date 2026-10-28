@@ -379,10 +379,20 @@ async function compressImage(file){
       return new File([blob], file.name.replace(/\.[^.]+$/, "") + "." + ext, { type: outType });
    } catch (e) { return file; }
 }
+function fmtSize(b){
+     b = Number(b || 0);
+     if (b < 1024) return b + " B";
+     if (b < 1024 * 1024) return Math.round(b / 1024) + " KB";
+     return (b / 1048576).toFixed(1) + " MB";
+}
+/* Aakhri upload ki size report — product form upload ke baad dikhata hai
+   ke compression lagi ya nahi (original → uploaded). */
+let LAST_UPLOAD_INFO = null;
 async function uploadImage(file, folder){
   if (!file) throw new Error("Koi image file select nahi hui.");
   if (!String(file.type || "").startsWith("image/")) throw new Error("Sirf image file select karein.");
    const up = await compressImage(file);
+     LAST_UPLOAD_INFO = { before: file.size, after: up.size };
   const match = String(up.name || "").match(/\.([a-zA-Z0-9]+)$/);
   const ext = match ? "." + match[1].toLowerCase() : "";
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
@@ -731,7 +741,7 @@ function bindProdCards(wrap){
       const file = fileInput.files && fileInput.files[0];
       if (!file) return;
       preview.src = URL.createObjectURL(file);
-      setUploadMsg(msg, `Selected: ${file.name} — Save dabane par upload hogi.`);
+      setUploadMsg(msg, `Selected: ${file.name} (${fmtSize(file.size)}) — Save dabane par upload hogi.`);
     });
   });
   wrap.querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
@@ -749,7 +759,12 @@ function bindProdCards(wrap){
         imageUrl = await uploadImage(file, `products/${b.dataset.save}`);
         card.querySelector('[data-f="img"]').value = imageUrl;
         card.querySelector("[data-preview]").src = imageUrl;
-        setUploadMsg(msg, "✅ Image upload complete — ab product save ho raha hai.", "ok");
+        let doneNote = "✅ Image upload complete — ab product save ho raha hai.";
+                 if (LAST_UPLOAD_INFO && LAST_UPLOAD_INFO.after < LAST_UPLOAD_INFO.before){
+                              const pct = Math.round((1 - LAST_UPLOAD_INFO.after / LAST_UPLOAD_INFO.before) * 100);
+                              doneNote += ` Compress hui: ${fmtSize(LAST_UPLOAD_INFO.before)} → ${fmtSize(LAST_UPLOAD_INFO.after)} (${pct}% chhoti).`;
+                 }
+                 setUploadMsg(msg, doneNote, "ok");
       } catch (e) {
         setUploadMsg(msg, "Upload fail: " + e.message, "err");
         alert("Image upload fail — product save nahi kiya gaya: " + e.message);
