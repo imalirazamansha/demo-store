@@ -390,6 +390,10 @@ function fmtSize(b){
 let LAST_UPLOAD_INFO = null;
 async function uploadImage(file, folder){
   if (!file) throw new Error("Koi image file select nahi hui.");
+  /* HEIC (iPhone ki default photo format) browser mein dikhayi nahi deta —
+     is liye isay chup-chap upload karke kharab image banane ke bajaye
+     foran saaf message ke saath roka jata hai. */
+  if (/\.hei[cf]$/i.test(file.name || "") || file.type === "image/heic" || file.type === "image/heif") throw new Error("Ye photo HEIC format mein hai (iPhone ki default setting) — browser isay dikha nahi sakta, is liye upload rok di gayi hai. iPhone par Settings → Camera → Formats → 'Most Compatible' select karein, ya photo ko JPG mein convert karke dobara upload karein.");
   if (!String(file.type || "").startsWith("image/")) throw new Error("Sirf image file select karein.");
    const up = await compressImage(file);
      LAST_UPLOAD_INFO = { before: file.size, after: up.size };
@@ -691,6 +695,16 @@ function refreshCatList(){
   const cats = [...new Set([...fromTable, ...fromProducts])];
   $("#catList").innerHTML = cats.map(c => `<option value="${esc(c)}">`).join("");
 }
+/* Gallery URL inputs — product ki jitni gallery images hon, utne inputs
+   (kam se kam 3). Multi-upload ya drag-reorder se zyada images banen to
+   inputs khud barh jate hain, taa ke save par koi image gum na ho. */
+function galleryInputs(p){
+  const g = Array.isArray(p.gallery) ? p.gallery : [];
+  const slots = Math.max(3, g.length);
+  let h = "";
+  for (let i = 0; i < slots; i++) h += `<input data-f="gallery${i+1}" value="${esc(g[i] || "")}" placeholder="Extra image ${i+1} URL (optional)">`;
+  return h;
+}
 function prodCard(p){
   const out = p.stock === "out";
   return `<div class="prod" data-id="${p.id}">
@@ -719,16 +733,85 @@ function prodCard(p){
     </div>
     <p class="hint">Delivery fee: 0 = is product par <strong>FREE delivery</strong>; fee product par ek dafa lagti hai, quantity par nahi.</p>
     <p class="hint">Discount badge: khali/0 chor dein to badge price/old price se <strong>auto hisaab</strong> hoga; koi number likhein to card aur product page par <strong>wohi % badge</strong> nazar aayega.</p>
-    <label>📷 Product image upload</label><input data-file="imgfile" type="file" accept="image/*">
-    <p class="upload-msg" data-upload-msg>File select karein to Save dabane par image upload hogi. Koi file na ho to neeche wala URL use hoga.</p>
+    <label>📷 Product images upload (ek saath kai select karein)</label><input data-file="imgfile" type="file" accept="image/*" multiple>
+    <p class="upload-msg" data-upload-msg>Files select karein to Save dabane par upload hongi. 1 file ho to sirf main image badlegi; 2 ya zyada hon to yehi poori image set ban jayegi (pehli main, baaki gallery). Koi file na ho to neeche wala URL use hoga.</p>
     <label>Ya image URL paste karein</label><input data-f="img" value="${esc(p.img||"")}" placeholder="https://…">
-    <label>🖼️ Extra images (card par swipe hongi — V3.6 gallery)</label><input data-f="gallery1" value="${esc((Array.isArray(p.gallery) ? p.gallery[0] : "") || "")}" placeholder="Extra image 1 URL (optional)"><input data-f="gallery2" value="${esc((Array.isArray(p.gallery) ? p.gallery[1] : "") || "")}" placeholder="Extra image 2 URL (optional)"><input data-f="gallery3" value="${esc((Array.isArray(p.gallery) ? p.gallery[2] : "") || "")}" placeholder="Extra image 3 URL (optional)"><p class="hint">Extra image ho to product card par image swipe hogi (dots + auto-rotate) — FunBug ke bestseller cards ki tarah. Khaali chor dein to sirf main image dikhegi.</p><label>Description</label><textarea data-f="desc" rows="6">${esc(p.desc||"")}</textarea>
+    <label>🖼️ Extra images (card par swipe hongi — V3.6 gallery)</label><div data-gallery-wrap>${galleryInputs(p)}</div><p class="hint">Extra image ho to product card par image swipe hogi (dots + auto-rotate) — FunBug ke bestseller cards ki tarah. Khaali chor dein to sirf main image dikhegi.</p>
+    <label>↕️ Images ki tartib (pehli = main)</label><div class="img-order" data-img-order style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <p class="hint">Desktop par image ko drag karke aage-peeche karein, mobile par ▲▼ buttons dabayein, phir Save karein — pehli image main hogi, baaki gallery mein swipe hongi.</p><label>Description</label><textarea data-f="desc" rows="6">${esc(p.desc||"")}</textarea>
     <p class="hint">Ye text product page par 'Product Details' mein nazar aayega — khaali line chorne se naya paragraph banta hai.</p>
     <div class="actions">
       <button class="btn small" data-save="${p.id}">💾 Save</button>
       <button class="btn small danger" data-del="${p.id}">Delete</button>
     </div>
   </div>`;
+}
+/* ---------- Product images ki tartib (drag-reorder) ---------- */
+/* Strip mein product ki saari images (main + gallery, jitni bhi hon) thumbs
+   ki shakal mein. Desktop par HTML5 drag, mobile par ▲▼ buttons (touch par
+   drag nahi chalta). Har tabdeeli foran img + gallery inputs mein likhi
+   jati hai, Save par persist hoti hai. */
+function imgOrderList(card){
+  const arr = [];
+  const main = card.querySelector('[data-f="img"]').value.trim();
+  if (main) arr.push(main);
+  card.querySelectorAll('[data-gallery-wrap] input').forEach(el => {
+    const v = el.value.trim();
+    if (v) arr.push(v);
+  });
+  return arr;
+}
+function writeImgOrder(card, arr){
+  card.querySelector('[data-f="img"]').value = arr[0] || "";
+  const wrap = card.querySelector('[data-gallery-wrap]');
+  const rest = arr.slice(1);
+  let inputs = wrap.querySelectorAll('input');
+  while (inputs.length < rest.length){
+    const el = document.createElement('input');
+    el.setAttribute('data-f', 'gallery' + (inputs.length + 1));
+    el.placeholder = 'Extra image ' + (inputs.length + 1) + ' URL (optional)';
+    wrap.appendChild(el);
+    inputs = wrap.querySelectorAll('input');
+  }
+  inputs.forEach((el, i) => { el.value = rest[i] || ""; });
+  const prev = card.querySelector('[data-preview]');
+  if (prev) prev.src = arr[0] || PLACEHOLDER_IMG;
+}
+function renderImgOrder(card){
+  const strip = card.querySelector('[data-img-order]');
+  if (!strip) return;
+  const arr = imgOrderList(card);
+  if (!arr.length){ strip.innerHTML = '<span class="hint">Koi image nahi — pehle image upload karein ya URL paste karein.</span>'; return; }
+  let dragIdx = -1;
+  strip.innerHTML = arr.map((u, i) => `<div draggable="true" data-idx="${i}" style="position:relative;border:2px solid #ddd;border-radius:8px;overflow:hidden;width:64px;height:64px;cursor:grab;flex:0 0 auto" title="Image ${i+1}${i===0 ? " (main)" : ""}"><img src="${safeUrl(u)}" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block"><span style="position:absolute;top:0;left:0;background:#000a;color:#fff;font-size:11px;padding:1px 5px;border-radius:0 0 6px 0">${i+1}</span><span style="position:absolute;bottom:0;right:0;display:flex"><button type="button" data-move="-1" title="Ek pehle" style="background:#000a;color:#fff;border:0;padding:4px 7px;font-size:14px;line-height:1">▲</button><button type="button" data-move="1" title="Ek baad mein" style="background:#000a;color:#fff;border:0;padding:4px 7px;font-size:14px;line-height:1">▼</button></span></div>`).join("");
+  strip.querySelectorAll('[data-idx]').forEach(box => {
+    box.addEventListener('dragstart', e => { dragIdx = +box.dataset.idx; try { e.dataTransfer.setData('text/plain', String(dragIdx)); } catch (err) {} });
+    box.addEventListener('dragover', e => e.preventDefault());
+    box.addEventListener('drop', e => {
+      e.preventDefault();
+      let from = dragIdx;
+      if (from < 0){ try { from = +e.dataTransfer.getData('text/plain'); } catch (err) {} }
+      const to = +box.dataset.idx;
+      if (from === to || isNaN(from)) return;
+      const a = imgOrderList(card);
+      const [it] = a.splice(from, 1);
+      a.splice(to, 0, it);
+      writeImgOrder(card, a);
+      renderImgOrder(card);
+    });
+  });
+  strip.querySelectorAll('[data-move]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const box = btn.closest('[data-idx]');
+      const i = +box.dataset.idx, d = +btn.dataset.move;
+      const a = imgOrderList(card);
+      const j = i + d;
+      if (j < 0 || j >= a.length) return;
+      [a[i], a[j]] = [a[j], a[i]];
+      writeImgOrder(card, a);
+      renderImgOrder(card);
+    });
+  });
 }
 function bindProdCards(wrap){
   wrap.querySelectorAll(".prod").forEach(card => {
@@ -738,10 +821,14 @@ function bindProdCards(wrap){
     const msg = card.querySelector("[data-upload-msg]");
     urlInput.addEventListener("input", () => { preview.src = urlInput.value.trim() || PLACEHOLDER_IMG; });
     fileInput.addEventListener("change", () => {
-      const file = fileInput.files && fileInput.files[0];
-      if (!file) return;
-      preview.src = URL.createObjectURL(file);
-      setUploadMsg(msg, `Selected: ${file.name} (${fmtSize(file.size)}) — Save dabane par upload hogi.`);
+      const files = fileInput.files ? Array.from(fileInput.files) : [];
+      if (!files.length) return;
+      preview.src = URL.createObjectURL(files[0]);
+      setUploadMsg(msg, `${files.length} image${files.length > 1 ? "s" : ""} selected — Save dabane par upload hongi.` + (files.length === 1 ? " Sirf main image badlegi." : " Yehi poori image set ban jayegi (pehli main, baaki gallery).") + (files.length > 10 ? " Sirf pehli 10 li jayengi." : ""));
+    });
+    renderImgOrder(card);
+    card.addEventListener("input", e => {
+      if (e.target.matches('[data-f="img"]') || e.target.closest('[data-gallery-wrap]')) renderImgOrder(card);
     });
   });
   wrap.querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
@@ -749,22 +836,37 @@ function bindProdCards(wrap){
     const get = f => card.querySelector(`[data-f="${f}"]`).value;
     const msg = card.querySelector("[data-upload-msg]");
     const fileInput = card.querySelector('[data-file="imgfile"]');
-    const file = fileInput.files && fileInput.files[0];
+    const files = fileInput.files ? Array.from(fileInput.files) : [];
     let imageUrl = get("img").trim();
     const oldLabel = b.textContent;
-    b.disabled = true; b.textContent = file ? "Uploading…" : "Saving…";
-    if (file){
+    b.disabled = true; b.textContent = files.length ? "Uploading…" : "Saving…";
+    if (files.length){
       try {
-        setUploadMsg(msg, "Image upload ho rahi hai…");
-        imageUrl = await uploadImage(file, `products/${b.dataset.save}`);
+        const take = files.slice(0, 10);
+        setUploadMsg(msg, take.length + " image" + (take.length > 1 ? "s" : "") + " upload ho rahi " + (take.length > 1 ? "hain" : "hai") + "…");
+        let totalBefore = 0, totalAfter = 0;
+        const urls = [];
+        for (const f of take){
+          totalBefore += f.size;
+          urls.push(await uploadImage(f, `products/${b.dataset.save}`));
+          if (LAST_UPLOAD_INFO) totalAfter += LAST_UPLOAD_INFO.after;
+        }
+        if (take.length === 1){
+        imageUrl = urls[0];
         card.querySelector('[data-f="img"]').value = imageUrl;
         card.querySelector("[data-preview]").src = imageUrl;
-        let doneNote = "✅ Image upload complete — ab product save ho raha hai.";
-                 if (LAST_UPLOAD_INFO && LAST_UPLOAD_INFO.after < LAST_UPLOAD_INFO.before){
-                              const pct = Math.round((1 - LAST_UPLOAD_INFO.after / LAST_UPLOAD_INFO.before) * 100);
-                              doneNote += ` Compress hui: ${fmtSize(LAST_UPLOAD_INFO.before)} → ${fmtSize(LAST_UPLOAD_INFO.after)} (${pct}% chhoti).`;
+        } else {
+          writeImgOrder(card, urls);
+          imageUrl = urls[0];
+        }
+        let doneNote = `✅ ${urls.length} image${urls.length > 1 ? "s" : ""} upload complete — ab product save ho raha hai.`;
+                 if (totalAfter > 0 && totalAfter < totalBefore){
+                              const pct = Math.round((1 - totalAfter / totalBefore) * 100);
+                              doneNote += ` Compress hui: ${fmtSize(totalBefore)} → ${fmtSize(totalAfter)} (${pct}% chhoti).`;
                  }
-                 setUploadMsg(msg, doneNote, "ok");
+                 if (take.length > 1) doneNote += " Yehi poori image set ban gayi (pehli main, baaki gallery).";
+        if (files.length > 10) doneNote += " Sirf pehli 10 li gayin.";
+        setUploadMsg(msg, doneNote, "ok");
       } catch (e) {
         setUploadMsg(msg, "Upload fail: " + e.message, "err");
         alert("Image upload fail — product save nahi kiya gaya: " + e.message);
@@ -786,7 +888,7 @@ function bindProdCards(wrap){
       delivery_fee: Math.max(0, parseInt(get("delivery_fee")) || 0),
       discount_pct: (!discountNum || discountNum <= 0) ? null : Math.min(90, Math.round(discountNum)),
       active: get("active") === "true",
-      img: imageUrl, gallery: [get("gallery1").trim(), get("gallery2").trim(), get("gallery3").trim()].filter(Boolean),
+      img: imageUrl, gallery: Array.from(card.querySelectorAll('[data-gallery-wrap] input')).map(el => el.value.trim()).filter(Boolean),
       desc: get("desc").trim(),
     };
     const { error } = await sb.from("products").update(payload).eq("id", +b.dataset.save).eq("store_id", STORE_ID);
@@ -1218,7 +1320,7 @@ async function collectHeroSlides(){
     const get = f => box.querySelector(`[data-hf="${f}"]`).value.trim();
     let image = get("image");
     const file = box.querySelector("[data-hfile]").files[0];
-    if (file){
+    if (files.length){
       const msg = box.querySelector("[data-hmsg]");
       setUploadMsg(msg, "Hero image upload ho rahi hai…");
       image = await uploadImage(file, `hero/slide-${slides.length + 1}`);
@@ -1398,7 +1500,16 @@ function renderHomepage(){
     const ed = inp.closest(".custom-editor");
     const msg = ed.querySelector("[data-cmsg]");
     try {
-      setUploadMsg(msg, "Image upload ho rahi hai…");
+      const take = files.slice(0, 10);
+        setUploadMsg(msg, take.length + " image" + (take.length > 1 ? "s" : "") + " upload ho rahi " + (take.length > 1 ? "hain" : "hai") + "…");
+        let totalBefore = 0, totalAfter = 0;
+        const urls = [];
+        for (const f of take){
+          totalBefore += f.size;
+          urls.push(await uploadImage(f, `products/${b.dataset.save}`));
+          if (LAST_UPLOAD_INFO) totalAfter += LAST_UPLOAD_INFO.after;
+        }
+        if (take.length === 1){
       const url = await uploadImage(file, "custom-sections");
       ed.querySelector('[data-cf="img"]').value = url;
       setUploadMsg(msg, "✅ Image upload ho gayi — Save karna na bhoolein.", "ok");
