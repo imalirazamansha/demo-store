@@ -152,7 +152,7 @@ const DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
-  /* --- V3.6 Playful Pop layout: Instagram reels + blog (Content tab se) --- */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* --- V2 keys (Part A admin contract) --- */
+  /* --- V3.6 Playful Pop layout: Instagram reels + blog (Content tab se) --- */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* --- V3.9 Fashion options + editable section/PDP text --- */ showSizes: true, showColors: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* --- V2 keys (Part A admin contract) --- */
   font_family: { name: "", stack: "", google: "" },
   theme_color: "",
   logo_url: "",
@@ -235,7 +235,7 @@ function descHtml(text){
 /* Har product ki apni delivery fee (admin se set hoti hai). 0 = FREE delivery.
    Fee product par EK dafa lagti hai — quantity jitni bhi ho. */
 function feeOf(p){ return Math.max(0, Number(p && p.delivery_fee) || 0); }
-function deliveryTotal(entries){ return entries.reduce((sum, [id]) => sum + feeOf(findP(id)), 0); }
+function deliveryTotal(entries){ return entries.reduce((sum, [k]) => sum + feeOf(findP(parseCartKey(k).id)), 0); }
 function delivText(p){
   const f = feeOf(p);
   return f === 0 ? `${icon("truck", "ic-inline")} FREE Delivery` : `${icon("truck", "ic-inline")} Delivery: ${fmt(f)}`;
@@ -271,7 +271,7 @@ function mergeSettings(raw){
     return { product: cleanStr(x.product), name: cleanStr(x.name), city: cleanStr(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cleanStr(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cleanStr(x.label), amount: cleanStr(x.amount), note: cleanStr(x.note), budget: cleanStr(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), sub: cleanStr(x.sub) })); /* V3.6: Instagram reels + blog — key maujood ho to wahi (khaali = delete). */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ video: cleanStr(x.video), poster: cleanStr(x.poster), title: cleanStr(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), excerpt: cleanStr(x.excerpt), img: cleanStr(x.img), link: cleanStr(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog;
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), sub: cleanStr(x.sub) })); /* V3.6: Instagram reels + blog — key maujood ho to wahi (khaali = delete). */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ video: cleanStr(x.video), poster: cleanStr(x.poster), title: cleanStr(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), excerpt: cleanStr(x.excerpt), img: cleanStr(x.img), link: cleanStr(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (raw.sectionText && typeof raw.sectionText === "object"){ Object.keys(raw.sectionText).forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); }
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* Deep merge: sections toggles */
   if (raw.sections && typeof raw.sections === "object")
@@ -424,9 +424,7 @@ function applySettings(){
   const wa = $("#waFloat");
   const digits = String(SETTINGS.whatsapp_number || "").replace(/\D/g, "");
   if (digits){ wa.href = "https://wa.me/" + digits; wa.hidden = false; } else { wa.hidden = true; wa.removeAttribute("href"); }
-  /* Homepage sections: sections_order (V2) ho to wohi order + visibility;
-     na ho to legacy settings.sections toggles wala purana behaviour. */
-  applySections();
+  /* Homepage sections: sections_order (V2) ho to wohi order + visibility; na ho to legacy settings.sections toggles wala purana behaviour. */ applySections(); applySectionText();
   /* Footer contact lines (profile se) — jo field bhara ho sirf wohi line. */
   const fc = $("#footerContact");
   if (fc){
@@ -742,8 +740,7 @@ function applySections(){
     el.hidden = (k === "hero" && HERO_SLIDES.length === 0 && !PLAYFUL_HERO) || (PLAYFUL_ONLY_SECTIONS.includes(k) && !playfulOn);
     seq.push(el);
   });
-  seq.forEach(el => home.appendChild(el));
-}
+  seq.forEach(el => home.appendChild(el)); applySectionText(); } /* ---------- V3.9: editable section titles (Content tab -> settings.sectionText) ---------- Khaali ho to asal HTML heading rehta hai; sirf bhara hua eyebrow/title badalta hai. */ const SECTION_TEXT_DEFAULTS = { categories: { eyebrow: "Apni Pasand Chunein", title: "SHOP BY CATEGORY" }, best: { eyebrow: "SAB SE ZYADA ORDER HONE WALE PRODUCTS", title: "BEST SELLERS" }, hot: { eyebrow: "Trending Now", title: "HOT SELLING THIS WEEK" }, arrivals: { eyebrow: "JUST LAUNCHED", title: "NEW ARRIVALS" }, deals: { eyebrow: "LIMITED TIME", title: "MEGA DEALS — HAR GHAR KI ZAROORAT" }, budget: { eyebrow: "Har Budget Ke Liye", title: "SHOP BY BUDGET" }, howto: { eyebrow: "Asaan Tareeqa", title: "HOW TO ORDER" }, faq: { eyebrow: "Aksar Sawalat", title: "FAQ" }, reviews: { eyebrow: "Customer Love", title: "HAPPY CUSTOMERS" } }; const SECTION_TEXT_KEY = { categories: "categories", best_sellers: "best", hot: "hot", new_arrivals: "arrivals", deals: "deals", budget: "budget", how_to_order: "howto", faq: "faq", testimonials: "reviews" }; function applySectionText(){ const custom = (SETTINGS && SETTINGS.sectionText && typeof SETTINGS.sectionText === "object") ? SETTINGS.sectionText : {}; Object.keys(SECTION_TEXT_KEY).forEach(sec => { const el = document.querySelector(`[data-section="${sec}"]`); if (!el) return; const c = custom[SECTION_TEXT_KEY[sec]] || {}; const eyebrow = String(c.eyebrow || "").trim(), title = String(c.title || "").trim(); const eb = el.querySelector(".eyebrow"), ti = el.querySelector(".section-title"); if (eb && eyebrow) eb.textContent = eyebrow; if (ti && title) ti.textContent = title; }); }
 /* V3.6: hero render (applySettings + products load dono se chalta hai, taa ke Fun-hero ko products ka wait na karna pare — boot race fix). */ function renderHero(){ PLAYFUL_HERO = false; stopFunHero(); if (isPlayful() && funHeroItems().length){ PLAYFUL_HERO = true; clearInterval(heroTimer); const items = funHeroItems(); const head = HERO_SLIDES[0] || {}; const hTitle = (head.title || "").trim() || (SETTINGS.store_name || "ShopNest"); const hSub = (head.subtitle || "").trim() || "Quality checked products — Cash on Delivery ke saath, poore Pakistan mein."; $("#heroSection").hidden = false; $("#heroTrack").innerHTML = `<article class="fun-hero"><div class="fun-hero-bg fh-bg-0"></div><div class="fun-hero-inner"><div class="fun-hero-copy"><h1>${esc(hTitle)}</h1><p>${esc(hSub)}</p></div><div class="fh-stage">${items.map((p, i) => `<div class="fh-item ${i === 0 ? "active" : ""}"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}"><div class="fh-meta"><strong>${esc(p.name)}</strong><span>${fmt(p.price)}</span></div></div>`).join("")}</div><div class="fh-ctas"><button class="btn primary" type="button" data-hero-target="bestSection">Shop Now</button><button class="btn outline-light" type="button" data-hero-target="budgetSection">Shop by Budget</button></div></div></article>`; $("#heroDots").innerHTML = items.map((_, i) => `<button type="button" data-fh-dot="${i}" class="${i === 0 ? "active" : ""}" aria-label="Hero product ${i + 1}"></button>`).join(""); $$("[data-fh-dot]").forEach(b => b.onclick = () => showFunHero(+b.dataset.fhDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); $$("#heroTrack .fh-item").forEach((el, i) => el.onclick = () => openProduct(items[i].id)); funHeroIndex = 0; startFunHero(); } else { $("#heroSection").hidden = HERO_SLIDES.length === 0; $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `<article class="hero-slide ${i % 2 === 1 ? "alt" : ""}"><div class="hero-inner"><div class="hero-content"><span class="hero-pill">${esc(s.pill)}</span><h1>${esc(s.title)}</h1><p>${esc(s.subtitle)}</p><button class="btn primary" type="button" data-hero-target="${i === 0 ? "bestSection" : "dealsSection"}">${esc(s.button)}</button></div><img class="hero-img" src="${safeUrl(s.image)}" alt="${esc(s.title)}"></div></article>`).join(""); $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join(""); $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); } } } function setHero(i){
   if (!HERO_SLIDES.length) return;
   heroIndex = (i + HERO_SLIDES.length) % HERO_SLIDES.length;
@@ -1082,7 +1079,7 @@ function openProduct(id){
     catch (e) { toast(shareUrl); }
   };
   /* product_fields: values sirf product.custom?.[id] se — na hon to khamoshi se skip. */
-  renderPdpCustomFields(p);
+  renderPdpCustomFields(p); /* V3.9: sizes/colors (products.options) + PDP texts (settings.pdpText). */ renderPdpOptions(p); const pdpT = (SETTINGS && SETTINGS.pdpText) || {}; if (String(pdpT.delivery || "").trim()){ const dEl = document.querySelector("#pdpFee .pdp-fee-days"); if (dEl) dEl.textContent = "• " + String(pdpT.delivery).trim();} const pdDet = document.querySelector(".pdp-details .section-title"); if (pdDet && String(pdpT.details || "").trim()) pdDet.textContent = String(pdpT.details).trim(); const pdRel = document.querySelector(".related .section-title"); if (pdRel && String(pdpT.related || "").trim()) pdRel.textContent = String(pdpT.related).trim();
   /* Mobile sticky buy bar ki values. */
   const stPrice = $("#pdpStickyPrice"); if (stPrice) stPrice.textContent = fmt(p.price);
   const stName = $("#pdpStickyName"); if (stName) stName.textContent = p.name;
@@ -1175,8 +1172,8 @@ function renderPdpCustomFields(p){
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeLb(); });
 })();
 /* ---------- PDP sticky buy bar (mobile) ---------- */
-$("#pdpStickyAdd").onclick = () => { if (pdpId !== null) addToCart(pdpId, pdpQty); };
-$("#pdpStickyOrder").onclick = () => { if (pdpId !== null) buyNow(pdpId, pdpQty); };
+$("#pdpStickyAdd").onclick = () => { if (pdpId !== null) addToCart(pdpId, pdpQty, pdpVariant); };
+$("#pdpStickyOrder").onclick = () => { if (pdpId !== null) buyNow(pdpId, pdpQty, pdpVariant); };
 function updatePdpSticky(){
   const bar = $("#pdpSticky");
   if (!bar) return;
@@ -1193,16 +1190,16 @@ $("#crumbHome").onclick = showHome;
 $("#pdpCrumbCat").onclick = () => { const p = findP(pdpId); if (p) setFilter({ cat: p.cat, maxPrice: null }); };
 $("#pdpMinus").onclick = () => { pdpQty = Math.max(1, pdpQty - 1); $("#pdpQty").textContent = pdpQty; };
 $("#pdpPlus").onclick = () => { pdpQty++; $("#pdpQty").textContent = pdpQty; };
-$("#pdpAdd").onclick = () => { if (pdpId !== null) addToCart(pdpId, pdpQty); };
-$("#pdpOrder").onclick = () => { if (pdpId !== null) buyNow(pdpId, pdpQty); };
+$("#pdpAdd").onclick = () => { if (pdpId !== null) addToCart(pdpId, pdpQty, pdpVariant); };
+$("#pdpOrder").onclick = () => { if (pdpId !== null) buyNow(pdpId, pdpQty, pdpVariant); };
 
-/* ---------- Cart ---------- */
+/* ---------- V3.9: per-product sizes/colors (products.options) ---------- options = { sizes: ["S","M","L","XL"], colors: [{name, hex}] }. Cart keys variant-aware hain: "id" (purani cart, bina variant) ya "id|size|color" — purani cart entries bina toote chalti rehti hain. */ let pdpVariant = { size: null, color: null }; function productOptions(p){ const o = (p && p.options && typeof p.options === "object") ? p.options : {}; const sizes = Array.isArray(o.sizes) ? o.sizes.map(s => String(s).trim()).filter(Boolean).slice(0, 12) : []; const colors = Array.isArray(o.colors) ? o.colors.filter(c => c && typeof c === "object" && String(c.name || "").trim()).map(c => ({ name: String(c.name).trim(), hex: /^#[0-9a-fA-F]{6}$/.test(String(c.hex || "")) ? String(c.hex) : "#8A8A8A" })).slice(0, 12) : []; return { sizes, colors }; } function cartKey(id, v){ const s = (v && v.size) ? String(v.size) : ""; const c = (v && v.color) ? String(v.color) : ""; return (s || c) ? (id + "|" + s + "|" + c) : String(id); } function parseCartKey(k){ const parts = String(k).split("|"); return { id: +parts[0], size: parts[1] || null, color: parts[2] || null }; } function variantText(v){ const parts = []; if (v && v.size) parts.push("Size: " + v.size); if (v && v.color) parts.push(v.color); return parts.join(" • "); } function renderPdpOptions(p){ let box = document.getElementById("pdpOptions"); if (!box){ box = document.createElement("div"); box.id = "pdpOptions"; const qtyRow = document.querySelector(".pdp-info .qty-row"); if (qtyRow && qtyRow.parentNode) qtyRow.parentNode.insertBefore(box, qtyRow); else return; } const { sizes, colors } = productOptions(p); const showSizes = SETTINGS.showSizes !== false && sizes.length > 0; const showColors = SETTINGS.showColors !== false && colors.length > 0; pdpVariant = { size: showSizes ? sizes[0] : null, color: showColors ? colors[0].name : null }; let h = ""; if (showSizes) h += `<div class="opt-block"><span class="opt-label">Size: <strong>${esc(pdpVariant.size)}</strong></span><div class="size-pills">${sizes.map(s => `<button type="button" class="size-pill${s === pdpVariant.size ? " on" : ""}" data-size="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>`; if (showColors) h += `<div class="opt-block"><span class="opt-label">Color: <strong>${esc(pdpVariant.color)}</strong></span><div class="color-swatches">${colors.map(c => `<button type="button" class="color-swatch${c.name === pdpVariant.color ? " on" : ""}" data-color="${esc(c.name)}" style="background:${c.hex}" title="${esc(c.name)}" aria-label="${esc(c.name)}"></button>`).join("")}</div></div>`; box.innerHTML = h; box.hidden = !h; box.querySelectorAll("[data-size]").forEach(b => b.onclick = () => { pdpVariant.size = b.dataset.size; b.closest(".opt-block").querySelectorAll("[data-size]").forEach(x => x.classList.toggle("on", x === b)); b.closest(".opt-block").querySelector(".opt-label strong").textContent = b.dataset.size; }); box.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { pdpVariant.color = b.dataset.color; b.closest(".opt-block").querySelectorAll("[data-color]").forEach(x => x.classList.toggle("on", x === b)); b.closest(".opt-block").querySelector(".opt-label strong").textContent = b.dataset.color; }); } /* ---------- Cart ---------- */
 function saveCart(){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
 function cartCount(){ return Object.values(cart).reduce((a,b) => a + Number(b || 0), 0); }
-function cartEntries(){ return Object.entries(cart).map(([id,q]) => [+id, Number(q)]).filter(([,q]) => q > 0); }
-function cartSubtotal(){ return cartEntries().reduce((sum,[id,q]) => { const p = findP(id); return p ? sum + Number(p.price) * q : sum; }, 0); }
-function addToCart(id, qty){
-  cart[id] = (Number(cart[id]) || 0) + qty;
+function cartEntries(){ return Object.entries(cart).map(([k,q]) => [k, Number(q)]).filter(([,q]) => q > 0); }
+function cartSubtotal(){ return cartEntries().reduce((sum,[k,q]) => { const p = findP(parseCartKey(k).id); return p ? sum + Number(p.price) * q : sum; }, 0); }
+function addToCart(id, qty, variant){
+   const k = cartKey(id, variant); cart[k] = (Number(cart[k]) || 0) + qty;
   saveCart(); renderCart();
   const p = findP(id); if (p) toast(`Added: ${p.name}`);
   /* V3.2 cart bump: icon ek dafa uchhalta hai, animationend par class hat
@@ -1215,8 +1212,8 @@ function addToCart(id, qty){
     cb.addEventListener("animationend", function h(){ cb.classList.remove("bump"); cb.removeEventListener("animationend", h); });
   }
 }
-function setQty(id, q){
-  if (q <= 0) delete cart[id]; else cart[id] = q;
+function setQty(key, q){
+  if (q <= 0) delete cart[key]; else cart[key] = q;
   saveCart(); renderCart();
 }
 function renderCart(){
@@ -1224,18 +1221,17 @@ function renderCart(){
   $("#cartCount").textContent = n;
   const entries = cartEntries();
   $("#cartEmptyMsg").hidden = n !== 0;
-  $("#cartRows").innerHTML = entries.map(([id,q]) => {
-    const p = findP(id); if (!p) return "";
+  $("#cartRows").innerHTML = entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k); const p = findP(id); if (!p) return ""; const vt = variantText({ size, color });
     return `<div class="cart-row">
       <img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}">
-      <div><h3>${esc(p.name)}</h3><p>${fmt(p.price)} each • ${delivText(p)}</p>
-        <div class="cart-controls"><button class="qty-btn" type="button" data-cdec="${p.id}">−</button><strong>${q}</strong><button class="qty-btn" type="button" data-cinc="${p.id}">+</button><button class="remove-link" type="button" data-crem="${p.id}">Remove</button></div>
+      <div><h3>${esc(p.name)}</h3><p>${fmt(p.price)} each • ${delivText(p)}</p>${vt ? `<p class="cart-variant">${esc(vt)}</p>` : ""}
+        <div class="cart-controls"><button class="qty-btn" type="button" data-cdec="${esc(k)}">−</button><strong>${q}</strong><button class="qty-btn" type="button" data-cinc="${esc(k)}">+</button><button class="remove-link" type="button" data-crem="${esc(k)}">Remove</button></div>
       </div><strong class="line-total">${fmt(Number(p.price) * q)}</strong>
     </div>`;
   }).join("");
-  $$("[data-cinc]").forEach(b => b.onclick = () => setQty(+b.dataset.cinc, Number(cart[b.dataset.cinc]) + 1));
-  $$("[data-cdec]").forEach(b => b.onclick = () => setQty(+b.dataset.cdec, Number(cart[b.dataset.cdec]) - 1));
-  $$("[data-crem]").forEach(b => b.onclick = () => setQty(+b.dataset.crem, 0));
+  $$("[data-cinc]").forEach(b => b.onclick = () => setQty(b.dataset.cinc, Number(cart[b.dataset.cinc]) + 1));
+  $$("[data-cdec]").forEach(b => b.onclick = () => setQty(b.dataset.cdec, Number(cart[b.dataset.cdec]) - 1));
+  $$("[data-crem]").forEach(b => b.onclick = () => setQty(b.dataset.crem, 0));
   const sub = cartSubtotal();
   const fee = deliveryTotal(entries);
   $("#cpSubtotal").textContent = fmt(sub);
@@ -1254,7 +1250,7 @@ $("#cpCheckoutBtn").onclick = () => {
 /* ---------- Checkout page ---------- */
 function checkoutTotals(){
   const entries = checkoutState ? checkoutState.entries : [];
-  const sub = entries.reduce((sum,[id,q]) => { const p = findP(id); return p ? sum + Number(p.price) * q : sum; }, 0);
+  const sub = entries.reduce((sum,[k,q]) => { const p = findP(parseCartKey(k).id); return p ? sum + Number(p.price) * q : sum; }, 0);
   const fee = deliveryTotal(entries);
   /* Coupon discount sirf products subtotal par — delivery par nahi. */
   const discount = appliedCoupon ? Math.round(sub * Math.min(90, Math.max(0, appliedCoupon.pct)) / 100) : 0;
@@ -1262,9 +1258,8 @@ function checkoutTotals(){
 }
 function renderCheckoutSummary(){
   const entries = checkoutState ? checkoutState.entries : [];
-  $("#coItems").innerHTML = entries.map(([id,q]) => {
-    const p = findP(id); if (!p) return "";
-    return `<div class="co-item"><img src="${safeUrl(p.img || "")}" alt=""><div class="co-item-info"><h4>${esc(p.name)}</h4><p>${fmt(p.price)} × ${q} • ${delivText(p)}</p></div><strong>${fmt(Number(p.price) * q)}</strong></div>`;
+  $("#coItems").innerHTML = entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k); const p = findP(id); if (!p) return ""; const vt = variantText({ size, color });
+    return `<div class="co-item"><img src="${safeUrl(p.img || "")}" alt=""><div class="co-item-info"><h4>${esc(p.name)}</h4><p>${fmt(p.price)} × ${q} • ${delivText(p)}</p>${vt ? `<p class="cart-variant">${esc(vt)}</p>` : ""}</div><strong>${fmt(Number(p.price) * q)}</strong></div>`;
   }).join("");
   const { sub, fee, discount, total } = checkoutTotals();
   $("#coSubtotal").textContent = fmt(sub);
@@ -1339,9 +1334,9 @@ function renderCheckoutFields(){
   wrap.hidden = fields.length === 0;
 }
 function showCheckoutPage(){ renderCheckoutFields(); renderCheckoutSummary(); showPage("checkoutPage"); }
-function buyNow(id, qty){
+function buyNow(id, qty, variant){
   if (!findP(id)) return;
-  checkoutState = { source: "buynow", entries: [[id, qty]] };
+  checkoutState = { source: "buynow", entries: [[cartKey(id, variant), qty]] };
   showCheckoutPage();
 }
 $("#backToShop").onclick = showHome;
@@ -1377,9 +1372,8 @@ $("#checkoutForm").onsubmit = async e => {
   }
   btn.disabled = true; btn.textContent = "Order save ho raha hai…";
   const { total, discount } = checkoutTotals();
-  const lines = checkoutState.entries.map(([id,q]) => {
-    const p = findP(id);
-    return { id: p.id, name: p.name, price: p.price, qty: q, delivery_fee: feeOf(p) };
+  const lines = checkoutState.entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k); const p = findP(id);
+    const line = { id: p.id, name: p.name, price: p.price, qty: q, delivery_fee: feeOf(p) }; if (size) line.size = size; if (color) line.color = color; return line;
   });
   /* items jsonb ab ek object hai: { lines, coupon, discount } — line items ke
      saath coupon meta bhi save hota hai. Purane orders plain array thay;
