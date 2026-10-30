@@ -154,7 +154,7 @@ const ADMIN_DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
-  /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
+  /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* V3.9: fashion options + editable section/PDP text */ showSizes: true, showColors: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
   policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
   profile: { logo_url: "", email: "", phone: "", address: "" },
   /* V2 keys — storefront inhein consume karega (Part B) */
@@ -435,8 +435,7 @@ function orderLines(o){
 }
 function orderMeta(o){
   if (o && o.items && !Array.isArray(o.items)) return { coupon: o.items.coupon || null, discount: Number(o.items.discount) || 0 };
-  return { coupon: null, discount: 0 };
-}
+  return { coupon: null, discount: 0 }; } /* V3.9: order line label — variant (size/color) ke saath. */ function lineLabel(i){ const v = []; if (i.size) v.push("Size: " + i.size); if (i.color) v.push(i.color); return esc(i.name) + " × " + i.qty + (v.length? " <small>(" + v.map(esc).join(", ") + ")</small>": "");} function lineLabelPlain(i){ const v = []; if (i.size) v.push("Size: " + i.size); if (i.color) v.push(i.color); return i.name + " x" + i.qty + (v.length? " (" + v.join(", ") + ")": "");}
 async function loadOrders(){
   const { data, error } = await sb.from("orders").select("*").eq("store_id", STORE_ID).order("id", { ascending: false });
   const wrap = $("#ordersWrap");
@@ -482,7 +481,7 @@ function renderOrders(){
       <td><strong>${esc(o.customer_name)}</strong></td>
       <td>${esc(o.phone)}<br><small style="color:var(--muted)">${esc(o.city)}</small></td>
       <td style="max-width:170px">${esc(o.address)}</td>
-      <td class="order-items">${lines.map(i => `${esc(i.name)} × ${i.qty}`).join("<br>")}${lines.some(i => i.delivery_fee !== undefined) ? `<br><small>Delivery: ${(() => { const d = lines.reduce((s,i) => s + (Number(i.delivery_fee)||0), 0); return d === 0 ? "FREE" : fmt(d); })()}</small>` : ""}${meta.coupon ? `<br><small>🎟️ Coupon ${esc(meta.coupon)}: −${fmt(meta.discount)}</small>` : ""}</td>
+      <td class="order-items">${lines.map(lineLabel).join("<br>")}${lines.some(i => i.delivery_fee !== undefined) ? `<br><small>Delivery: ${(() => { const d = lines.reduce((s,i) => s + (Number(i.delivery_fee)||0), 0); return d === 0 ? "FREE" : fmt(d); })()}</small>` : ""}${meta.coupon ? `<br><small>🎟️ Coupon ${esc(meta.coupon)}: −${fmt(meta.discount)}</small>` : ""}</td>
       <td><strong>${fmt(o.total)}</strong></td>
       <td><select class="status" data-status="${o.id}">${STATUSES.map(s => `<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select></td>
       <td style="white-space:nowrap"><button class="btn small ghost" data-edit-order="${o.id}">✎ Edit</button> <button class="btn small danger" data-del-order="${o.id}">Delete</button></td>
@@ -560,7 +559,7 @@ function addOeItemRow(l = {}){
     <input type="number" data-oe="qty" min="0" value="${l.qty ?? 1}">
     <input type="number" data-oe="price" min="0" value="${l.price ?? 0}">
     <input type="number" data-oe="fee" min="0" value="${l.delivery_fee ?? 0}">
-    <button class="btn small danger" type="button" data-oe-del title="Item hatayein">✕</button>`;
+    <input type="text" data-oe="size" value="${esc(l.size || "")}" placeholder="Size"> <input type="text" data-oe="color" value="${esc(l.color || "")}" placeholder="Color"> <button class="btn small danger" type="button" data-oe-del title="Item hatayein">✕</button>`;
   row.querySelectorAll("input").forEach(inp => inp.addEventListener("input", oeRecalc));
   row.querySelector("[data-oe-del]").onclick = () => { row.remove(); oeRecalc(); };
   $("#oeItems").appendChild(row);
@@ -572,13 +571,13 @@ function oeReadItems(){
       name: g("name").trim(),
       qty: Math.max(0, parseInt(g("qty")) || 0),
       price: Math.max(0, parseInt(g("price")) || 0),
-      delivery_fee: Math.max(0, parseInt(g("fee")) || 0)
+      delivery_fee: Math.max(0, parseInt(g("fee")) || 0), size: g("size").trim(), color: g("color").trim()
     };
     if (r.dataset.pid) item.id = isNaN(+r.dataset.pid) ? r.dataset.pid : +r.dataset.pid;
-    /* Checkout wali line shape: { id, name, price, qty, delivery_fee } */
-    return item.id !== undefined
+    /* Checkout wali line shape: { id, name, price, qty, delivery_fee } + V3.9 size/color (hon to). */
+    const out = item.id !== undefined
       ? { id: item.id, name: item.name, price: item.price, qty: item.qty, delivery_fee: item.delivery_fee }
-      : { name: item.name, price: item.price, qty: item.qty, delivery_fee: item.delivery_fee };
+      : { name: item.name, price: item.price, qty: item.qty, delivery_fee: item.delivery_fee }; if (item.size) out.size = item.size; if (item.color) out.color = item.color; return out;
   }).filter(i => i.name || i.price > 0 || i.qty > 0);
 }
 function oeComputed(){
@@ -836,7 +835,7 @@ function refreshCatList(){
   const cats = [...new Set([...fromTable, ...fromProducts])];
   $("#catList").innerHTML = cats.map(c => `<option value="${esc(c)}">`).join("");
 }
-/* Gallery URL inputs — product ki jitni gallery images hon, utne inputs
+/* V3.9: product.options <-> form strings (sizes "S, M, L, XL"; colors "Maroon #7F1D1D, Green #0B3D2E"). */ function optionsOf(p){ const o = (p && p.options && typeof p.options === "object")? p.options: {}; return { sizes: Array.isArray(o.sizes)? o.sizes.map(s => String(s).trim()).filter(Boolean): [], colors: Array.isArray(o.colors)? o.colors.filter(c => c && typeof c === "object" && String(c.name || "").trim()).map(c => ({ name: String(c.name).trim(), hex: /^#[0-9a-fA-F]{6}$/.test(String(c.hex || ""))? String(c.hex): "#8A8A8A"})): []};} function sizesStr(p){ return optionsOf(p).sizes.join(", ");} function colorsStr(p){ return optionsOf(p).colors.map(c => c.name + " " + c.hex).join(", ");} function parseSizes(str){ return String(str || "").split(",").map(s => s.trim()).filter(Boolean).slice(0, 12);} function parseColors(str){ return String(str || "").split(",").map(s => s.trim()).filter(Boolean).map(part => { const m = part.match(/^(.*?)\s*(#[0-9a-fA-F]{6})\s*$/); if (m) return { name: m[1].trim(), hex: m[2]}; return { name: part, hex: "#8A8A8A"};}).filter(c => c.name).slice(0, 12);} /* Gallery URL inputs — product ki jitni gallery images hon, utne inputs
    (kam se kam 3). Multi-upload ya drag-reorder se zyada images banen to
    inputs khud barh jate hain, taa ke save par koi image gum na ho. */
 function galleryInputs(p){
@@ -874,7 +873,7 @@ function prodCard(p){
     </div>
     <p class="hint">Delivery fee: 0 = is product par <strong>FREE delivery</strong>; fee product par ek dafa lagti hai, quantity par nahi.</p>
     <p class="hint">Discount badge: khali/0 chor dein to badge price/old price se <strong>auto hisaab</strong> hoga; koi number likhein to card aur product page par <strong>wohi % badge</strong> nazar aayega.</p>
-    <label>📷 Product images upload (ek saath kai select karein)</label><input data-file="imgfile" type="file" accept="image/*" multiple>
+     <div class="row2"> <div><label>👗 Sizes (comma se alag — khaali = size nahi dikhega)</label><input data-f="sizes" value="${esc(sizesStr(p))}" placeholder="S, M, L, XL"></div> <div><label>🎨 Colors (naam + hex — khaali = color nahi dikhega)</label><input data-f="colors" value="${esc(colorsStr(p))}" placeholder="Maroon #7F1D1D, Green #0B3D2E"></div> </div> <p class="hint">Sizes/colors sirf is product ke liye hain — product page par pills/swatches banenge. Content tab se sizes ya colors poore store ke liye band bhi kiye ja sakte hain.</p> <label>📷 Product images upload (ek saath kai select karein)</label><input data-file="imgfile" type="file" accept="image/*" multiple>
     <p class="upload-msg" data-upload-msg>Files select karein to Save dabane par upload hongi. 1 file ho to sirf main image badlegi; 2 ya zyada hon to yehi poori image set ban jayegi (pehli main, baaki gallery). Koi file na ho to neeche wala URL use hoga.</p>
     <label>Ya image URL paste karein</label><input data-f="img" value="${esc(p.img||"")}" placeholder="https://…">
     <label>🖼️ Extra images (card par swipe hongi — V3.6 gallery)</label><div data-gallery-wrap>${galleryInputs(p)}</div><p class="hint">Extra image ho to product card par image swipe hogi (dots + auto-rotate) — FunBug ke bestseller cards ki tarah. Khaali chor dein to sirf main image dikhegi.</p>
@@ -1030,7 +1029,7 @@ function bindProdCards(wrap){
       discount_pct: (!discountNum || discountNum <= 0) ? null : Math.min(90, Math.round(discountNum)),
       active: get("active") === "true",
       img: imageUrl, gallery: Array.from(card.querySelectorAll('[data-gallery-wrap] input')).map(el => el.value.trim()).filter(Boolean),
-      desc: get("desc").trim(),
+      desc: get("desc").trim(), options: { sizes: parseSizes(get("sizes")), colors: parseColors(get("colors")) },
     };
     const { error } = await sb.from("products").update(payload).eq("id", +b.dataset.save).eq("store_id", STORE_ID);
     if (error) {
@@ -1056,7 +1055,7 @@ function bindProdCards(wrap){
 $("#addProductBtn").onclick = async () => {
   const { data, error } = await sb.from("products").insert({
     store_id: STORE_ID,
-    name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, discount_pct: null, stock: "in", featured: false, img: "", gallery: [], desc: "", active: false,
+    name: "New Product", cat: "General", price: 999, rating: 4.5, reviews: 0, delivery_fee: 0, discount_pct: null, stock: "in", featured: false, img: "", gallery: [], desc: "", active: false, options: {},
   }).select("id").single();
   if (error) showToast("Add fail: " + error.message, "err");
   else {
@@ -1327,7 +1326,7 @@ function normalizeHeroSlides(rawHero){
     return d;
   });
 }
-function mergeAdminSettings(raw){
+/* V3.9: section titles editor — keys storefront SECTION_TEXT_KEY se match karte hain. */ const SECTION_TEXT_KEYS_ADMIN = ["categories", "best", "hot", "arrivals", "deals", "budget", "howto", "faq", "reviews"]; function mergeAdminSettings(raw){
   const out = JSON.parse(JSON.stringify(ADMIN_DEFAULT_SETTINGS));
   if (!raw || typeof raw !== "object") return out;
   if (typeof raw.store_name === "string" && raw.store_name.trim()) out.store_name = raw.store_name.trim();
@@ -1345,7 +1344,7 @@ function mergeAdminSettings(raw){
     return { product: cs(x.product), name: cs(x.name), city: cs(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cs(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cs(x.label), amount: cs(x.amount), note: cs(x.note), budget: cs(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog;
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); }
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
@@ -2043,7 +2042,7 @@ function fillContent(s){
   renderCntList("cntFaqWrap", s.faqs || [], FAQ_FIELDS);
   renderCntList("cntReviewsWrap", s.reviews || [], REVIEW_FIELDS);
   renderCntList("cntBudgetWrap", s.budgetTiles || [], BUDGET_FIELDS);
-  renderCntList("cntTrustWrap", s.trustItems || [], TRUST_FIELDS); /* V3.6: Instagram + blog (checkboxes: stored false ho to uncheck). */ if (g("cntInstaHandle")) g("cntInstaHandle").value = s.instaHandle || ""; if (g("cntShowReels")) g("cntShowReels").checked = s.showReels !== false; if (g("cntShowBlog")) g("cntShowBlog").checked = s.showBlog !== false; renderCntList("cntReelsWrap", s.instaReels || [], REEL_FIELDS); renderCntList("cntBlogWrap", s.blogPosts || [], BLOG_FIELDS);
+  renderCntList("cntTrustWrap", s.trustItems || [], TRUST_FIELDS); /* V3.6: Instagram + blog (checkboxes: stored false ho to uncheck). */ if (g("cntInstaHandle")) g("cntInstaHandle").value = s.instaHandle || ""; if (g("cntShowReels")) g("cntShowReels").checked = s.showReels !== false; if (g("cntShowBlog")) g("cntShowBlog").checked = s.showBlog !== false; /* V3.9: fashion toggles + section/PDP text. */ if (g("cntShowSizes")) g("cntShowSizes").checked = s.showSizes !== false; if (g("cntShowColors")) g("cntShowColors").checked = s.showColors !== false; SECTION_TEXT_KEYS_ADMIN.forEach(k => { if (g("cntSec_" + k + "_eyebrow")) g("cntSec_" + k + "_eyebrow").value = (s.sectionText && s.sectionText[k] && s.sectionText[k].eyebrow) || ""; if (g("cntSec_" + k + "_title")) g("cntSec_" + k + "_title").value = (s.sectionText && s.sectionText[k] && s.sectionText[k].title) || "";}); if (g("cntPdpDetails")) g("cntPdpDetails").value = (s.pdpText && s.pdpText.details) || ""; if (g("cntPdpRelated")) g("cntPdpRelated").value = (s.pdpText && s.pdpText.related) || ""; if (g("cntPdpDelivery")) g("cntPdpDelivery").value = (s.pdpText && s.pdpText.delivery) || ""; renderCntList("cntReelsWrap", s.instaReels || [], REEL_FIELDS); renderCntList("cntBlogWrap", s.blogPosts || [], BLOG_FIELDS);
   contentFilled = true;
 }
 function addCntRow(wrapId, fields, rowClass){
@@ -2179,7 +2178,7 @@ async function persistAllSettings(){
         return { ...r, rating: Number.isFinite(v) ? Math.min(5, Math.max(1, v)) : 5 };
       });
       data.budgetTiles = readCntList("cntBudgetWrap", BUDGET_FIELDS);
-      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
+      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; /* V3.9: fashion toggles + section/PDP text. */ data.showSizes = document.getElementById("cntShowSizes") ? document.getElementById("cntShowSizes").checked : true; data.showColors = document.getElementById("cntShowColors") ? document.getElementById("cntShowColors").checked : true; data.sectionText = {}; SECTION_TEXT_KEYS_ADMIN.forEach(k => { const eb = document.getElementById("cntSec_" + k + "_eyebrow"); const ti = document.getElementById("cntSec_" + k + "_title"); const e = eb ? eb.value.trim() : "", t = ti ? ti.value.trim() : ""; if (e || t) data.sectionText[k] = { eyebrow: e, title: t };}); data.pdpText = { details: document.getElementById("cntPdpDetails") ? document.getElementById("cntPdpDetails").value.trim() : "", related: document.getElementById("cntPdpRelated") ? document.getElementById("cntPdpRelated").value.trim() : "", delivery: document.getElementById("cntPdpDelivery") ? document.getElementById("cntPdpDelivery").value.trim() : "" }; data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
     }
     /* Per-store settings: upsert store_id par hota hai (platform migration
        mein settings.store_id par unique index hai; id sequence se auto
@@ -2220,7 +2219,7 @@ if (_expO) _expO.onclick = () => {
   ORDERS_CACHE.forEach(o => {
     const lines = orderLines(o);
     rows.push([o.id, new Date(o.created_at).toLocaleString("en-PK"), o.customer_name || "", o.phone || "", o.city || "", o.address || "",
-      lines.map(i => `${i.name} x${i.qty}`).join("; "), o.total || 0, o.status || ""]);
+      lines.map(lineLabelPlain).join("; "), o.total || 0, o.status || ""]);
   });
   downloadCSV(`orders-${STORE_SLUG || "store"}-${csvDate()}.csv`, rows);
 };
