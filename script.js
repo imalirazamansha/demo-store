@@ -472,7 +472,7 @@ function resolveActiveTheme(){
     ACTIVE_THEME = null;
     return null;
   }
-  var allowedKeys = getAllowed ? getAllowed(STORE ? STORE.allowed_themes : null).map(function(t){ return t.key; }) : ["general", "fashion", "beauty", "electronics", "food", "playful"];
+  var allowedKeys = getAllowed ? getAllowed(STORE ? STORE.allowed_themes : null).map(function(t){ return t.key; }) : ["general", "fashion", "beauty", "electronics", "food", "playful", "luxury"];
   var pick = function(k){ return (k && allowedKeys.indexOf(k) !== -1 && known(k)) ? k : null; };
   var key = pick(SETTINGS.theme) || pick(STORE && STORE.theme) || "general";
   ACTIVE_THEME = getTheme(key);
@@ -482,7 +482,7 @@ function applyTheme(){
   var root = document.documentElement;
   var t = resolveActiveTheme();
   /* Body classes: pichli theme ki classes saaf, nayi lagayen. */
-  ["general", "fashion", "beauty", "electronics", "food", "playful"].forEach(function(k){ document.body.classList.remove("theme-" + k); });
+  ["general", "fashion", "beauty", "electronics", "food", "playful", "luxury"].forEach(function(k){ document.body.classList.remove("theme-" + k); });
   ["slider", "banner", "minimal"].forEach(function(x){ document.body.classList.remove("hero-" + x); });
   ["rounded", "sharp", "soft"].forEach(function(x){ document.body.classList.remove("cards-" + x); });
   ["tiles", "pills", "list"].forEach(function(x){ document.body.classList.remove("cats-" + x); });
