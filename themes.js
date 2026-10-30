@@ -91,7 +91,21 @@
                body: F("Rubik", "'Rubik', system-ui, sans-serif", "Rubik:wght@400;500;600;700") },
       heroStyle: "banner", cardStyle: "soft", categoryStyle: "tiles"
     }
-     , { key: "playful", layoutDesc: "FunBug-style ALAG layout — crossfade hero (static headline, badalta product), auto-slide categories + trust, swipe cards, featured + reels + blog", layout: { hero: "banner", header: "standard", grid: "standard", card: "standard", cats: "circles", deals: "grid", defaultOrder: ["hero", "categories", "trust", "best_sellers", "featured", "promos", "reels", "budget", "testimonials", "blog", "about", "how_to_order", "faq", "hot", "new_arrivals", "deals", "all_products"], footer: "dark", button: "rounded", heading: "bold-rounded" }, name: "Playful Pop", nameUr: "Playful / Rangin", business: "Gaming, toys, gifts, trendy store", tagline: "Rangin aur playful — gaming, toys aur trendy dukaan ke liye fun look", palette: { primary: "#241A4D", accent: "#FF7A1A", header: "#1B1440", footer: "#120D2E", price: "#241A4D", badge: "#FF7A1A" }, fonts: { head: F("Outfit", "'Outfit', system-ui, sans-serif", "Outfit:wght@500;600;700;800"), body: F("Inter", "'Inter', system-ui, sans-serif", "Inter:wght@400;500;600;700")}, heroStyle: "banner", cardStyle: "soft", categoryStyle: "tiles" }];
+     , { key: "playful", layoutDesc: "FunBug-style ALAG layout — crossfade hero (static headline, badalta product), auto-slide categories + trust, swipe cards, featured + reels + blog", layout: { hero: "banner", header: "standard", grid: "standard", card: "standard", cats: "circles", deals: "grid", defaultOrder: ["hero", "categories", "trust", "best_sellers", "featured", "promos", "reels", "budget", "testimonials", "blog", "about", "how_to_order", "faq", "hot", "new_arrivals", "deals", "all_products"], footer: "dark", button: "rounded", heading: "bold-rounded" }, name: "Playful Pop", nameUr: "Playful / Rangin", business: "Gaming, toys, gifts, trendy store", tagline: "Rangin aur playful — gaming, toys aur trendy dukaan ke liye fun look", palette: { primary: "#241A4D", accent: "#FF7A1A", header: "#1B1440", footer: "#120D2E", price: "#241A4D", badge: "#FF7A1A" }, fonts: { head: F("Outfit", "'Outfit', system-ui, sans-serif", "Outfit:wght@500;600;700;800"), body: F("Inter", "'Inter', system-ui, sans-serif", "Inter:wght@400;500;600;700")}, heroStyle: "banner", cardStyle: "soft", categoryStyle: "tiles" },
+     {
+              key: "luxury",
+              layoutDesc: "Asim Jofa style premium fashion — full-bleed editorial hero, serif headings, portrait cards, mobile swipe rows",
+              layout: { hero: "editorial", header: "centered", grid: "large", card: "large", cats: "tiles", deals: "grid", defaultOrder: ["hero", "new_arrivals", "categories", "best_sellers", "hot", "promos", "deals", "testimonials", "trust", "all_products", "about", "faq"], footer: "dark", button: "sharp", heading: "serif-upper" },
+              name: "Luxury / Premium Fashion",
+              nameUr: "Luxury / Premium Fashion",
+              business: "Fashion boutique, luxury lawn/velvet, premium clothing",
+              tagline: "Ivory + deep green + gold — premium fashion brands jaisi elegant look",
+              palette: { primary: "#0B3D2E", accent: "#B08D57", header: "#0B3D2E", footer:  "#0B3D2E", price: "#16130E", badge: "#A52A2A" },
+              fonts: { head: F("Playfair Display", "'Playfair Display', Georgia, serif", "Playfair+Display:wght@500;600;700;800"),
+                                     body: F("Jost", "'Jost', system-ui, sans-serif", "Jost:wght@400;500;600;700") },
+              heroStyle: "banner", cardStyle: "sharp", categoryStyle: "tiles"
+     }
+     ];
   var byKey = {};
   THEMES.forEach(function(t){ byKey[t.key] = t; });
   window.SHOPNEST_THEMES = THEMES;
