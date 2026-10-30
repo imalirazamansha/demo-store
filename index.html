@@ -103,6 +103,24 @@
     <div class="cat-track" id="catTiles"></div>
   </section>
 
+<!-- V3.10 Luxury-only sections: Festive Edit tiles, Collection Tabs, Editorial Banner -->
+  <section class="section wrap" id="festiveSection" data-section="festive" hidden>
+    <p class="eyebrow">THE FESTIVE EDIT</p>
+    <h2 class="section-title">FESTIVE COUTURE EDIT</h2>
+    <div class="festive-grid" id="festiveGrid"></div>
+  </section>
+
+  <section class="section wrap" id="luxTabsSection" data-section="collection_tabs" hidden>
+    <p class="eyebrow">SHOP BY COLLECTION</p>
+    <h2 class="section-title">UNSTITCHED &amp; READY TO WEAR</h2>
+    <div class="lux-tabs" id="luxTabs"></div>
+    <div class="grid" id="luxTabsGrid"></div>
+  </section>
+
+  <section class="section" id="editorialSection" data-section="editorial" hidden>
+    <div class="editorial-banner" id="editorialBanner"></div>
+  </section>
+
   <section class="section section-alt" id="bestSection" data-section="best_sellers">
     <div class="wrap">
       <p class="eyebrow">SAB SE ZYADA ORDER HONE WALE PRODUCTS</p>
@@ -118,6 +136,7 @@
       <p class="results" id="resultsText">Loading products…</p>
     </div>
     <div class="toolbar">
+      <button class="btn outline" id="luxFilterBtn" type="button" hidden>⚙ FILTERS <span class="lux-filter-count" id="luxFilterCount" hidden>0</span></button>
       <span class="filter-note" id="filterNote">Saari categories aur prices</span>
       <label class="sort">Sort:
         <select id="sortSelect">
@@ -132,6 +151,16 @@
     <p class="empty" id="emptyMsg" hidden>No products found. Search, category ya budget filter change karke dobara dekhein.</p>
     <p class="empty error" id="loadError" hidden><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Products load nahi ho sakay. Internet check karke page refresh karein.</p>
   </main>
+  <!-- V3.10 Luxury Filters sheet -->
+  <div class="lux-sheet-backdrop" id="luxSheetBackdrop" hidden></div>
+  <div class="lux-sheet" id="luxSheet" hidden role="dialog" aria-label="Filters">
+    <div class="lux-sheet-head"><h3>FILTERS</h3><button class="icon-btn" id="luxSheetClose" type="button" aria-label="Band karein">✕</button></div>
+    <label class="checkline"><input type="checkbox" id="luxFOnSale"> Discount wale products (sale)</label>
+    <label class="checkline"><input type="checkbox" id="luxFInStock"> Sirf In Stock</label>
+    <div class="lux-sheet-row"><label>Min price (Rs)<input type="number" id="luxFMin" min="0" placeholder="0"></label><label>Max price (Rs)<input type="number" id="luxFMax" min="0" placeholder="Koi limit nahi"></label></div>
+    <div class="lux-sheet-block"><span class="opt-label">Size</span><div class="size-pills" id="luxFSizePills"></div></div>
+    <div class="lux-sheet-actions"><button class="btn ghost" id="luxFClear" type="button">CLEAR ALL</button><button class="btn primary" id="luxFApply" type="button">APPLY FILTERS</button></div>
+  </div>
 
   <section class="section wrap" id="promoSection" data-section="promos"><div class="promo-grid" id="promoGrid"></div></section>
 
@@ -234,6 +263,8 @@
     <div class="pdp-fields" id="pdpCustomFields" hidden></div>
   </section>
   <div class="related"><h2 class="section-title left">YOU MIGHT ALSO LIKE</h2><div class="grid related-grid" id="relatedWrap"></div></div>
+  <!-- V3.10 Luxury PDP: Recently Viewed -->
+  <div class="recently-viewed" id="recentSection" hidden><h2 class="section-title left">RECENTLY VIEWED</h2><div class="grid related-grid" id="recentWrap"></div></div>
 </section>
 
 <!-- PDP sticky buy bar (mobile) — buy box se aagay scroll karne par nazar aata hai -->
@@ -353,5 +384,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="themes.js"></script>
 <script src="script.js"></script>
+<!-- V3.10 Luxury bottom nav (mobile) -->
+<nav id="luxBottomNav" aria-label="Store navigation" hidden>
+  <button type="button" data-luxnav="home">⌂<span>Home</span></button>
+  <button type="button" data-luxnav="new">✦<span>New In</span></button>
+  <button type="button" data-luxnav="search">⌕<span>Search</span></button>
+  <button type="button" data-luxnav="cart">🛒<span>Cart</span><b class="lux-nav-badge" id="luxNavCartCount" hidden>0</b></button>
+</nav>
+
 </body>
 </html>
