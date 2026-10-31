@@ -107,15 +107,24 @@
   <section class="section wrap" id="festiveSection" data-section="festive" hidden>
     <p class="eyebrow">THE FESTIVE EDIT</p>
     <h2 class="section-title">FESTIVE COUTURE EDIT</h2>
+       <p class="section-sub">Celebrate every moment in timeless luxury and handcrafted festive wear.</p>
     <div class="festive-grid" id="festiveGrid"></div>
   </section>
 
-  <section class="section wrap" id="luxTabsSection" data-section="collection_tabs" hidden>
+<!-- V3.11 Luxury: Unstitched + Ready To Wear (Asim Jofa jaisi do tabbed sections) -->
+     <section class="section wrap" id="unstitchedSection" data-section="unstitched_tabs" hidden>
     <p class="eyebrow">SHOP BY COLLECTION</p>
-    <h2 class="section-title">UNSTITCHED &amp; READY TO WEAR</h2>
-    <div class="lux-tabs" id="luxTabs"></div>
-    <div class="grid" id="luxTabsGrid"></div>
+    <h2 class="section-title">UNSTITCHED</h2>
+    <div class="lux-tabs" id="unstitchedTabs"></div>
+    <div class="grid" id="unstitchedGrid"></div>
   </section>
+
+     <section class="section wrap" id="rtwSection" data-section="readytowear_tabs" hidden>
+          <p class="eyebrow">SHOP BY COLLECTION</p>
+          <h2 class="section-title">READY TO WEAR</h2>
+          <div class="lux-tabs" id="rtwTabs"></div>
+          <div class="grid" id="rtwGrid"></div>
+   </section>
 
   <section class="section" id="editorialSection" data-section="editorial" hidden>
     <div class="editorial-banner" id="editorialBanner"></div>
@@ -130,7 +139,7 @@
     </div>
   </section>
 
-    <section class="section" id="featuredSection" data-section="featured">     <div class="wrap">       <p class="eyebrow">FEATURED PICK</p>       <h2 class="section-title">Aaj Ki Khaas Pick</h2>       <div id="featuredBand"></div>     </div>   </section>    <section class="section" id="reelsSection" data-section="reels">     <div class="wrap">       <p class="eyebrow">SEE IT IN ACTION</p>       <h2 class="section-title">Reels &amp; Videos</h2>       <div id="reelsFollow"></div>       <div id="reelsRow"></div>     </div>   </section>    <section class="section wrap" id="blogSection" data-section="blog">     <p class="eyebrow">BUYING GUIDES</p>     <h2 class="section-title">Blog &amp; Guides</h2>     <div id="blogGrid"></div>   </section>    <main class="section wrap" id="shop" data-section="all_products">
+    <section class="section" id="featuredSection" data-section="featured">     <div class="wrap">       <p class="eyebrow">FEATURED PICK</p>       <h2 class="section-title">Aaj Ki Khaas Pick</h2>       <div id="featuredBand"></div>     </div>   </section>    <section class="section" id="reelsSection" data-section="reels">     <div class="wrap">       <p class="eyebrow">SEE IT IN ACTION</p>       <h2 class="section-title">Reels &amp; Videos</h2>       <div id="reelsFollow"></div>       <div id="reelsRow"></div><div id="reelsVisit"></div>     </div>   </section>    <section class="section wrap" id="blogSection" data-section="blog">     <p class="eyebrow">BUYING GUIDES</p>     <h2 class="section-title">Blog &amp; Guides</h2>     <div id="blogGrid"></div>   </section>    <main class="section wrap" id="shop" data-section="all_products">
     <div class="shop-heading">
       <div><p class="eyebrow">Complete Collection</p><h2 class="section-title left" id="shopTitle">ALL PRODUCTS</h2></div>
       <p class="results" id="resultsText">Loading products…</p>
@@ -161,6 +170,14 @@
     <div class="lux-sheet-block"><span class="opt-label">Size</span><div class="size-pills" id="luxFSizePills"></div></div>
     <div class="lux-sheet-actions"><button class="btn ghost" id="luxFClear" type="button">CLEAR ALL</button><button class="btn primary" id="luxFApply" type="button">APPLY FILTERS</button></div>
   </div>
+     <!-- V3.11 Luxury Collections popup (Menu) -->
+     <div class="lux-sheet-backdrop" id="luxMenuBackdrop" hidden></div>
+     <div class="lux-sheet" id="luxMenuSheet" hidden role="dialog" aria-label="Collections">
+          <div class="lux-sheet-head"><h3>COLLECTIONS</h3><button class="icon-btn" id="luxMenuClose" type="button" aria-label="Band karein">✕</button></div>
+          <div class="festive-grid" id="luxMenuGrid"></div>
+     </div>
+          <!-- V3.11 Luxury PKR chip -->
+          <button type="button" id="luxPkrChip" hidden>🇵🇰 PKR ⌄</button>
 
   <section class="section wrap" id="promoSection" data-section="promos"><div class="promo-grid" id="promoGrid"></div></section>
 
@@ -170,7 +187,7 @@
         <div><p class="eyebrow">Trending Now</p><h2 class="section-title left">HOT SELLING THIS WEEK</h2></div>
         <div class="carousel-arrows"><button class="arrow-btn" id="hotPrev" type="button" aria-label="Previous hot products">‹</button><button class="arrow-btn" id="hotNext" type="button" aria-label="Next hot products">›</button></div>
       </div>
-      <div class="h-track" id="hotTrack"></div>
+      <div class="trend-toolbar" id="trendToolbar" hidden> <select id="trendCat" aria-label="Collection"></select> <button class="icon-btn" id="trendPause" type="button" aria-label="Auto-slide rokain/chalayein">⏸</button> <select id="trendSort" aria-label="Sort"> <option value="popular">Most Popular</option> <option value="price-low">Price: Low to High</option> <option value="price-high">Price: High to Low</option> <option value="rating">Top Rated</option> </select> <button class="btn outline" id="trendFilterBtn" type="button">⚙ Filter</button> </div> <div class="h-track" id="hotTrack"></div>
       <div class="center-action"><button class="btn primary wide" id="hotOrderBtn" type="button">ORDER NOW</button></div>
       <p class="trust-checklist"><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg> SMART PRODUCTS &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> QUALITY CHECKED &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg> CASH ON DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> FAST DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-returns"/></svg> EASY EXCHANGE</p>
     </div>
@@ -386,7 +403,7 @@
 <script src="script.js"></script>
 <!-- V3.10 Luxury bottom nav (mobile) -->
 <nav id="luxBottomNav" aria-label="Store navigation" hidden>
-  <button type="button" data-luxnav="home">⌂<span>Home</span></button>
+  <button type="button" data-luxnav="home">⌂<span>Home</span></button> <button type="button" data-luxnav="menu">☰<span>Menu</span></button>
   <button type="button" data-luxnav="new">✦<span>New In</span></button>
   <button type="button" data-luxnav="search">⌕<span>Search</span></button>
   <button type="button" data-luxnav="cart">🛒<span>Cart</span><b class="lux-nav-badge" id="luxNavCartCount" hidden>0</b></button>
