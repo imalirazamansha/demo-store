@@ -95,7 +95,7 @@
      {
               key: "luxury",
               layoutDesc: "Asim Jofa style premium fashion — full-bleed editorial hero, serif headings, portrait cards, mobile swipe rows",
-              layout: { hero: "editorial", header: "centered", grid: "large", card: "large", cats: "tiles", deals: "grid", defaultOrder: ["hero", "new_arrivals", "festive", "collection_tabs", "editorial", "reels", "best_sellers", "hot", "deals", "testimonials", "trust", "all_products", "about", "faq"], footer: "dark", button: "sharp", heading: "serif-upper" },
+              layout: { hero: "editorial", header: "centered", grid: "large", card: "large", cats: "tiles", deals: "grid", defaultOrder: ["hero", "new_arrivals", "festive", "unstitched_tabs", "readytowear_tabs", "editorial", "reels", "hot", "deals", "testimonials", "trust", "all_products", "about", "faq"], footer: "dark", button: "sharp", heading: "serif-upper" },
               name: "Luxury / Premium Fashion",
               nameUr: "Luxury / Premium Fashion",
               business: "Fashion boutique, luxury lawn/velvet, premium clothing",
