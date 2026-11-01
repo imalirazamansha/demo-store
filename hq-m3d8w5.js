@@ -244,7 +244,8 @@ function renderStores(){
       </div>
     </div>
   </div>`; }).join("");
-  bindStoreActions(wrap);
+  reinjectLuxCopyResult(wrap);
+ bindStoreActions(wrap);
 }
 function bindStoreActions(wrap){
   wrap.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b.dataset.copy, b));
