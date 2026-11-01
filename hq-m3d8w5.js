@@ -655,10 +655,10 @@ $("#csCreateBtn").onclick = async () => {
       /* Settings data copy — store_name nayi store ka */
       const { data: srcSettings } = await sb.from("settings").select("data").eq("store_id", srcId).maybeSingle();
       const newData = JSON.parse(JSON.stringify((srcSettings && srcSettings.data) || {}));
-      newData.store_name = name;
+              newData.store_name = name;         /* (C) Wart fix: template copy shopnest ki pehchan bhi copy kar deta tha —            nayi store ko shopnest ka WhatsApp / logo / socials / theme colour mil            jata tha. Inhein khaali kar dein (theme, sections_order, Luxury keys            copy hone dein — wahi maqsad hai). */         newData.whatsapp_number = "";         newData.logo_url = "";         newData.socials = { facebook: "", instagram: "", tiktok: "", youtube: "", x: "", whatsapp: ""};         newData.theme_color = "";         /* Profile fallback bhi reset: storefront logo profile.logo_url se aur            WhatsApp float profile.phone se bhi parhta hai — sirf top-level keys            khaali karne se shopnest ka number phir bhi leak hota. */         if (newData.profile) { newData.profile.logo_url = ""; newData.profile.phone = "";}
       const { error: e4 } = await sb.from("settings").upsert({ store_id: sid, data: newData }, { onConflict: "store_id" });
       if (e4) throw new Error("Settings copy: " + e4.message);
-      steps.push("✅ Settings copy ho gayein (store name naya wala)");
+              steps.push("✅ Settings copy ho gayein (store name naya wala)");         steps.push("✅ ShopNest identity reset — WhatsApp/logo/socials/theme colour khaali (nayi store ki apni pehchan hogi)");
     }
 
     const sf = pageUrl("index.html", slug), ad = pageUrl("p-x7k94f.html", slug);
