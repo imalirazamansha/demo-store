@@ -248,6 +248,7 @@ function renderStores(){
 }
 function bindStoreActions(wrap){
   wrap.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b.dataset.copy, b));
+ wrap.querySelectorAll("[data-luxcopy]").forEach(b => b.onclick = () => openLuxCopyPanel(b.dataset.luxcopy, b)););
   wrap.querySelectorAll("[data-suspend]").forEach(b => b.onclick = async () => {
     const s = STORES.find(x => x.id === b.dataset.suspend);
     if (!confirm(`"${s.name}" ko SUSPEND kar dein? Storefront band ho jayega (data mehfooz rahega).`)) return;
