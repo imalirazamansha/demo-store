@@ -761,6 +761,13 @@ body.theme-luxury .logo{color:#fff;letter-spacing:.02em;text-transform:none}
 body.theme-luxury .logo-bag{display:none}
 body.theme-luxury .site-header .icon-btn{background:transparent;border:0;color:#fff}
 body.theme-luxury .site-header .icon-btn:hover{border-color:transparent;color:#fff} /* V3.12 FIX F5: on PDP pages there is no hero behind the transparent header, so white logo/icons go invisible on the white page. Solid white header + dark text. */ body.theme-luxury.lux-pdp .site-header{background:#fff;box-shadow:0 1px 0 #E8E0D0} body.theme-luxury.lux-pdp .logo,body.theme-luxury.lux-pdp #logoName{color:#111} body.theme-luxury.lux-pdp .site-header .icon-btn{color:#111} body.theme-luxury.lux-pdp .site-header .icon-btn:hover{color:#111}
+/* V3.12 FIX R1: under Luxury the header is position:absolute (out of flow) and .page
+has only 24px top padding, so the first element of a .page — the "← Back to Shop"
+button on the collection page and the PDP — sits underneath the ~60-75px header and
+can never be seen or clicked. lux-pdp is on for both pages (C6), so give .page
+enough top padding to clear the header. Homepage untouched: homeView is not a
+.page, and the header still overlays the hero there. */
+body.theme-luxury.lux-pdp .page{padding-top:88px}
 body.theme-luxury .cart-count{background:#D92D20}
 body.theme-luxury .catnav{display:none}
 body.theme-luxury .search-bar{border-color:#111;border-radius:8px}
