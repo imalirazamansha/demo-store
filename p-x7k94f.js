@@ -2069,7 +2069,7 @@ function readSpEntries(){
    saare tabs ke DOM se values parh kar EK settings.data upsert hota hai,
    taa ke kisi ek tab ki save doosre tab ki values ko wipe na kare.
    Upar wala topbar Save button bhi yehi routine chalata hai. */
-async function persistAllSettings(){
+/* ---------- (A) Luxury auto-seed: theme-apply par 7 categories ----------    Jab admin Appearance se Luxury theme save karta hai aur store ka Luxury    content bilkul khaali hai (tiles/tabs/banners/reels — sab khaali), to 7    Luxury categories auto-ban jati hain jo store mein pehle se na hon.    VALUES seed nahi hoti (na shopnest ki, na images/handle) — sirf structure.    Kabhi overwrite nahi: koi bhi Luxury list non-empty ho to kuch nahi hota.    Seed condition "values empty" hai, "keys absent" nahi — persistAllSettings    har Save par poora merged object likhta hai, is liye khaali keys DB mein    maujood hoti hain. */ const LUXURY_CATEGORIES = ["Luxury", "Daily Wear", "Embroidered", "Pret", "Luxury Pret", "Daily Wear Pret", "Embroidered Pret"]; async function seedLuxuryCategories(savedData){   const empty = v => !Array.isArray(v) || v.length === 0;   try {     if (!savedData || savedData.theme !== "luxury") return { created: 0, skipped: true };     if (!empty(savedData.luxuryTiles) || !empty(savedData.luxuryTabs) || !empty(savedData.luxuryRtwTabs) || !empty(savedData.luxuryBanners) || !empty(savedData.instaReels)) return { created: 0, skipped: true };     const { data: existing, error: e0 } = await sb.from("categories").select("name, sort").eq("store_id", STORE_ID);     if (e0) throw e0;     const have = new Set((existing || []).map(c => String(c.name || "").trim().toLowerCase()));     let maxSort = (existing || []).reduce((m, c) => Math.max(m, Number(c.sort) || 0), 0);     const missing = LUXURY_CATEGORIES.filter(n => !have.has(n.toLowerCase()));     if (!missing.length) return { created: 0, skipped: false };     const rows = missing.map(n => { maxSort += 1; return { store_id: STORE_ID, name: n, image: "", visible: true, sort: maxSort }; });     const { error } = await sb.from("categories").insert(rows);     if (error) throw error;     if (typeof loadCategories === "function") loadCategories();     showToast("👑 Luxury theme: " + rows.length + " categories ban gayin.", "ok");     return { created: rows.length, skipped: false };   } catch (e) {     showToast("Luxury categories seed fail: " + (e && e.message ? e.message : e), "err");     return { created: 0, error: e };   } } async function persistAllSettings(){
   const saveBtns = [...document.querySelectorAll(".js-save, #globalSaveBtn")];
   const savedLabels = saveBtns.map(b => b.innerHTML);
   saveBtns.forEach(b => { b.disabled = true; b.textContent = "Saving…"; });
@@ -2185,7 +2185,7 @@ async function persistAllSettings(){
        aata hai nayi row par). */
     const { error } = await sb.from("settings").upsert({ store_id: STORE_ID, data }, { onConflict: "store_id" });
     if (error) throw error;
-    SETTINGS_STATE = data;
+    SETTINGS_STATE = data; /* (A) Luxury auto-seed — theme save ho gaya, ab categories (agar khaali hon). Seed apni ghalti khud pakarta hai (toast) — save is se fail nahi hota. */ await seedLuxuryCategories(data);
     renderHeroEditor();
     const okText = "✅ Save ho gaya — store reload karke changes dekhein.";
     Object.values(msgEls).forEach(m => { if (m){ m.textContent = okText; m.className = "msg ok"; } });
