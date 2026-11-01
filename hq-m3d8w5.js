@@ -209,6 +209,8 @@ function renderStores(){
       <button class="btn small" data-feepaid="${esc(s.id)}">💰 Fee mili</button>
       <button class="btn small ghost" data-feeunpaid="${esc(s.id)}">⚠️ Fee baaki</button>
       <button class="btn small ghost" data-edit="${esc(s.id)}">✏️ Edit</button>
+      ${s.slug === "shopnest" ? "" : `<button class="btn small" data-luxcopy="${esc(s.id)}">👑 Luxury setup copy</button>`}
+      
       <button class="btn small danger" data-del="${esc(s.id)}">🗑 Delete</button>
     </div>
     <div class="store-edit hidden" data-editpanel="${esc(s.id)}">
