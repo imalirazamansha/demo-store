@@ -19,6 +19,9 @@
 <svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true">
   <defs>
     <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></g></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></g></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></g></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4.4 0 7-2.8 7-6.5 0-2.6-1.4-4.6-2.8-6.3-.4 1.2-1.2 2-2.2 2.4.3-2.7-.8-5.6-3-7.6-.3 1.9-1.1 3.3-2.4 4.3C7.2 9.6 5 11.6 5 15.5 5 19.2 7.6 22 12 22z"/></g></symbol>
     <symbol id="i-cart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></g></symbol>
     <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></symbol>
     <symbol id="i-bag" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></g></symbol>
@@ -69,6 +72,7 @@
 
 <header class="site-header" id="siteHeader">
   <div class="header-pill">
+    <button class="icon-btn" id="menuToggle" type="button" aria-label="Open menu"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg></button>
     <button class="icon-btn" id="searchToggle" type="button" aria-label="Search products"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></button>
     <a class="logo" href="#" id="logoHome" aria-label="Store home"><img id="logoImg" class="logo-img" alt="" hidden><span class="logo-bag"><svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg></span><span id="logoName">ShopNest</span></a>
     <div class="header-actions">
@@ -106,7 +110,7 @@
 <!-- V3.10 Luxury-only sections: Festive Edit tiles, Collection Tabs, Editorial Banner -->
   <section class="section wrap" id="festiveSection" data-section="festive" hidden>
     <p class="eyebrow">THE FESTIVE EDIT</p>
-    <h2 class="section-title">FESTIVE COUTURE EDIT</h2>
+    <h2 class="section-title">Festive Couture Edit</h2>
        <p class="section-sub">Celebrate every moment in timeless luxury and handcrafted festive wear.</p>
     <div class="festive-grid" id="festiveGrid"></div>
   </section>
@@ -114,14 +118,14 @@
 <!-- V3.11 Luxury: Unstitched + Ready To Wear (Asim Jofa jaisi do tabbed sections) -->
      <section class="section wrap" id="unstitchedSection" data-section="unstitched_tabs" hidden>
     <p class="eyebrow">SHOP BY COLLECTION</p>
-    <h2 class="section-title">UNSTITCHED</h2>
+    <h2 class="section-title">Unstitched</h2>
     <div class="lux-tabs" id="unstitchedTabs"></div>
     <div class="grid" id="unstitchedGrid"></div>
   </section>
 
      <section class="section wrap" id="rtwSection" data-section="readytowear_tabs" hidden>
           <p class="eyebrow">SHOP BY COLLECTION</p>
-          <h2 class="section-title">READY TO WEAR</h2>
+          <h2 class="section-title">Ready To Wear</h2>
           <div class="lux-tabs" id="rtwTabs"></div>
           <div class="grid" id="rtwGrid"></div>
    </section>
@@ -163,31 +167,36 @@
   <!-- V3.10 Luxury Filters sheet -->
   <div class="lux-sheet-backdrop" id="luxSheetBackdrop" hidden></div>
   <div class="lux-sheet" id="luxSheet" hidden role="dialog" aria-label="Filters">
+    <div class="sheet-handle" aria-hidden="true"></div>
     <div class="lux-sheet-head"><h3>FILTERS</h3><button class="icon-btn" id="luxSheetClose" type="button" aria-label="Band karein">✕</button></div>
-    <label class="checkline"><input type="checkbox" id="luxFOnSale"> Discount wale products (sale)</label>
-    <label class="checkline"><input type="checkbox" id="luxFInStock"> Sirf In Stock</label>
+    <div class="lux-sheet-block"><span class="opt-label">Discounts</span><label class="checkline"><input type="checkbox" id="luxFOnSale"> Discount wale products (sale)</label></div>
+    <div class="lux-sheet-block"><span class="opt-label">Category</span><div class="size-pills" id="luxFCatPills"></div></div>
     <div class="lux-sheet-row"><label>Min price (Rs)<input type="number" id="luxFMin" min="0" placeholder="0"></label><label>Max price (Rs)<input type="number" id="luxFMax" min="0" placeholder="Koi limit nahi"></label></div>
+    <div class="lux-sheet-block"><span class="opt-label">Pcs</span><div class="size-pills" id="luxFPcsPills"></div></div>
     <div class="lux-sheet-block"><span class="opt-label">Size</span><div class="size-pills" id="luxFSizePills"></div></div>
+    <div class="lux-sheet-block"><span class="opt-label">Availability</span><label class="checkline"><input type="checkbox" id="luxFInStock"> Sirf In Stock</label></div>
+    <div class="lux-sheet-block"><span class="opt-label">Fabric</span><div class="size-pills" id="luxFFabricPills"></div></div>
     <div class="lux-sheet-actions"><button class="btn ghost" id="luxFClear" type="button">CLEAR ALL</button><button class="btn primary" id="luxFApply" type="button">APPLY FILTERS</button></div>
   </div>
      <!-- V3.11 Luxury Collections popup (Menu) -->
      <div class="lux-sheet-backdrop" id="luxMenuBackdrop" hidden></div>
      <div class="lux-sheet" id="luxMenuSheet" hidden role="dialog" aria-label="Collections">
-          <div class="lux-sheet-head"><h3>COLLECTIONS</h3><button class="icon-btn" id="luxMenuClose" type="button" aria-label="Band karein">✕</button></div>
+          <div class="sheet-handle" aria-hidden="true"></div>
+          <div class="lux-sheet-head"><h3>Collections</h3><button class="icon-btn" id="luxMenuClose" type="button" aria-label="Band karein">✕</button></div>
           <div class="festive-grid" id="luxMenuGrid"></div>
      </div>
           <!-- V3.11 Luxury PKR chip -->
-          <button type="button" id="luxPkrChip" hidden>🇵🇰 PKR ⌄</button>
+          <button type="button" id="luxPkrChip" hidden><img src="https://flagcdn.com/w40/pk.png" alt="Pakistan flag" class="pkr-flag"> PKR ⌄</button>
 
   <section class="section wrap" id="promoSection" data-section="promos"><div class="promo-grid" id="promoGrid"></div></section>
 
   <section class="section section-alt" id="hotSection" data-section="hot">
     <div class="wrap">
       <div class="section-head-row">
-        <div><p class="eyebrow">Trending Now</p><h2 class="section-title left">HOT SELLING THIS WEEK</h2></div>
+        <div><p class="eyebrow">Trending Now</p><h2 class="section-title left">Trending Products</h2></div>
         <div class="carousel-arrows"><button class="arrow-btn" id="hotPrev" type="button" aria-label="Previous hot products">‹</button><button class="arrow-btn" id="hotNext" type="button" aria-label="Next hot products">›</button></div>
       </div>
-      <div class="trend-toolbar" id="trendToolbar" hidden> <select id="trendCat" aria-label="Collection"></select> <button class="icon-btn" id="trendPause" type="button" aria-label="Auto-slide rokain/chalayein">⏸</button> <select id="trendSort" aria-label="Sort"> <option value="popular">Most Popular</option> <option value="price-low">Price: Low to High</option> <option value="price-high">Price: High to Low</option> <option value="rating">Top Rated</option> </select> <button class="btn outline" id="trendFilterBtn" type="button">⚙ Filter</button> </div> <div class="h-track" id="hotTrack"></div>
+      <div class="trend-toolbar" id="trendToolbar" hidden> <div class="trend-drop"><button class="trend-btn" id="trendCatBtn" type="button" aria-haspopup="true" aria-expanded="false">All Collections ⌄</button><div class="trend-menu" id="trendCatMenu" hidden></div></div> <button class="icon-btn" id="trendPause" type="button" aria-label="Auto-slide rokain/chalayein">⏸</button> <div class="trend-drop"><button class="trend-btn" id="trendSortBtn" type="button" aria-haspopup="true" aria-expanded="false">Sort: Newest ⌄</button><div class="trend-menu" id="trendSortMenu" hidden><button type="button" data-trendsort="newest">Newest</button><button type="button" data-trendsort="price-low">Price: Low to High</button><button type="button" data-trendsort="price-high">Price: High to Low</button><button type="button" data-trendsort="popular">Most Popular</button></div></div> <button class="btn outline" id="trendFilterBtn" type="button">⚙ Filter</button> </div> <div class="h-track" id="hotTrack"></div>
       <div class="center-action"><button class="btn primary wide" id="hotOrderBtn" type="button">ORDER NOW</button></div>
       <p class="trust-checklist"><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg> SMART PRODUCTS &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> QUALITY CHECKED &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg> CASH ON DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> FAST DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-returns"/></svg> EASY EXCHANGE</p>
     </div>
@@ -195,7 +204,7 @@
 
   <section class="section wrap" id="newSection" data-section="new_arrivals">
     <p class="eyebrow">JUST LAUNCHED</p>
-    <h2 class="section-title">NEW ARRIVALS</h2>
+    <h2 class="section-title">New Arrivals</h2>
     <div class="grid" id="newGrid"></div>
     <div class="center-action"><button class="btn outline wide" id="viewNewBtn" type="button">VIEW ALL NEW ARRIVALS</button></div>
   </section>
@@ -265,6 +274,9 @@
       <div class="qty-row"><span>Quantity</span><button class="qty-btn" id="pdpMinus" type="button">−</button><strong id="pdpQty">1</strong><button class="qty-btn" id="pdpPlus" type="button">+</button></div>
       <button class="btn outline big" id="pdpAdd" type="button">ADD TO CART</button>
       <button class="btn primary big" id="pdpOrder" type="button"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> ORDER NOW</button>
+      <p class="pdp-disclaimer" id="pdpDisclaimer" hidden><strong>Disclaimer:</strong> Color of this outfit may slightly vary due to photographic lighting sources or your device settings.</p>
+      <p class="pdp-delivery-lines" id="pdpDeliveryLines" hidden>Local Delivery 5 - 7 working days<br>International Delivery 10 - 14 working days</p>
+      <div class="pdp-badges" id="pdpBadges" hidden><span class="pdp-badge"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Secure payment methods</span><span class="pdp-badge"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg> Buyers Protection</span></div>
       <div class="delivery-widget">
         <p><strong id="pdpEtaText">Get it by —</strong><span>Delivery estimate</span></p>
         <div class="delivery-track"><i class="done"></i><i class="done mid"></i><i></i></div>
@@ -403,10 +415,10 @@
 <script src="script.js"></script>
 <!-- V3.10 Luxury bottom nav (mobile) -->
 <nav id="luxBottomNav" aria-label="Store navigation" hidden>
-  <button type="button" data-luxnav="home">⌂<span>Home</span></button> <button type="button" data-luxnav="menu">☰<span>Menu</span></button>
-  <button type="button" data-luxnav="new">✦<span>New In</span></button>
-  <button type="button" data-luxnav="search">⌕<span>Search</span></button>
-  <button type="button" data-luxnav="cart">🛒<span>Cart</span><b class="lux-nav-badge" id="luxNavCartCount" hidden>0</b></button>
+  <button type="button" data-luxnav="home"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span>Home</span></button> <button type="button" data-luxnav="menu"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg><span>Menu</span></button>
+  <button type="button" data-luxnav="new"><svg class="ic" aria-hidden="true"><use href="#i-flame"/></svg><span>New In</span></button>
+  <button type="button" data-luxnav="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span>Search</span></button>
+  <button type="button" data-luxnav="cart"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg><span>Cart</span><b class="lux-nav-badge" id="luxNavCartCount" hidden>0</b></button>
 </nav>
 
 </body>
