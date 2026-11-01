@@ -397,12 +397,12 @@ function luxCopyResultHtml(r){
   lines.push(r.copyProducts ? `Products: ${r.prodsCopied} copy hue, ${r.prodsSkipped} naam pehle se maujood the (skip).` : "Products: copy nahi hue (checkbox OFF — default).");
   r.notes.forEach(n => lines.push("ℹ️ " + esc(n)));
   if (r.filled.indexOf("instaHandle") !== -1) lines.push("⚠️ Instagram handle 'shopnest.demo' copy hua — apna handle store admin → Content tab se badal lein.");
-  if (r.orderNote) lines.push("ℹ️ " + esc(r.orderNote));
-  if (!r.filled.length && !r.catsCreated && !r.themeSet && !r.copyProducts) lines.push("Kuch nahi badla — sab kuch pehle se maujood/configured tha (dobara chalane par bhi yahi hoga).");
+  if (r.orderAppended && r.orderAppended.length) lines.push("✅ Homepage order: Luxury sections add kar diye gaye: " + esc(r.orderAppended.join(", ")) + ".");
+  if (!r.filled.length && !r.catsCreated && !r.themeSet && !r.copyProducts && !(r.orderAppended && r.orderAppended.length)) lines.push("Kuch nahi badla — sab kuch pehle se maujood/configured tha (dobara chalane par bhi yahi hoga).");
   return lines.join("<br>");
 }
 
-async function runLuxuryCopy(targetId, opts){
+/* ---------- Sections-order follow-up — (B) copy ke waqt missing Luxury keys append karo ---------- */ /* Sirf Luxury-only sections (LUXURY_ONLY_SECTIONS) — Luxury defaultOrder ki tartib mein. hero / new_arrivals / reels / hot generic sections hain — unhein append karna owner ki deliberate removal ko wapas la sakta hai, is liye in 4 tak mehdood hai. */ const LUXURY_ORDER_KEYS = ["festive", "unstitched_tabs", "readytowear_tabs", "editorial"]; /* sections_order {key, visible} OBJECTS ki list hoti hai (plain strings nahi). Sirf woh keys append karo jo bilkul maujood nahi hain — maujooda tartib kabhi nahi badalni; visible:false wali entry bhi "maujood" hai (owner ne chhupayi hai). Saved order na ho (null/absent/khaali []) to kuch nahi karna — storefront tab theme defaultOrder istemal karta hai. Appended keys ki list return hoti hai. */ function appendMissingLuxuryOrderKeys(merged){ const so = merged.sections_order; if (!Array.isArray(so) || !so.length) return []; const have = new Set(so.map(e => (e && typeof e.key === "string") ? e.key : e)); const appended = []; merged.sections_order = so.slice(); LUXURY_ORDER_KEYS.forEach(k => { if (!have.has(k)){ merged.sections_order.push({ key: k, visible: true }); appended.push(k); } }); return appended; } async function runLuxuryCopy(targetId, opts){
   const target = STORES.find(s => s.id === targetId);
   const src = STORES.find(s => s.slug === SHOPNEST_SRC_SLUG && s.status !== "deleted");
   if (!target) throw new Error("Target store nahi mili.");
@@ -412,7 +412,7 @@ async function runLuxuryCopy(targetId, opts){
 
   const steps = [];
   const filled = [], skipped = [], notes = [];
-  let catsCreated = 0, prodsCopied = 0, prodsSkipped = 0, themeSet = false, orderNote = "";
+  let catsCreated = 0, prodsCopied = 0, prodsSkipped = 0, themeSet = false;
 
   try {
     /* 1) Categories — 7 Luxury naam; jo naam target pe hai woh skip. */
@@ -469,7 +469,7 @@ async function runLuxuryCopy(targetId, opts){
       themeSet = true;
     }
 
-    if (settingsDirty){
+    /* 3b) Homepage order — missing Luxury keys end par append karo (object form). Saved order na ho (null/khaali) to kuch nahi — storefront tab theme defaultOrder istemal karta hai. Append hua to settings save karni hai. */ const orderAppended = appendMissingLuxuryOrderKeys(merged); if (orderAppended.length) settingsDirty = true;     if (settingsDirty){
       const { error: eu } = await sb.from("settings").upsert({ store_id: targetId, data: merged }, { onConflict: "store_id" });
       if (eu) throw new Error("Settings save: " + eu.message);
       STORE_SETTINGS[targetId] = merged;
@@ -495,13 +495,13 @@ async function runLuxuryCopy(targetId, opts){
       steps.push(`✅ Products: ${prodsCopied} copy hue, ${prodsSkipped} naam pehle se maujood the (skip)`);
     }
 
-    /* 5) Homepage order note — Luxury sections order mein hain ya nahi. */
-    const so = merged.sections_order;
-    if (Array.isArray(so) && so.length && !["festive", "unstitched_tabs", "readytowear_tabs", "editorial"].some(k => so.indexOf(k) !== -1))
-      orderNote = "Homepage order mein Luxury sections (Festive / Unstitched Tabs / RTW Tabs / Editorial) nahi hain — store admin → Homepage builder se add karein, warna storefront par nahi dikhenge.";
+    /* 5) Homepage order — step 3b mein missing Luxury keys append ho chuki hain (upsert se pehle, taake save ho jayen). Yahan sirf audit + return. */
+  
+  
 
-    audit("luxury_setup_copied", targetId, { source: src.slug, categories_created: catsCreated, settings_filled: filled, theme_set: themeSet, products_copied: prodsCopied });
-    return { target, src, catsCreated, catsSkipped, filled, skipped, notes, themeSet, copyProducts, prodsCopied, prodsSkipped, orderNote, steps };
+
+    audit("luxury_setup_copied", targetId, { source: src.slug, categories_created: catsCreated, settings_filled: filled, theme_set: themeSet, products_copied: prodsCopied, order_appended: orderAppended });
+    return { target, src, catsCreated, catsSkipped, filled, skipped, notes, themeSet, copyProducts, prodsCopied, prodsSkipped, orderAppended, steps };
   } catch (e) {
     e.stepsDone = steps.slice();
     throw e;
