@@ -1,0 +1,88 @@
+/* ================= ShopNest Themes V4 — Theme Registry =================
+   V4 Phase 1: registry + Luxury as data — NO behaviour change.
+   This file is DATA, not logic: it only declares what each theme is.
+   No existing global is changed; nothing here runs on its own.
+   Load order (index.html, Phase 1): supabase CDN -> themes.js -> themes-v4.js -> script.js
+   SHOPNEST_THEME_DEF(key) returns the def for a theme key, or null.
+   Luxury is theme #1: 8 sections, 13 settings keys, fallbacks, copyProfile,
+   cssScope "theme-luxury", 5-button bottom nav, PDP block.
+   Sections: hero, new_arrivals, festive, unstitched_tabs, readytowear_tabs,
+   editorial, reels, hot — hero and new_arrivals are declared but NOT
+   dispatched in Phase 1 (renderHero / renderInto:newGrid stay direct).
+   Reels dispatch to renderReels (NOT renderReelsLuxury — that stays
+   inside renderReels for the Luxury path).
+   showDisclaimer is deferred: the schema carries it, the storefront
+   does not define it, so the PDP toggle stays dead in Phase 1.
+   onlySections: Luxury-only sections are festive, unstitched_tabs,
+   readytowear_tabs, editorial; the playful stub also carries
+   onlySections ["featured", "blog"].
+   Stubs for the other 6 V3 themes carry {key, v3} only — their data
+   lands in later phases; Phase 1 must not invent it.
+   If themes-v4.js fails to load, every Phase 1 helper in script.js
+   falls back to the old literals / calls — the storefront still
+   works exactly as before. */
+(function(){
+/* V3 entry lookup — defensive: themes.js failed to load to bhi crash nahi. */
+function v3entry(key){
+try { return (window.SHOPNEST_THEME ? window.SHOPNEST_THEME(key) : null); } catch (e){ return null; }
+}
+window.SHOPNEST_THEME_DEFS = {
+luxury: {
+key: "luxury",
+v3: v3entry("luxury"),
+sections: [
+{ key: "hero", render: "renderHero" },
+{ key: "new_arrivals", render: "renderInto:newGrid" },
+{ key: "festive", render: "renderFestive" },
+{ key: "unstitched_tabs", render: "renderUnstitchedTabs" },
+{ key: "readytowear_tabs", render: "renderRtwTabs" },
+{ key: "editorial", render: "renderEditorial" },
+{ key: "reels", render: "renderReels" },
+{ key: "hot", render: "renderTrending" }
+],
+onlySections: ["festive", "unstitched_tabs", "readytowear_tabs", "editorial"],
+defaultOrder: ["hero", "new_arrivals", "festive", "unstitched_tabs", "readytowear_tabs", "editorial", "reels", "hot"],
+settingsSchema: {
+luxuryTiles: { type: "list", fields: ["label", "cat", "img"], max: 4, keep: "any" },
+luxuryTabs: { type: "list", fields: ["label", "cat"], max: 4, keep: "any" },
+luxuryRtwTabs: { type: "list", fields: ["label", "cat"], max: 4, keep: "any" },
+luxuryBanners: { type: "list", fields: ["img", "eyebrow", "title", "button", "cat"], max: 4, keep: "img" },
+luxuryBanner: { type: "object", fields: ["img", "eyebrow", "title", "button", "cat"], legacy: true },
+instaHandle: { type: "string" },
+instaReels: { type: "list", fields: ["user", "avatar", "video", "poster", "title"], max: null, keep: "all" },
+collectionPages: { type: "list", fields: ["key", "title", "cat", "img"], max: 4, keep: "key" },
+sectionText: { type: "map", kind: "open", fields: ["eyebrow", "title"] },
+pdpText: { type: "map", kind: "fixed", keys: ["details", "related", "delivery"] },
+showSizes: { type: "boolean", default: true },
+showColors: { type: "boolean", default: true },
+showDisclaimer: { type: "boolean", default: true, deferred: true }
+},
+fallbacks: {
+luxuryTiles: "named4",
+luxuryTabs: "defaultLuxTabs",
+luxuryRtwTabs: "defaultLuxRtwTabs",
+luxuryBanners: "legacySingle"
+},
+copyProfile: {
+categories: ["Luxury", "Daily Wear", "Embroidered", "Pret", "Luxury Pret", "Daily Wear Pret", "Embroidered Pret"],
+copyKeys: ["luxuryTiles", "luxuryTabs", "luxuryRtwTabs", "luxuryBanners", "instaHandle", "instaReels", "collectionPages", "sectionText", "pdpText", "showSizes", "showColors", "showDisclaimer"],
+seedWhen: "theme==luxury AND all 5 lists empty",
+orderKeys: ["festive", "unstitched_tabs", "readytowear_tabs", "editorial"],
+productsNote: "12 demo products (ids 103-114) — default OFF"
+},
+cssScope: "theme-luxury",
+nav: { bottom: ["menu", "unstitched", "stitched", "new", "cart"] },
+pdp: { fabric: true, trustBadges: 5, options: true }
+},
+general: { key: "general", v3: v3entry("general") },
+fashion: { key: "fashion", v3: v3entry("fashion") },
+beauty: { key: "beauty", v3: v3entry("beauty") },
+electronics: { key: "electronics", v3: v3entry("electronics") },
+food: { key: "food", v3: v3entry("food") },
+playful: { key: "playful", v3: v3entry("playful"), onlySections: ["featured", "blog"] }
+};
+window.SHOPNEST_THEME_DEF = function(key){
+var defs = window.SHOPNEST_THEME_DEFS || {};
+return (key && defs[key]) ? defs[key] : null;
+};
+})();
