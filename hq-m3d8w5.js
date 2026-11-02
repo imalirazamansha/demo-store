@@ -209,7 +209,7 @@ function renderStores(){
       <button class="btn small" data-feepaid="${esc(s.id)}">💰 Fee mili</button>
       <button class="btn small ghost" data-feeunpaid="${esc(s.id)}">⚠️ Fee baaki</button>
       <button class="btn small ghost" data-edit="${esc(s.id)}">✏️ Edit</button>
-      ${s.slug === "shopnest" ? "" : `<button class="btn small" data-luxcopy="${esc(s.id)}">👑 Luxury setup copy</button>`}
+      ${s.slug === "shopnest" ? "" : `<button class="btn small" data-luxcopy="${esc(s.id)}">👑 ${esc(v4ThemeDisplayName("luxury"))} setup copy</button>`}
       <button class="btn small danger" data-del="${esc(s.id)}">🗑 Delete</button>
     </div>
     <div class="store-edit hidden" data-editpanel="${esc(s.id)}">
@@ -244,12 +244,12 @@ function renderStores(){
       </div>
     </div>
   </div>`; }).join("");
-  reinjectLuxCopyResult(wrap);
+  reinjectThemeCopyResult(wrap);
  bindStoreActions(wrap);
 }
 function bindStoreActions(wrap){
   wrap.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyText(b.dataset.copy, b));
- wrap.querySelectorAll("[data-luxcopy]").forEach(b => b.onclick = () => openLuxCopyPanel(b.dataset.luxcopy, b));
+ wrap.querySelectorAll("[data-luxcopy]").forEach(b => b.onclick = () => openThemeCopyPanel("luxury", b.dataset.luxcopy, b));
   wrap.querySelectorAll("[data-suspend]").forEach(b => b.onclick = async () => {
     const s = STORES.find(x => x.id === b.dataset.suspend);
     if (!confirm(`"${s.name}" ko SUSPEND kar dein? Storefront band ho jayega (data mehfooz rahega).`)) return;
@@ -357,19 +357,43 @@ async function storeUpdate(id, payload){
   else loadStores();
 }
 
-/* ---------- Luxury setup copy (B) — shopnest se aik click mein ---------- */
+/* ---------- V4 Phase 3: theme copy — def-driven (runThemeCopy) ---------- */
+   Copy profile (categories, copyKeys, sourceSlug, displayName, setThemeDefault,
+                 copyProductsDefault, reelsMp4Only, productsLabel, productsWarning) hamesha def
+      (themes-v4.js) se aata hai — file ke andar koi theme-specific value hardcoded nahi.
+      Luxury ke liye def wahi values deta hai jo pehle yahan likhi thin, is liye result
+      byte-identical rehta hai. Def na mile to copy saaf error ke saath ruk jata hai
+         (koi aadha kaam nahi hota). */
+function v4ThemeCopyProfile(themeKey){
+   var def = (typeof window!== "undefined" && typeof window.SHOPNEST_THEME_DEF === "function")? window.SHOPNEST_THEME_DEF(themeKey): null;
+   if (!def ||!def.copyProfile) return null;
+   return def.copyProfile;
+}
+function v4ThemeDisplayName(themeKey){
 
-const LUXURY_CATEGORIES = ["Luxury", "Daily Wear", "Embroidered", "Pret", "Luxury Pret", "Daily Wear Pret", "Embroidered Pret"];
+   var profile = v4ThemeCopyProfile(themeKey);
+   if (profile && profile.displayName) return profile.displayName;
+   return themeKey? (themeKey.charAt(0).toUpperCase() + themeKey.slice(1)): "Luxury";
+         }
+function v4ThemeSourceSlug(themeKey){
+   var profile = v4ThemeCopyProfile(themeKey);
+   return (profile && profile.sourceSlug)? profile.sourceSlug: "shopnest";
+}
+function v4CapFirst(s){
+   s = String(s || "");
+   return s? (s.charAt(0).toUpperCase() + s.slice(1)): s;
+}
 
-const LUXURY_COPY_KEYS = ["luxuryTiles", "luxuryTabs", "luxuryRtwTabs", "luxuryBanners", "instaHandle", "instaReels", "collectionPages", "sectionText", "pdpText", "showSizes", "showColors", "showDisclaimer"];
+/* ---------- Theme setup copy (B) — def-driven, aik click mein ---------- */
+/* (B) ke saare theme values ab def ke copyProfile mein hain
+   (themes-v4.js) — categories, copyKeys, sourceSlug. Yahan koi
+   hardcoded list nahi rehti. */
 
-const SHOPNEST_SRC_SLUG = "shopnest";
-
-let LAST_LUX_COPY = null;   /* aakhri copy ka result — loadStores() ke baad dobara dikhane ke liye */
+let LAST_THEME_COPY = null;   /* aakhri copy ka result — loadStores() ke baad dobara dikhane ke liye */
 
 /* "Khaali" ka matlab: key maujood hi nahi, ya value khaali hai.
    boolean false / number 0 CONFIGURED value hain — kabhi overwrite nahi. */
-function isEmptyLuxVal(key, v){
+function isEmptyCopyVal(key, v){
   if (v === undefined || v === null) return true;
   if (typeof v === "string") return v.trim() === "";
   if (Array.isArray(v)) return v.length === 0;
@@ -387,27 +411,32 @@ function isMp4Url(u){
   return typeof u === "string" && /\.mp4(\?|#|$)/i.test(u.trim());
 }
 
-function luxCopyResultHtml(r){
+function themeCopyResultHtml(r){
   const lines = [];
-  lines.push(`<strong>✅ Luxury setup copy ho gaya — "${esc(r.target.name)}"</strong>`);
+  lines.push(`<strong>✅ ${esc(r.themeName || "Luxury")} setup copy ho gaya — "${esc(r.target.name)}"</strong>`);
   lines.push(`Categories: ${r.catsCreated} ban gayin, ${r.catsSkipped} pehle se maujood thin.`);
   lines.push(r.filled.length ? `Settings bhari gayin: ${esc(r.filled.join(", "))}.` : "Settings: koi khaali key nahi thi — kuch copy nahi hua.");
   if (r.skipped.length) lines.push(`Skip (pehle se configured): ${esc(r.skipped.join(", "))}.`);
-  lines.push(r.themeSet ? "Theme: Luxury set ho gaya." : "Theme: nahi badla (checkbox OFF tha).");
+  lines.push(r.themeSet ? "Theme: ${esc(r.themeName || "Luxury")} set ho gaya." : "Theme: nahi badla (checkbox OFF tha).");
   lines.push(r.copyProducts ? `Products: ${r.prodsCopied} copy hue, ${r.prodsSkipped} naam pehle se maujood the (skip).` : "Products: copy nahi hue (checkbox OFF — default).");
   r.notes.forEach(n => lines.push("ℹ️ " + esc(n)));
-  if (r.filled.indexOf("instaHandle") !== -1) lines.push("⚠️ Instagram handle 'shopnest.demo' copy hua — apna handle store admin → Content tab se badal lein.");
-  if (r.orderAppended && r.orderAppended.length) lines.push("✅ Homepage order: Luxury sections add kar diye gaye: " + esc(r.orderAppended.join(", ")) + ".");
+  if (r.filled.indexOf("instaHandle") !== -1) lines.push("⚠️ Instagram handle '${esc(r.copiedHandle || "")}' copy hua — apna handle store admin → Content tab se badal lein.");
+  if (r.orderAppended && r.orderAppended.length) lines.push("✅ Homepage order: ${esc(r.themeName || "Luxury")} sections add kar diye gaye: " + esc(r.orderAppended.join(", ")) + ".");
   if (!r.filled.length && !r.catsCreated && !r.themeSet && !r.copyProducts && !(r.orderAppended && r.orderAppended.length)) lines.push("Kuch nahi badla — sab kuch pehle se maujood/configured tha (dobara chalane par bhi yahi hoga).");
   return lines.join("<br>");
 }
 
-/* ---------- Sections-order follow-up — (B) copy ke waqt missing Luxury keys append karo ---------- */ /* Sirf Luxury-only sections (LUXURY_ONLY_SECTIONS) — Luxury defaultOrder ki tartib mein. hero / new_arrivals / reels / hot generic sections hain — unhein append karna owner ki deliberate removal ko wapas la sakta hai, is liye in 4 tak mehdood hai. */ const LUXURY_ORDER_KEYS = ["festive", "unstitched_tabs", "readytowear_tabs", "editorial"]; /* sections_order {key, visible} OBJECTS ki list hoti hai (plain strings nahi). Sirf woh keys append karo jo bilkul maujood nahi hain — maujooda tartib kabhi nahi badalni; visible:false wali entry bhi "maujood" hai (owner ne chhupayi hai). Saved order na ho (null/absent/khaali []) to kuch nahi karna — storefront tab theme defaultOrder istemal karta hai. Appended keys ki list return hoti hai. */ function appendMissingLuxuryOrderKeys(merged){ const so = merged.sections_order; if (!Array.isArray(so) || !so.length) return []; const have = new Set(so.map(e => (e && typeof e.key === "string") ? e.key : e)); const appended = []; merged.sections_order = so.slice(); LUXURY_ORDER_KEYS.forEach(k => { if (!have.has(k)){ merged.sections_order.push({ key: k, visible: true }); appended.push(k); } }); return appended; } async function runLuxuryCopy(targetId, opts){
+/* ---------- Sections-order follow-up — (B) copy ke waqt missing theme keys append karo ---------- */ /* Sirf theme-only sections (def copyProfile.orderKeys) — Luxury defaultOrder ki tartib mein. hero / new_arrivals / reels / hot generic sections hain — unhein append karna owner ki deliberate removal ko wapas la sakta hai, is liye in 4 tak mehdood hai. */ function appendMissingOrderKeys(merged, def){ const keys = (def && def.copyProfile && Array.isArray(def.copyProfile.orderKeys))? def.copyProfile.orderKeys: []; const so = merged.sections_order; if (!Array.isArray(so) ||!so.length) return []; const have = new Set(so.map(e => (e && typeof e.key === "string")? e.key: e)); const appended = []; merged.sections_order = so.slice(); keys.forEach(k => { if (!have.has(k)){ merged.sections_order.push({ key: k, visible: true}); appended.push(k);}}); return appended;} async function runThemeCopy(themeKey, targetId, opts){
+   var def = (typeof window!== "undefined" && typeof window.SHOPNEST_THEME_DEF === "function")? window.SHOPNEST_THEME_DEF(themeKey): null;
+   var profile = (def && def.copyProfile)? def.copyProfile: null;
+   if (!profile) throw new Error("Is theme ke liye copy profile nahi hai — themes-v4.js load nahi hua ya def mein copyProfile nahi.");
+   var displayName = profile.displayName || themeKey;
+   let copiedHandle = null;
   const target = STORES.find(s => s.id === targetId);
-  const src = STORES.find(s => s.slug === SHOPNEST_SRC_SLUG && s.status !== "deleted");
+  const src = STORES.find(s => s.slug === profile.sourceSlug && s.status !== "deleted");
   if (!target) throw new Error("Target store nahi mili.");
-  if (!src) throw new Error("Source store 'shopnest' nahi mili.");
-  if (src.id === targetId) throw new Error("Shopnest khud source hai — us par copy nahi chal sakta.");
+  if (!src) throw new Error("Source store '" + profile.sourceSlug + "' nahi mili.");
+  if (src.id === targetId) throw new Error(v4CapFirst(profile.sourceSlug) + " khud source hai — us par copy nahi chal sakta.");
   if (target.status === "deleted") throw new Error("Deleted store par copy nahi chal sakta.");
 
   const steps = [];
@@ -416,21 +445,21 @@ function luxCopyResultHtml(r){
 
   try {
     /* 1) Categories — 7 Luxury naam; jo naam target pe hai woh skip. */
-    const { data: srcCats, error: ec1 } = await sb.from("categories").select("name, image, visible, sort").eq("store_id", src.id).in("name", LUXURY_CATEGORIES);
+    const { data: srcCats, error: ec1 } = await sb.from("categories").select("name, image, visible, sort").eq("store_id", src.id).in("name", profile.categories);
     if (ec1) throw new Error("Source categories: " + ec1.message);
     const { data: tgtCats, error: ec2 } = await sb.from("categories").select("name").eq("store_id", targetId);
     if (ec2) throw new Error("Target categories: " + ec2.message);
     const haveNames = new Set((tgtCats || []).map(c => c.name));
     const srcCatByName = {};
     (srcCats || []).forEach(c => { srcCatByName[c.name] = c; });
-    const missing = LUXURY_CATEGORIES.filter(n => !haveNames.has(n));
+    const missing = profile.categories.filter(n => !haveNames.has(n));
     if (missing.length){
       const rows = missing.map(n => { const sc = srcCatByName[n] || {}; return { store_id: targetId, name: n, image: sc.image || "", visible: sc.visible !== false, sort: sc.sort ?? 0 }; });
       const { error: ei } = await sb.from("categories").insert(rows);
       if (ei) throw new Error("Categories insert: " + ei.message);
       catsCreated = missing.length;
     }
-    const catsSkipped = LUXURY_CATEGORIES.length - catsCreated;
+    const catsSkipped = profile.categories.length - catsCreated;
     steps.push(`✅ Categories: ${catsCreated} ban gayin, ${catsSkipped} pehle se maujood thin (skip)`);
 
     /* 2) Settings — fresh read, per-key sirf khaali keys bharo. */
@@ -442,34 +471,35 @@ function luxCopyResultHtml(r){
     const merged = { ...((tgtSet && tgtSet.data) || {}) };
     let settingsDirty = false;
 
-    LUXURY_COPY_KEYS.forEach(k => {
+    profile.copyKeys.forEach(k => {
       if (k === "instaReels"){
-        const filtered = Array.isArray(srcData.instaReels) ? srcData.instaReels.filter(r => r && isMp4Url(r.video)) : [];
-        if (!filtered.length){ notes.push("Reels: source mein koi direct MP4 reel nahi — instaReels copy nahi hua."); return; }
-        if (isEmptyLuxVal(k, merged[k])){ merged[k] = JSON.parse(JSON.stringify(filtered)); filled.push(k + " (" + filtered.length + " reels)"); settingsDirty = true; }
+        const mp4Only = profile.reelsMp4Only!== false;
+         const filtered = Array.isArray(srcData.instaReels) ? srcData.instaReels.filter(r => r && (!mp4Only || isMp4Url(r.video))) : [];
+        if (!filtered.length){ notes.push(mp4Only ? "Reels: source mein koi direct MP4 reel nahi — instaReels copy nahi hua." : "Reels: source mein koi reel nahi — instaReels copy nahi hua."); return; }
+        if (isEmptyCopyVal(k, merged[k])){ merged[k] = JSON.parse(JSON.stringify(filtered)); filled.push(k + " (" + filtered.length + " reels)"); settingsDirty = true; }
         else skipped.push(k);
         return;
       }
       const sv = srcData[k];
       if (sv === undefined || sv === null){ notes.push(k + ": source pe khaali — copy nahi hua."); return; }
-      if (isEmptyLuxVal(k, sv)){ notes.push(k + ": source pe khaali — copy nahi hua."); return; }
-      if (isEmptyLuxVal(k, merged[k])){ merged[k] = JSON.parse(JSON.stringify(sv)); filled.push(k); settingsDirty = true; }
+      if (isEmptyCopyVal(k, sv)){ notes.push(k + ": source pe khaali — copy nahi hua."); return; }
+      if (isEmptyCopyVal(k, merged[k])){ merged[k] = JSON.parse(JSON.stringify(sv)); filled.push(k); settingsDirty = true; if (k === "instaHandle") copiedHandle = sv; }
       else skipped.push(k);
     });
 
     /* 3) Theme — checkbox ON ho to settings.theme + stores.theme dono Luxury. */
     if (opts.setTheme){
-      merged.theme = "luxury";
+      merged.theme = themeKey;
       settingsDirty = true;
-      const storePatch = { theme: "luxury" };
-      if (Array.isArray(target.allowed_themes) && target.allowed_themes.length > 0 && target.allowed_themes.indexOf("luxury") === -1)
-        storePatch.allowed_themes = [...target.allowed_themes, "luxury"];
+      const storePatch = { theme: themeKey };
+      if (Array.isArray(target.allowed_themes) && target.allowed_themes.length > 0 && target.allowed_themes.indexOf(themeKey) === -1)
+        storePatch.allowed_themes = [...target.allowed_themes, themeKey];
       const { error: et } = await sb.from("stores").update(storePatch).eq("id", targetId);
       if (et) throw new Error("Theme set: " + et.message);
       themeSet = true;
     }
 
-    /* 3b) Homepage order — missing Luxury keys end par append karo (object form). Saved order na ho (null/khaali) to kuch nahi — storefront tab theme defaultOrder istemal karta hai. Append hua to settings save karni hai. */ const orderAppended = appendMissingLuxuryOrderKeys(merged); if (orderAppended.length) settingsDirty = true;     if (settingsDirty){
+    /* 3b) Homepage order — missing theme keys end par append karo (object form). Saved order na ho (null/khaali) to kuch nahi — storefront tab theme defaultOrder istemal karta hai. Append hua to settings save karni hai. */ const orderAppended = appendMissingOrderKeys(merged, def); if (orderAppended.length) settingsDirty = true;     if (settingsDirty){
       const { error: eu } = await sb.from("settings").upsert({ store_id: targetId, data: merged }, { onConflict: "store_id" });
       if (eu) throw new Error("Settings save: " + eu.message);
       STORE_SETTINGS[targetId] = merged;
@@ -479,7 +509,7 @@ function luxCopyResultHtml(r){
     let copyProducts = false;
     if (opts.copyProducts){
       copyProducts = true;
-      const { data: srcProds, error: ep1 } = await sb.from("products").select("*").eq("store_id", src.id).in("cat", LUXURY_CATEGORIES);
+      const { data: srcProds, error: ep1 } = await sb.from("products").select("*").eq("store_id", src.id).in("cat", profile.categories);
       if (ep1) throw new Error("Source products: " + ep1.message);
       const { data: tgtProds, error: ep2 } = await sb.from("products").select("name").eq("store_id", targetId);
       if (ep2) throw new Error("Target products: " + ep2.message);
@@ -495,35 +525,40 @@ function luxCopyResultHtml(r){
       steps.push(`✅ Products: ${prodsCopied} copy hue, ${prodsSkipped} naam pehle se maujood the (skip)`);
     }
 
-    /* 5) Homepage order — step 3b mein missing Luxury keys append ho chuki hain (upsert se pehle, taake save ho jayen). Yahan sirf audit + return. */
+    /* 5) Homepage order — step 3b mein missing theme keys append ho chuki hain (upsert se pehle, taake save ho jayen). Yahan sirf audit + return. */
   
   
 
 
-    audit("luxury_setup_copied", targetId, { source: src.slug, categories_created: catsCreated, settings_filled: filled, theme_set: themeSet, products_copied: prodsCopied, order_appended: orderAppended });
-    return { target, src, catsCreated, catsSkipped, filled, skipped, notes, themeSet, copyProducts, prodsCopied, prodsSkipped, orderAppended, steps };
+    audit(themeKey + "_setup_copied", targetId, { source: src.slug, categories_created: catsCreated, settings_filled: filled, theme_set: themeSet, products_copied: prodsCopied, order_appended: orderAppended });
+    return { target, src, catsCreated, catsSkipped, filled, skipped, notes, themeSet, copyProducts, prodsCopied, prodsSkipped, orderAppended, steps, themeName: displayName, copiedHandle };
   } catch (e) {
     e.stepsDone = steps.slice();
     throw e;
   }
 }
 
-function openLuxCopyPanel(storeId, btn){
+/* Purana naam — alias, taa ke koi purana caller na toote. */
+async function runLuxuryCopy(targetId, opts){ return runThemeCopy("luxury", targetId, opts);}
+function openThemeCopyPanel(themeKey, storeId, btn){
   const card = btn.closest(".store-card");
   if (!card) return;
   const old = card.querySelector("[data-luxpanel]");
   if (old){ old.remove(); return; }   /* dobara click = band */
   const store = STORES.find(s => s.id === storeId);
+   var profile = v4ThemeCopyProfile(themeKey);
+   var displayName = v4ThemeDisplayName(themeKey);
+   var sourceSlug = v4ThemeSourceSlug(themeKey);
   const panel = document.createElement("div");
   panel.className = "domain-help";
   panel.setAttribute("data-luxpanel", "");
   panel.style.marginTop = "8px";
   panel.innerHTML = `
-    <strong>👑 Luxury setup copy — "${esc(store ? store.name : "")}"</strong><br>
-    Source: <strong>shopnest</strong> (sirf read — us mein kuch nahi badlega).<br>
-    <label class="checkline"><input type="checkbox" data-luxopt="theme" checked> Theme bhi <strong>Luxury</strong> set karein</label><br>
-    <label class="checkline"><input type="checkbox" data-luxopt="products"> Demo products bhi copy karein (12 fashion products)</label>
-    <p class="hint">⚠️ Demo products fashion ke hain — tech/gadget store mein mix ho jayenge. Sirf test/fashion store ke liye tick karein. Products naam se skip hote hain (dobara copy par duplicate nahi bante).</p>
+    <strong>👑 ${esc(displayName)} setup copy — "${esc(store ? store.name : "")}"</strong><br>
+    Source: <strong>${esc(sourceSlug)}</strong> (sirf read — us mein kuch nahi badlega).<br>
+    <label class="checkline"><input type="checkbox" data-luxopt="theme"${profile && profile.setThemeDefault === false? "": " checked"}> Theme bhi <strong>${esc(displayName)}</strong> set karein</label><br>
+    <label class="checkline"><input type="checkbox" data-luxopt="products"${profile && profile.copyProductsDefault? " checked": ""}> Demo products bhi copy karein (${esc((profile && profile.productsLabel) || "")})</label>
+    ${(profile && profile.productsWarning)? `<p class="hint">⚠️ ${esc(profile.productsWarning)}</p>`: ""}
     <p class="hint">Settings sirf khaali keys mein bhari jayengi — store ki apni configured values kabhi overwrite nahi hongi. Categories naam se skip hongi.</p>
     <button class="btn small" data-luxgo>✅ Copy karein</button>
     <button class="btn small ghost" data-luxcancel>✖ Cancel</button>
@@ -536,12 +571,12 @@ function openLuxCopyPanel(storeId, btn){
     goBtn.disabled = true; goBtn.textContent = "Copy ho raha hai…";
     msg.textContent = ""; msg.className = "msg";
     try {
-      const res = await runLuxuryCopy(storeId, {
+      const res = await runThemeCopy(themeKey, storeId, {
         setTheme: panel.querySelector('[data-luxopt="theme"]').checked,
         copyProducts: panel.querySelector('[data-luxopt="products"]').checked
       });
-      LAST_LUX_COPY = { storeId, html: luxCopyResultHtml(res) };
-      loadStores();   /* result reinjectLuxCopyResult se dobara dikhega */
+      LAST_THEME_COPY = { storeId, html: themeCopyResultHtml(res) };
+      loadStores();   /* result reinjectThemeCopyResult se dobara dikhega */
     } catch (e) {
       msg.textContent = "❌ Copy fail: " + e.message + (e.stepsDone && e.stepsDone.length ? " (Ho chuka tha: " + e.stepsDone.join(", ") + ")" : "");
       msg.className = "msg err";
@@ -550,9 +585,9 @@ function openLuxCopyPanel(storeId, btn){
   };
 }
 
-function reinjectLuxCopyResult(wrap){
-  if (!LAST_LUX_COPY) return;
-  const card = wrap.querySelector(`[data-store="${CSS.escape(LAST_LUX_COPY.storeId)}"]`);
+function reinjectThemeCopyResult(wrap){
+  if (!LAST_THEME_COPY) return;
+  const card = wrap.querySelector(`[data-store="${CSS.escape(LAST_THEME_COPY.storeId)}"]`);
   if (!card) return;
   if (card.querySelector("[data-luxresult]")) return;
   const box = document.createElement("div");
@@ -561,8 +596,8 @@ function reinjectLuxCopyResult(wrap){
   box.style.marginTop = "8px";
   box.style.background = "#f0fdf4";
   box.style.borderColor = "#bbf7d0";
-  box.innerHTML = LAST_LUX_COPY.html + `<br><button class="btn small ghost" data-luxdismiss>✖ Band karein</button>`;
-  box.querySelector("[data-luxdismiss]").onclick = () => { LAST_LUX_COPY = null; box.remove(); };
+  box.innerHTML = LAST_THEME_COPY.html + `<br><button class="btn small ghost" data-luxdismiss>✖ Band karein</button>`;
+  box.querySelector("[data-luxdismiss]").onclick = () => { LAST_THEME_COPY = null; box.remove(); };
   card.appendChild(box);
 }
 
