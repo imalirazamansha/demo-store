@@ -94,7 +94,7 @@ let heroState = [];
 let CURRENT_TAB = "dashboard";
 let SETTINGS_STATE = null;   // loadSettings ke baad full merged settings (saare tabs isi se bharte/save hote hain)
 let EDITING_PRODUCT_ID = null;
-let HP_ORDER = []; let HP_LUX_WARN = []; // V3.12: Luxury theme mein drop ki gayi sections ki list           // homepage builder: [{key, visible}] — custom entries key "custom:<id>"
+let HP_ORDER = []; let HP_LUX_WARN = []; // Is theme par render na hone wali sections ki list (grey rows) — builder se koi key nahi hat-ti           // homepage builder: [{key, visible}] — custom entries key "custom:<id>"
 let HP_CUSTOM = {};          // custom sections content: id -> {heading, text, img, btn_label, btn_link}
 let homepageFilled = false;
 
@@ -1344,6 +1344,35 @@ try { def = (themeKey && window.SHOPNEST_THEME_DEF) ? (window.SHOPNEST_THEME_DEF
 if (def && Array.isArray(def.sections)) return def.sections.map(function(s){ return s && s.key; }).filter(Boolean);
 return null;
 }
+/* Renderable sections per theme (builder greying — ek jagah, def-driven):
+   - def.sections ho (Luxury) to wahi keys renderable hain.
+   - warna SECTION_DEFS ki keys mein se theme-gated keys hata dein:
+     Luxury-only = luxury def ki onlySections (fallback literal),
+     Playful-only = playful def ki onlySections (fallback literal),
+     reels sirf playful/luxury par render hota hai (storefront ki wahi shart).
+   Ye sirf BUILDER ke grey/disabled ke liye hai — storefront ke gates
+   (applySections) alag se chalte hain aur wahi faisla karte hain. */
+function v4AdminOnlySectionsFor(themeKey, fallback){
+var d = null;
+ try { d = (themeKey && window.SHOPNEST_THEME_DEF) ? (window.SHOPNEST_THEME_DEF(String(themeKey).toLowerCase()) || null) : null; } catch(e){ d = null; }
+ if (d && Array.isArray(d.onlySections) && d.onlySections.length) return d.onlySections.slice();
+ return fallback.slice();
+}
+function v4AdminRenderableSectionsFor(themeKey){
+var key = String(themeKey || "").toLowerCase();
+var defKeys = v4AdminDefSectionsFor(key);
+if (defKeys) return defKeys;
+var all = SECTION_DEFS.map(function(d){ return d.key; });
+var luxOnly = v4AdminOnlySectionsFor("luxury", ["festive", "unstitched_tabs", "readytowear_tabs", "editorial"]);
+var playOnly = v4AdminOnlySectionsFor("playful", ["featured", "blog"]);
+return all.filter(function(k){
+if (key !== "luxury" && luxOnly.indexOf(k) !== -1) return false;
+if (key !== "playful" && playOnly.indexOf(k) !== -1) return false;
+if (k === "reels" && key !== "playful" && key !== "luxury") return false;
+return true;
+});
+}
+
 function v4AdminThemeDef(){
 var k = v4AdminThemeKey();
 try { return (k && window.SHOPNEST_THEME_DEF) ? (window.SHOPNEST_THEME_DEF(k) || null) : null; } catch (e){ return null; }
@@ -1737,13 +1766,13 @@ function seedHomepage(s){
     HP_ORDER = SECTION_DEFS.map(d => ({ key: d.key, visible: legacyVisible(s, d.key) }));
     Object.keys(HP_CUSTOM).forEach(id => HP_ORDER.push({ key: "custom:" + id, visible: true }));
   }
-  /* V3.12: Luxury theme mein sirf 8 sections dikhte hain - baaki builder se hata dein, warning ke liye yaad rakhein. */ var v4DefKeys = v4AdminDefSectionsFor(s.theme); if (v4DefKeys) { HP_LUX_WARN = HP_ORDER.filter(e => !v4DefKeys.includes(e.key)).map(e => e.key); HP_ORDER = HP_ORDER.filter(e => v4DefKeys.includes(e.key)); } homepageFilled = true;
+  /* Builder hamesha poori list dikhata hai — jo section is theme par render nahi hota, woh grey + disabled rehta hai (renderHomepage). Koi key kabhi builder se nahi hat-ti, is liye stale theme par bhi koi rendered section gum nahi hota. */ var v4Renderable = v4AdminRenderableSectionsFor(s.theme); HP_LUX_WARN = HP_ORDER.filter(e => !e.key.startsWith("custom:") && v4Renderable.indexOf(e.key) === -1).map(e => e.key); homepageFilled = true;
   renderHomepage();
 }
 function renderHomepage(){
   const wrap = $("#sectionsWrap");
   if (!wrap) return;
-  wrap.innerHTML = (HP_LUX_WARN.length ? `<div class="msg warn" style="margin-bottom:10px">⚠️ Luxury theme mein ye sections nahi dikhte: ${HP_LUX_WARN.map(esc).join(", ")}</div>` : "") + HP_ORDER.map(e => {
+  wrap.innerHTML = (HP_LUX_WARN.length ? `<div class="msg warn" style="margin-bottom:10px">⚠️ Grey rows is theme par nahi dikhte — unhein hide/show ya drag nahi kiya ja sakta: ${HP_LUX_WARN.map(esc).join(", ")}</div>` : "") + HP_ORDER.map((e, i) => {
     if (e.key.startsWith("custom:")){
       const id = e.key.slice(7);
       const c = HP_CUSTOM[id] || { heading: "", text: "", img: "", btn_label: "", btn_link: "" };
@@ -1753,6 +1782,7 @@ function renderHomepage(){
           <span class="sec-name">🧩 Custom Section<small data-cusname>${esc(c.heading || "Bina heading ke")}</small></span>
           <label class="checkline" style="border:0;padding:2px"><input type="checkbox" data-secvis ${e.visible ? "checked" : ""}> 👁 Show</label>
           <button class="btn small danger" type="button" data-secdel>Delete</button>
+          <span class="sec-move"><button class="btn small" type="button" data-secmove="-1" title="Upar le jayein"${i === 0 ? " disabled" : ""}>↑</button><button class="btn small" type="button" data-secmove="1" title="Neeche le jayein"${i === HP_ORDER.length - 1 ? " disabled" : ""}>↓</button></span>
         </div>
         <div class="custom-editor" data-customeditor="${esc(id)}">
           <div class="settings-grid">
@@ -1773,11 +1803,13 @@ function renderHomepage(){
       </div>`;
     }
     const def = SECTION_DEFS.find(d => d.key === e.key) || { label: e.key, sub: "" };
-    return `<div class="sec-row" data-seckey="${esc(e.key)}">
+     const off = HP_LUX_WARN.indexOf(e.key) !== -1;
+    return `<div class="sec-row${off ? " sec-off" : ""}" data-seckey="${esc(e.key)}">
       <div class="sec-line">
         <span class="drag-handle" title="Drag karke tartib badlein">⠿</span>
-        <span class="sec-name">${esc(def.label)}<small>${esc(def.sub)}</small></span>
-        <label class="checkline" style="border:0;padding:2px"><input type="checkbox" data-secvis ${e.visible ? "checked" : ""}> 👁 Show</label>
+        <span class="sec-name">${esc(def.label)}<small>${esc(def.sub)}${off ? " — is theme par nahi dikhta" : ""}</small></span>
+        <label class="checkline" style="border:0;padding:2px"><input type="checkbox" data-secvis ${e.visible ? "checked" : ""}${off ? " disabled" : ""}> 👁 Show</label>
+        <span class="sec-move"><button class="btn small" type="button" data-secmove="-1" title="Upar le jayein"${i === 0 ? " disabled" : ""}>↑</button><button class="btn small" type="button" data-secmove="1" title="Neeche le jayein"${i === HP_ORDER.length - 1 ? " disabled" : ""}>↓</button></span>
       </div>
     </div>`;
   }).join("");
@@ -1787,8 +1819,17 @@ function renderHomepage(){
     const key = b.closest(".sec-row").dataset.seckey;
     HP_ORDER = HP_ORDER.filter(e => e.key !== key);
     if (key.startsWith("custom:")) delete HP_CUSTOM[key.slice(7)];
-    renderHomepage();
+    renderHomepage();     
   });
+   wrap.querySelectorAll("[data-secmove]").forEach(b => b.onclick = () => {
+      syncHomepageFromDom();
+      const key = b.closest(".sec-row").dataset.seckey;
+      const idx = HP_ORDER.findIndex(e => e.key === key);
+      const ni = idx + (+b.dataset.secmove || 0);
+      if (idx < 0 || ni < 0 || ni >= HP_ORDER.length) return;
+      const tmp = HP_ORDER[idx]; HP_ORDER[idx] = HP_ORDER[ni]; HP_ORDER[ni] = tmp;
+      renderHomepage();
+   });
   wrap.querySelectorAll("[data-cfile]").forEach(inp => inp.addEventListener("change", async () => {
     const file = inp.files && inp.files[0];
     if (!file) return;
