@@ -417,11 +417,11 @@ function themeCopyResultHtml(r){
   lines.push(`Categories: ${r.catsCreated} ban gayin, ${r.catsSkipped} pehle se maujood thin.`);
   lines.push(r.filled.length ? `Settings bhari gayin: ${esc(r.filled.join(", "))}.` : "Settings: koi khaali key nahi thi — kuch copy nahi hua.");
   if (r.skipped.length) lines.push(`Skip (pehle se configured): ${esc(r.skipped.join(", "))}.`);
-  lines.push(r.themeSet ? "Theme: ${esc(r.themeName || "Luxury")} set ho gaya." : "Theme: nahi badla (checkbox OFF tha).");
+  lines.push(r.themeSet ? `Theme: ${esc(r.themeName || "Luxury")} set ho gaya.` : "Theme: nahi badla (checkbox OFF tha).");
   lines.push(r.copyProducts ? `Products: ${r.prodsCopied} copy hue, ${r.prodsSkipped} naam pehle se maujood the (skip).` : "Products: copy nahi hue (checkbox OFF — default).");
   r.notes.forEach(n => lines.push("ℹ️ " + esc(n)));
-  if (r.filled.indexOf("instaHandle") !== -1) lines.push("⚠️ Instagram handle '${esc(r.copiedHandle || "")}' copy hua — apna handle store admin → Content tab se badal lein.");
-  if (r.orderAppended && r.orderAppended.length) lines.push("✅ Homepage order: ${esc(r.themeName || "Luxury")} sections add kar diye gaye: " + esc(r.orderAppended.join(", ")) + ".");
+  if (r.filled.indexOf("instaHandle") !== -1) lines.push(`⚠️ Instagram handle '${esc(r.copiedHandle || "")}' copy hua — apna handle store admin → Content tab se badal lein.`);
+  if (r.orderAppended && r.orderAppended.length) lines.push(`✅ Homepage order: ${esc(r.themeName || "Luxury")} sections add kar diye gaye: ` + esc(r.orderAppended.join(", ")) + ".");
   if (!r.filled.length && !r.catsCreated && !r.themeSet && !r.copyProducts && !(r.orderAppended && r.orderAppended.length)) lines.push("Kuch nahi badla — sab kuch pehle se maujood/configured tha (dobara chalane par bhi yahi hoga).");
   return lines.join("<br>");
 }
