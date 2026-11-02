@@ -50,7 +50,7 @@ luxuryBanners: { type: "list", fields: ["img", "eyebrow", "title", "button", "ca
 luxuryBanner: { type: "object", fields: ["img", "eyebrow", "title", "button", "cat"], legacy: true },
 instaHandle: { type: "string" },
 instaReels: { type: "list", fields: ["user", "avatar", "video", "poster", "title"], max: null, keep: "all" },
-collectionPages: { type: "list", fields: ["key", "title", "cat", "img"], max: 4, keep: "key" },
+collectionPages: { type: "list", fields: ["cat", "title", "subtitle"], max: 12, keep: "cat" },
 sectionText: { type: "map", kind: "open", fields: ["eyebrow", "title"] },
 pdpText: { type: "map", kind: "fixed", keys: ["details", "related", "delivery"] },
 showSizes: { type: "boolean", default: true },
