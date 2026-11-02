@@ -357,7 +357,7 @@ async function storeUpdate(id, payload){
   else loadStores();
 }
 
-/* ---------- V4 Phase 3: theme copy — def-driven (runThemeCopy) ---------- */
+/* ---------- V4 Phase 3: theme copy — def-driven (runThemeCopy) ----------
    Copy profile (categories, copyKeys, sourceSlug, displayName, setThemeDefault,
                  copyProductsDefault, reelsMp4Only, productsLabel, productsWarning) hamesha def
       (themes-v4.js) se aata hai — file ke andar koi theme-specific value hardcoded nahi.
