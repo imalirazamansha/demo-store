@@ -868,7 +868,7 @@ function renderProductSections(){
   /* V3.11: Luxury mein Hot = Trending Products grid (renderTrending), baaqi themes mein carousel. */ renderThemeSection("hot", function(){ renderInto("hotTrack", [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 10)); });
   renderInto("newGrid", [...PRODUCTS].sort((a,b) => b.id - a.id).slice(0, 20), { newBadge: true }); if (isLuxury()){ appendViewAll("newGrid", "DAILY NEW IN", "All"); ensureSwipeWrap(document.getElementById("newGrid")); }
   renderInto("dealGrid", PRODUCTS.filter(p => effectivePct(p) >= 20).sort((a,b) => effectivePct(b) - effectivePct(a) || reviewsOf(b) - reviewsOf(a)).slice(0, 8)); renderThemeSection("featured", renderFeatured); renderThemeSection("reels", renderReels); renderThemeSection("blog", renderBlog); renderThemeSection("festive", renderFestive); renderThemeSection("unstitched_tabs", renderUnstitchedTabs); renderThemeSection("readytowear_tabs", renderRtwTabs); renderThemeSection("editorial", renderEditorial); updateLuxNav(); startCardGalleries();
-  renderReviews(); renderReels(); renderBlog(); renderThemeSection("featured", renderFeatured); renderThemeSection("reels", renderReels); renderThemeSection("blog", renderBlog); renderThemeSection("festive", renderFestive); renderThemeSection("unstitched_tabs", renderUnstitchedTabs); renderThemeSection("readytowear_tabs", renderRtwTabs); renderThemeSection("editorial", renderEditorial); updateLuxNav(); startCardGalleries();
+  renderReviews();
   const hot = [...PRODUCTS].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a))[0];
   $("#hotOrderBtn").disabled = !hot;
   $("#hotOrderBtn").onclick = () => { if (hot) openProduct(hot.id); };
