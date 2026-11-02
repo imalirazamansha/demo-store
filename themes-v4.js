@@ -68,7 +68,14 @@ categories: ["Luxury", "Daily Wear", "Embroidered", "Pret", "Luxury Pret", "Dail
 copyKeys: ["luxuryTiles", "luxuryTabs", "luxuryRtwTabs", "luxuryBanners", "instaHandle", "instaReels", "collectionPages", "sectionText", "pdpText", "showSizes", "showColors", "showDisclaimer"],
 seedWhen: "theme==luxury AND all 5 lists empty",
 orderKeys: ["festive", "unstitched_tabs", "readytowear_tabs", "editorial"],
-productsNote: "12 demo products (ids 103-114) — default OFF"
+productsNote: "12 demo products (ids 103-114) — default OFF",
+sourceSlug: "shopnest",
+displayName: "Luxury",
+setThemeDefault: true,
+copyProductsDefault: false,
+reelsMp4Only: true,
+productsLabel: "12 fashion products",
+productsWarning: "Demo products fashion ke hain — tech/gadget store mein mix ho jayenge. Sirf test/fashion store ke liye tick karein. Products naam se skip hote hain (dobara copy par duplicate nahi bante)."
 },
 cssScope: "theme-luxury",
 nav: { bottom: ["menu", "unstitched", "stitched", "new", "cart"] },
