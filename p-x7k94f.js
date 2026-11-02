@@ -1326,7 +1326,149 @@ function normalizeHeroSlides(rawHero){
     return d;
   });
 }
-/* V3.9: section titles editor — keys storefront SECTION_TEXT_KEY se match karte hain. */ const SECTION_TEXT_KEYS_ADMIN = ["categories", "best", "hot", "arrivals", "deals", "budget", "howto", "faq", "reviews", "festive", "unstitched_tabs", "readytowear_tabs"]; function mergeAdminSettings(raw){
+/* V3.9: section titles editor — keys storefront SECTION_TEXT_KEY se match karte hain. */ const SECTION_TEXT_KEYS_ADMIN = ["categories", "best", "hot", "arrivals", "deals", "budget", "howto", "faq", "reviews", "festive", "unstitched_tabs", "readytowear_tabs"]; /* ---------- V4 Phase 2: theme registry helpers (admin, def-driven) ----------
+   Behaviour contract: koi def na mile to V3 path — sab boxes dikhte hain,
+   builder poori list dikhata hai, Style table 13 rows. Def mile to sirf
+   uske controls dikhte hain; HIDE sirf CSS display:none se hota hai —
+   boxes DOM mein rehte hain, is liye persistAllSettings ka overlay
+   (readCntList / checkboxes) chhupi hui values ko bhi sahi parhta hai.
+   Save path mein koi guard nahi: guard lagana ghalat hota — theme switch
+   ke baad save hone wala unsaved edit mit jata. */
+function v4AdminThemeKey(){
+var t = (typeof SETTINGS_STATE !== "undefined" && SETTINGS_STATE && SETTINGS_STATE.theme) ? String(SETTINGS_STATE.theme).toLowerCase() : "";
+return t;
+}
+function v4AdminDefSectionsFor(themeKey){
+var def = null;
+try { def = (themeKey && window.SHOPNEST_THEME_DEF) ? (window.SHOPNEST_THEME_DEF(String(themeKey).toLowerCase()) || null) : null; } catch (e){ def = null; }
+if (def && Array.isArray(def.sections)) return def.sections.map(function(s){ return s && s.key; }).filter(Boolean);
+return null;
+}
+function v4AdminThemeDef(){
+var k = v4AdminThemeKey();
+try { return (k && window.SHOPNEST_THEME_DEF) ? (window.SHOPNEST_THEME_DEF(k) || null) : null; } catch (e){ return null; }
+}
+function v4AdminDefSections(){
+return v4AdminDefSectionsFor(v4AdminThemeKey());
+}
+/* Content box map: wrapId -> schema key ("generic" = hamesha dikhe). */
+var V4_CONTENT_BOXES = [
+{ wrap: "cntHowWrap", key: "generic" },
+{ wrap: "cntFaqWrap", key: "generic" },
+{ wrap: "cntReviewsWrap", key: "generic" },
+{ wrap: "cntBudgetWrap", key: "generic" },
+{ wrap: "cntTrustWrap", key: "generic" },
+{ wrap: "cntLuxTilesWrap", key: "luxuryTiles" },
+{ wrap: "cntLuxTabsWrap", key: "luxuryTabs" },
+{ wrap: "cntLuxRtwTabsWrap", key: "luxuryRtwTabs" },
+{ wrap: "cntLuxBannersWrap", key: "luxuryBanners" },
+{ wrap: "cntCollPagesWrap", key: "collectionPages" },
+{ wrap: "cntReelsWrap", key: "instaReels" },
+{ wrap: "cntBlogWrap", key: "blogPosts" }
+];
+function v4BoxVisibleForTheme(boxKey, def){
+if (!def || !def.settingsSchema) return true; /* V3 path — koi def nahi, ya stub def (settingsSchema nahi): aaj jaisa, sab dikhe */
+if (boxKey === "generic") return true;
+return !!def.settingsSchema[boxKey];
+}
+/* Style table key filter: def ho to sirf uske sections; na ho to 13 keys. */
+function v4StyleKeyVisible(k){
+var secs = v4AdminDefSections();
+if (!secs) return true;
+return secs.indexOf(k) !== -1;
+}
+function v4AdminCleanStr(v){ return String(v || ""); }
+function v4AdminSanitizeList(rawList, fields, max, keep){
+if (!Array.isArray(rawList)) return null;
+var out = rawList.filter(function(x){ return x && typeof x === "object"; }).map(function(x){
+var o = {};
+fields.forEach(function(f){ o[f] = v4AdminCleanStr(x[f]); });
+return o;
+}).filter(function(o){
+if (keep === "all") return true;
+if (keep === "img") return !!o.img;
+if (keep === "cat") return !!o.cat;
+return fields.some(function(f){ return !!o[f]; });
+});
+return (typeof max === "number") ? out.slice(0, max) : out;
+}
+function v4AdminSanitizeObject(rawObj, fields){
+if (!rawObj || typeof rawObj !== "object") return null;
+var o = {};
+fields.forEach(function(f){ if (typeof rawObj[f] === "string") o[f] = rawObj[f]; });
+return o;
+}
+/* V4 admin schema loop — def ki keys whitelist mein. ADDITIVE: V3 lines
+   upar rehti hain aur same values likhti hain; loop unhein dobara same tarah
+   likhta hai — SIWA luxuryBanners ke: V3 line admin shape {img,alt,title,cat}
+   likhti hai, loop def shape {img,eyebrow,title,button,cat} se OVERWRITE
+   karta hai (single-schema fix; alt kabhi display nahi hota tha).
+   'deferred' keys skip (showDisclaimer — admin V3 line usay likhti hai).
+   Maps: sectionText fixed 12 keys (SECTION_TEXT_KEYS_ADMIN), pdpText fixed
+   3 keys — def ka kind "open" storefront semantics hai; admin ke paas
+   sirf in keys ke inputs hain, is liye loop bhi inhi ko likhta hai. */
+function applyAdminThemeSchema(out, raw){
+var defs = window.SHOPNEST_THEME_DEFS || {};
+Object.keys(defs).forEach(function(dk){
+var def = defs[dk];
+var schema = def && def.settingsSchema;
+if (!schema) return;
+Object.keys(schema).forEach(function(key){
+var spec = schema[key];
+if (!spec || spec.deferred) return;
+if (spec.type === "list"){
+var list = v4AdminSanitizeList(raw[key], spec.fields, spec.max, spec.keep);
+if (list !== null) out[key] = list;
+} else if (spec.type === "string"){
+if (typeof raw[key] === "string") out[key] = raw[key].trim();
+} else if (spec.type === "boolean"){
+if (typeof raw[key] === "boolean") out[key] = raw[key];
+} else if (spec.type === "object"){
+var obj = v4AdminSanitizeObject(raw[key], spec.fields);
+if (obj !== null && out[key] && typeof out[key] === "object"){
+Object.keys(obj).forEach(function(f){ out[key][f] = obj[f]; });
+}
+} else if (spec.type === "map"){
+if (raw[key] && typeof raw[key] === "object"){
+if (key === "sectionText"){
+if (!out[key] || typeof out[key] !== "object") out[key] = {};
+SECTION_TEXT_KEYS_ADMIN.forEach(function(k){
+var v = raw[key][k];
+if (v && typeof v === "object") out[key][k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") };
+});
+} else if (key === "pdpText"){
+if (!out[key] || typeof out[key] !== "object") out[key] = {};
+(spec.keys || []).forEach(function(k){ if (typeof raw[key][k] === "string") out[key][k] = raw[key][k]; });
+} else if (spec.kind === "open"){
+if (!out[key] || typeof out[key] !== "object") out[key] = {};
+Object.keys(raw[key]).forEach(function(k){ var v = raw[key][k]; if (v && typeof v === "object") out[key][k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; });
+}
+}
+}
+});
+});
+}
+/* Theme visibility apply karein: Content boxes hide/show (display:none,
+   DOM mein rehte hain); theme badla ho to builder re-seed + Style table
+   re-render (reload jaisa, save ke baad). */
+var V4_APPLIED_THEME = null;
+function applyThemeVisibility(){
+var themeKey = v4AdminThemeKey();
+var def = v4AdminThemeDef();
+V4_CONTENT_BOXES.forEach(function(b){
+var wrap = document.getElementById(b.wrap);
+if (!wrap) return;
+var box = wrap.parentElement;
+if (!box || !box.classList || !box.classList.contains("settings-box")) return; /* fail safe: dikhta rahe */
+box.style.display = v4BoxVisibleForTheme(b.key, def) ? "" : "none";
+});
+if (themeKey !== V4_APPLIED_THEME){
+V4_APPLIED_THEME = themeKey;
+if (typeof homepageFilled !== "undefined" && homepageFilled && typeof seedHomepage === "function") seedHomepage(SETTINGS_STATE);
+if (typeof styleFilled !== "undefined" && styleFilled && typeof renderStyleSections === "function") renderStyleSections((SETTINGS_STATE && SETTINGS_STATE.style && SETTINGS_STATE.style.sections) || {});
+}
+}
+function mergeAdminSettings(raw){
   const out = JSON.parse(JSON.stringify(ADMIN_DEFAULT_SETTINGS));
   if (!raw || typeof raw !== "object") return out;
   if (typeof raw.store_name === "string" && raw.store_name.trim()) out.store_name = raw.store_name.trim();
@@ -1418,6 +1560,8 @@ function normalizeHeroSlides(rawHero){
   })) : [];
   out.checkout_fields = cleanFields(raw.checkout_fields);
   out.product_fields = cleanFields(raw.product_fields);
+/* V4 Phase 2: theme schema loop (additive — V3 lines upar rehti hain; luxuryBanners def shape se overwrite hota hai). */
+applyAdminThemeSchema(out, raw);
   return out;
 }
 function renderHeroEditor(){
@@ -1516,6 +1660,8 @@ function fillSettings(s){
   fillAppearance(s);
   fillStyle(s);
   fillContent(s);
+  /* V4 Phase 2: active theme ke controls dikhayein/chhupayein. */
+  applyThemeVisibility();
 }
 async function loadSettings(){
   settingsLoaded = true;
@@ -1591,7 +1737,7 @@ function seedHomepage(s){
     HP_ORDER = SECTION_DEFS.map(d => ({ key: d.key, visible: legacyVisible(s, d.key) }));
     Object.keys(HP_CUSTOM).forEach(id => HP_ORDER.push({ key: "custom:" + id, visible: true }));
   }
-  /* V3.12: Luxury theme mein sirf 8 sections dikhte hain - baaki builder se hata dein, warning ke liye yaad rakhein. */ if (String(s.theme || "").toLowerCase() === "luxury") { const LUX_KEYS = ["hero", "new_arrivals", "festive", "unstitched_tabs", "readytowear_tabs", "editorial", "reels", "hot"]; HP_LUX_WARN = HP_ORDER.filter(e => !LUX_KEYS.includes(e.key)).map(e => e.key); HP_ORDER = HP_ORDER.filter(e => LUX_KEYS.includes(e.key)); } homepageFilled = true;
+  /* V3.12: Luxury theme mein sirf 8 sections dikhte hain - baaki builder se hata dein, warning ke liye yaad rakhein. */ var v4DefKeys = v4AdminDefSectionsFor(s.theme); if (v4DefKeys) { HP_LUX_WARN = HP_ORDER.filter(e => !v4DefKeys.includes(e.key)).map(e => e.key); HP_ORDER = HP_ORDER.filter(e => v4DefKeys.includes(e.key)); } homepageFilled = true;
   renderHomepage();
 }
 function renderHomepage(){
@@ -1858,7 +2004,8 @@ function bindRadiusControl(sliderId, defId, valId){
 function renderStyleSections(sections){
   const body = $("#styleSectionsBody");
   if (!body) return;
-  body.innerHTML = STYLE_SECTION_KEYS_ADMIN.map(k => {
+  var v4StyleKeys = STYLE_SECTION_KEYS_ADMIN.filter(function(k){ return v4StyleKeyVisible(k); });
+  body.innerHTML = v4StyleKeys.map(k => {
     const def = SECTION_DEFS.find(d => d.key === k) || { label: k };
     const s = (sections && sections[k]) || {};
     return `<tr data-skey="${esc(k)}"><td><strong>${esc(def.label)}</strong></td>`
@@ -1996,7 +2143,7 @@ const FAQ_FIELDS = [["q", "Sawal", "text"], ["a", "Jawab", "textarea"]];
 const REVIEW_FIELDS = [["product", "Product (store jaisa naam)", "text"], ["name", "Customer naam", "text"], ["city", "Sheher", "text"], ["rating", "Rating (1–5)", "number"], ["text", "Review text", "textarea"]];
 const BUDGET_FIELDS = [["label", "Label (UNDER / ★ TOP PICKS)", "text"], ["amount", "Amount (Rs.1,499 / HIGHEST RATED)", "text"], ["note", "Note", "text"], ["budget", "Budget value (1499 ya top)", "text"]];
 const TRUST_FIELDS = [["title", "Title", "text"], ["sub", "Sub text", "text"]];
-const SP_FIELDS = [["name", "Naam", "text"], ["product", "Product", "text"], ["city", "Sheher", "text"], ["amount", "Amount", "text"], ["timeText", "Waqt exact", "text"]]; /* V3.6: Instagram reels + blog (Content tab) */ const REEL_FIELDS = [["user", "Instagram username (makeupbydeenak)", "text"], ["avatar", "Avatar image URL (profile photo)", "text"], ["video", "Video link (MP4 ya Instagram reel link)", "text"], ["poster", "Poster/thumbnail image URL", "text"], ["title", "Caption (Wedding Festive)", "text"]]; const BLOG_FIELDS = [["title", "Post title", "text"], ["excerpt", "Short excerpt", "textarea"], ["img", "Image URL", "text"], ["link", "Read-more link (optional)", "text"]]; const LUX_TILE_FIELDS = [["label", "Tile label (FESTIVE WEAR)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"], ["img", "Image URL (khaali ho to category ki pehli product image)", "text"]]; const LUX_TAB_FIELDS = [["label", "Tab label (Luxury)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"]]; const LUX_BANNER_FIELDS = [["img", "Banner image URL", "text"], ["alt", "Alt text", "text"], ["title", "Bara heading", "text"], ["cat", "Button kholta hai (category naam)", "text"]]; const COLL_PAGE_FIELDS = [["cat", "Category naam (bilkul store jaisa)", "text"], ["title", "Page title (khaali ho to collection ka naam)", "text"], ["subtitle", "Page subtitle (khaali ho to product count)", "text"]];
+const SP_FIELDS = [["name", "Naam", "text"], ["product", "Product", "text"], ["city", "Sheher", "text"], ["amount", "Amount", "text"], ["timeText", "Waqt exact", "text"]]; /* V3.6: Instagram reels + blog (Content tab) */ const REEL_FIELDS = [["user", "Instagram username (makeupbydeenak)", "text"], ["avatar", "Avatar image URL (profile photo)", "text"], ["video", "Video link (MP4 ya Instagram reel link)", "text"], ["poster", "Poster/thumbnail image URL", "text"], ["title", "Caption (Wedding Festive)", "text"]]; const BLOG_FIELDS = [["title", "Post title", "text"], ["excerpt", "Short excerpt", "textarea"], ["img", "Image URL", "text"], ["link", "Read-more link (optional)", "text"]]; const LUX_TILE_FIELDS = [["label", "Tile label (FESTIVE WEAR)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"], ["img", "Image URL (khaali ho to category ki pehli product image)", "text"]]; const LUX_TAB_FIELDS = [["label", "Tab label (Luxury)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"]]; const LUX_BANNER_FIELDS = [["img", "Banner image URL", "text"], ["eyebrow", "Upar wala chhota text (eyebrow)", "text"], ["title", "Bara heading", "text"], ["button", "Button label (khaali ho to button nahi dikhega)", "text"], ["cat", "Button kholta hai (category naam)", "text"]]; const COLL_PAGE_FIELDS = [["cat", "Category naam (bilkul store jaisa)", "text"], ["title", "Page title (khaali ho to collection ka naam)", "text"], ["subtitle", "Page subtitle (khaali ho to product count)", "text"]];
 function escAttr(v){ return String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 function cntRowHtml(fields, row, rowClass){
   let h = `<div class="${rowClass || "cnt-row"}">`;
@@ -2187,6 +2334,8 @@ function readSpEntries(){
     if (error) throw error;
     SETTINGS_STATE = data; /* (A) Luxury auto-seed — theme save ho gaya, ab categories (agar khaali hon). Seed apni ghalti khud pakarta hai (toast) — save is se fail nahi hota. */ await seedLuxuryCategories(data);
     renderHeroEditor();
+/* V4 Phase 2: theme badla ho to Content/builder/Style dobara dikhayein. */
+applyThemeVisibility();
     const okText = "✅ Save ho gaya — store reload karke changes dekhein.";
     Object.values(msgEls).forEach(m => { if (m){ m.textContent = okText; m.className = "msg ok"; } });
     showToast("✅ Save ho gaya — store reload karke changes dekhein.", "ok");
@@ -2428,4 +2577,6 @@ function switchTab(view){
     document.getElementById(panelId).classList.toggle("hidden", key !== view);
   });
   $("#globalSaveBtn").classList.toggle("hidden", !SAVEABLE_TABS.includes(view));
+  /* V4 Phase 2: tab khulte hi active theme ke controls dobara lagayein. */
+  applyThemeVisibility();
 }
