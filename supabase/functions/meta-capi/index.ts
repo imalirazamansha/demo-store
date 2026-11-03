@@ -7,7 +7,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // VERIFY at deploy: Meta Graph API ka current version (Meta docs). v21.0 deploy waqt check karein.
-const GRAPH_VERSION = "v21.0";
+const GRAPH_VERSION = "v26.0";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
