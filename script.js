@@ -1655,7 +1655,7 @@ $("#checkoutForm").onsubmit = async e => {
     items, total, status: "Pending"
   };
   if (STORE_ID) orderRow.store_id = STORE_ID;
-  const { error } = await sb.from("orders").insert(orderRow);
+  const { error } = await sb.from("orders").insert(orderRow, { returning: "minimal" });
   btn.disabled = false; btn.innerHTML = `${icon("check", "ic-inline")} ORDER PLACE KAREIN`;
   if (error){
     console.error(error);
