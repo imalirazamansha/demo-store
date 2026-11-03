@@ -1723,7 +1723,7 @@ async function collectHeroSlides(){
   }
   return slides.length ? slides : JSON.parse(JSON.stringify(ADMIN_DEFAULT_SETTINGS.hero));
 }
-$("#addSlideBtn").onclick = () => {
+/* ---------- V5 Phase 3: Content-list image uploads (URL ke saath file upload) ---------- Kaunsi list ki kaunsi field par file input lagta hai + file kis Storage folder mein jati hai. Sirf yahan listed (wrap, field) par upload button banta hai — baaki content lists (How/FAQ/Reviews/Budget/Trust/Tabs/Social-proof) mein koi file input nahi aata. Folder naam existing convention jaisay hain (hero/slide-N, custom-sections, profile) — sab aik hi public bucket "product-images" mein. */ const CNT_UPLOAD_FOLDERS = { cntLuxTilesWrap: { img: "luxury-tiles" }, cntLuxBannersWrap: { img: "luxury-banners" }, cntReelsWrap: { avatar: "reels", poster: "reels" }, cntBlogWrap: { img: "blog" }, cntCollPagesWrap: { img: "collection-pages" } }; async function collectCntUploads(){ /* Save se pehle: Content-list rows mein lagi files upload karo (hero jaisa deferred pattern — file Save par upload hoti hai, select par sirf preview). Upload fail ho to throw karta hai aur poora save ruk jata hai (purani URL barkarar rehti hai — input bhi, DB bhi). File ho to typed URL par jeet-ti hai (product flow jaisa). */ for (const [wrapId, fields] of Object.entries(CNT_UPLOAD_FOLDERS)){ const wrap = document.getElementById(wrapId); if (!wrap) continue; for (const row of wrap.querySelectorAll(".cnt-row")){ for (const [key, folder] of Object.entries(fields)){ const inp = row.querySelector(`[data-cntfile="${key}"]`); const file = inp && inp.files && inp.files[0]; if (!file) continue; const msg = row.querySelector(`[data-cntmsg="${key}"]`); const urlInp = row.querySelector(`[data-f="${key}"]`); const prev = row.querySelector(`[data-cntprev="${key}"]`); setUploadMsg(msg, "Image upload ho rahi hai…"); const url = await uploadImage(file, folder); if (urlInp) urlInp.value = url; if (prev) prev.src = url; inp.value = ""; setUploadMsg(msg, "✅ Image upload ho gayi.", "ok"); } } } } $("#addSlideBtn").onclick = () => {
   syncHeroFromDom();
   if (heroState.length >= 4){ showToast("Zyada se zyada 4 hero slides ho sakti hain.", "err"); return; }
   heroState.push({ pill: "", title: "", subtitle: "", button: "SHOP NOW", image: "", visible: true });
@@ -2442,16 +2442,16 @@ const FAQ_FIELDS = [["q", "Sawal", "text"], ["a", "Jawab", "textarea"]];
 const REVIEW_FIELDS = [["product", "Product (store jaisa naam)", "text"], ["name", "Customer naam", "text"], ["city", "Sheher", "text"], ["rating", "Rating (1–5)", "number"], ["text", "Review text", "textarea"]];
 const BUDGET_FIELDS = [["label", "Label (UNDER / ★ TOP PICKS)", "text"], ["amount", "Amount (Rs.1,499 / HIGHEST RATED)", "text"], ["note", "Note", "text"], ["budget", "Budget value (1499 ya top)", "text"]];
 const TRUST_FIELDS = [["title", "Title", "text"], ["sub", "Sub text", "text"]];
-const SP_FIELDS = [["name", "Naam", "text"], ["product", "Product", "text"], ["city", "Sheher", "text"], ["amount", "Amount", "text"], ["timeText", "Waqt exact", "text"]]; /* V3.6: Instagram reels + blog (Content tab) */ const REEL_FIELDS = [["user", "Instagram username (makeupbydeenak)", "text"], ["avatar", "Avatar image URL (profile photo)", "text"], ["video", "Video link (MP4 ya Instagram reel link)", "text"], ["poster", "Poster/thumbnail image URL", "text"], ["title", "Caption (Wedding Festive)", "text"]]; const BLOG_FIELDS = [["title", "Post title", "text"], ["excerpt", "Short excerpt", "textarea"], ["img", "Image URL", "text"], ["link", "Read-more link (optional)", "text"]]; const LUX_TILE_FIELDS = [["label", "Tile label (FESTIVE WEAR)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"], ["img", "Image URL (khaali ho to category ki pehli product image)", "text"]]; const LUX_TAB_FIELDS = [["label", "Tab label (Luxury)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"]]; const LUX_BANNER_FIELDS = [["img", "Banner image URL", "text"], ["eyebrow", "Upar wala chhota text (eyebrow)", "text"], ["title", "Bara heading", "text"], ["button", "Button label (khaali ho to button nahi dikhega)", "text"], ["cat", "Button kholta hai (category naam)", "text"]]; const COLL_PAGE_FIELDS = [["cat", "Category naam (bilkul store jaisa)", "text"], ["title", "Page title (khaali ho to collection ka naam)", "text"], ["subtitle", "Page subtitle (khaali ho to product count)", "text"]];
+const SP_FIELDS = [["name", "Naam", "text"], ["product", "Product", "text"], ["city", "Sheher", "text"], ["amount", "Amount", "text"], ["timeText", "Waqt exact", "text"]]; /* V3.6: Instagram reels + blog (Content tab) */ const REEL_FIELDS = [["user", "Instagram username (makeupbydeenak)", "text"], ["avatar", "Avatar image URL (profile photo)", "text"], ["video", "Video link (MP4 ya Instagram reel link)", "text"], ["poster", "Poster/thumbnail image URL", "text"], ["title", "Caption (Wedding Festive)", "text"]]; const BLOG_FIELDS = [["title", "Post title", "text"], ["excerpt", "Short excerpt", "textarea"], ["img", "Image URL", "text"], ["link", "Read-more link (optional)", "text"]]; const LUX_TILE_FIELDS = [["label", "Tile label (FESTIVE WEAR)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"], ["img", "Image URL (khaali ho to category ki pehli product image)", "text"]]; const LUX_TAB_FIELDS = [["label", "Tab label (Luxury)", "text"], ["cat", "Category naam (bilkul store jaisa)", "text"]]; const LUX_BANNER_FIELDS = [["img", "Banner image URL", "text"], ["eyebrow", "Upar wala chhota text (eyebrow)", "text"], ["title", "Bara heading", "text"], ["button", "Button label (khaali ho to button nahi dikhega)", "text"], ["cat", "Button kholta hai (category naam)", "text"]]; const COLL_PAGE_FIELDS = [["cat", "Category naam (bilkul store jaisa)", "text"], ["title", "Page title (khaali ho to collection ka naam)", "text"], ["subtitle", "Page subtitle (khaali ho to product count)", "text"], ["img", "Collection banner image URL", "text"]];
 function escAttr(v){ return String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
-function cntRowHtml(fields, row, rowClass){
-  let h = `<div class="${rowClass || "cnt-row"}">`;
+function cntRowHtml(fields, row, rowClass, wrapId){
+  let h = `<div class="${rowClass || "cnt-row"}">`; const upMap = (wrapId && CNT_UPLOAD_FOLDERS[wrapId]) || {};
   fields.forEach(([k, label, type]) => {
     const v = escAttr(row[k] ?? "");
     h += `<label style="font-size:13px;color:var(--muted)">${label}</label>`;
     if (type === "textarea") h += `<textarea data-f="${k}" rows="2">${v}</textarea>`;
     else if (type === "number") h += `<input data-f="${k}" type="number" min="1" max="5" step="0.1" value="${v}">`;
-    else h += `<input data-f="${k}" type="text" value="${v}">`;
+    else h += `<input data-f="${k}" type="text" value="${v}">`; /* V5 Phase 3: image field par URL ke saath file upload + preview. */ if (upMap[k]) h += `<div class="upload-row"><input type="file" data-cntfile="${k}" accept="image/*"><img class="thumb-sm" data-cntprev="${k}" src="${safeUrl(v) || PLACEHOLDER_IMG}" alt=""></div><p class="upload-msg" data-cntmsg="${k}"></p>`;
   });
   h += `<div class="cnt-row-actions"><button class="btn small" type="button" data-cnt-up>↑ Upar</button><button class="btn small" type="button" data-cnt-down>↓ Neeche</button><button class="btn small danger" type="button" data-cnt-del>Delete</button></div></div>`;
   return h;
@@ -2461,13 +2461,13 @@ function bindCntRows(wrap){
   wrap.querySelectorAll(".cnt-row").forEach(row => {
     row.querySelector("[data-cnt-up]").onclick = () => { const p = row.previousElementSibling; if (p) wrap.insertBefore(row, p); };
     row.querySelector("[data-cnt-down]").onclick = () => { const n = row.nextElementSibling; if (n) wrap.insertBefore(n, row); };
-    row.querySelector("[data-cnt-del]").onclick = () => row.remove();
+    row.querySelector("[data-cnt-del]").onclick = () => row.remove(); /* V5 Phase 3: file select par fori preview + Save ka msg; URL type karne par preview update. */ row.querySelectorAll("[data-cntfile]").forEach(inp => { inp.onchange = () => { const f = inp.files && inp.files[0]; if (!f) return; const prev = row.querySelector(`[data-cntprev="${inp.dataset.cntfile}"]`); const msg = row.querySelector(`[data-cntmsg="${inp.dataset.cntfile}"]`); if (prev) prev.src = URL.createObjectURL(f); setUploadMsg(msg, "Image select ho gayi — Save dabane par upload hogi."); }; }); row.querySelectorAll("[data-cntprev]").forEach(prev => { const urlInp = row.querySelector(`[data-f="${prev.dataset.cntprev}"]`); if (urlInp) urlInp.oninput = () => { const u = urlInp.value.trim(); prev.src = u ? (safeUrl(u) || PLACEHOLDER_IMG) : PLACEHOLDER_IMG; }; });
   });
 }
 function renderCntList(wrapId, rows, fields, rowClass){
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
-  wrap.innerHTML = (rows || []).map(r => cntRowHtml(fields, r, rowClass)).join("");
+  wrap.innerHTML = (rows || []).map(r => cntRowHtml(fields, r, rowClass, wrapId)).join("");
   bindCntRows(wrap);
 }
 function readCntList(wrapId, fields){
@@ -2494,7 +2494,7 @@ function fillContent(s){
 function addCntRow(wrapId, fields, rowClass){
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
-  wrap.insertAdjacentHTML("beforeend", cntRowHtml(fields, {}, rowClass));
+  wrap.insertAdjacentHTML("beforeend", cntRowHtml(fields, {}, rowClass, wrapId));
   bindCntRows(wrap);
 }
 $("#addCntHowBtn").onclick = () => addCntRow("cntHowWrap", HOW_FIELDS);
@@ -2526,7 +2526,7 @@ function readSpEntries(){
   try {
     const data = JSON.parse(JSON.stringify(SETTINGS_STATE || mergeAdminSettings(null)));
     /* Hero slides (pending file uploads samet) */
-    const hero = await collectHeroSlides();
+    const hero = await collectHeroSlides(); /* V5 Phase 3: Content-list uploads — hero ke baad, Content reads se pehle. */ await collectCntUploads();
     heroState = JSON.parse(JSON.stringify(hero));
     data.hero = hero;
     /* Settings tab ke fields */
