@@ -154,7 +154,7 @@ const ADMIN_DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
-  /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* V3.9: fashion options + editable section/PDP text */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* V3.10: Luxury theme content (Festive tiles, Collection tabs, Editorial banner) */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* V3.11: Ready To Wear tabs + Editorial slider banners */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
+  /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* V3.9: fashion options + editable section/PDP text */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* V3.10: Luxury theme content (Festive tiles, Collection tabs, Editorial banner) */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* V3.11: Ready To Wear tabs + Editorial slider banners */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages --- */ customPages: [], sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
   policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
   profile: { logo_url: "", email: "", phone: "", address: "" },
   /* V2 keys — storefront inhein consume karega (Part B) */
@@ -1460,6 +1460,7 @@ var V4_CONTENT_BOXES = [
 { wrap: "cntLuxRtwTabsWrap", key: "luxuryRtwTabs" },
 { wrap: "cntLuxBannersWrap", key: "luxuryBanners" },
 { wrap: "cntCollPagesWrap", key: "collectionPages" },
+{ wrap: "cntCustomPagesWrap", key: "generic" },
 { wrap: "cntReelsWrap", key: "instaReels" },
 { wrap: "cntBlogWrap", key: "blogPosts" }
 ];
@@ -1584,7 +1585,7 @@ function mergeAdminSettings(raw){
     return { product: cs(x.product), name: cs(x.name), city: cs(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cs(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cs(x.label), amount: cs(x.amount), note: cs(x.note), budget: cs(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cs(x.user), avatar: cs(x.avatar), video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (typeof raw.showDisclaimer === "boolean") out.showDisclaimer = raw.showDisclaimer; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxCs = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat), img: luxCs(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxCs(x.cat), title: luxCs(x.title), subtitle: luxCs(x.subtitle), img: luxCs(x.img) })).filter(x => x.cat).slice(0, 12);
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cs(x.user), avatar: cs(x.avatar), video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (typeof raw.showDisclaimer === "boolean") out.showDisclaimer = raw.showDisclaimer; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxCs = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat), img: luxCs(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxCs(x.cat), title: luxCs(x.title), subtitle: luxCs(x.subtitle), img: luxCs(x.img) })).filter(x => x.cat).slice(0, 12); if (Array.isArray(raw.customPages)) out.customPages = raw.customPages.filter(x => x && typeof x === "object").map(x => ({ slug: String(x.slug || "").trim().toLowerCase(), title: luxCs(x.title), body: String(x.body || "").slice(0, 20000), seoTitle: luxCs(x.seoTitle), showInHeader: x.showInHeader === true, showInFooter: x.showInFooter === true })).filter(x => x.slug).slice(0, 20);
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
@@ -2479,6 +2480,169 @@ function readCntList(wrapId, fields){
     return o;
   }).filter(o => Object.values(o).some(v => v !== ""));
 }
+/* ---------- V5 Phase 4: Custom Pages editor (Content tab) ----------
+Har row = aik page: title, slug (auto title se, English), body (rich text —
+B/I/Link/List toolbar, whitelist HTML), SEO title, header/footer menu
+checkboxes, live preview. Slug unique + URL-safe; khaali slug title se
+banta hai; Urdu title ho to fallback "page-<n>" (admin badal sakta hai).
+Save par readCustomPages() DOM se parhta hai — generic readCntList nahi,
+kyunke slug dedupe + checkbox + body-cap yahin hoti hai. */
+const CUSTOM_PAGE_MAX = 20;
+const CUSTOM_PAGE_BODY_MAX = 20000;
+function slugifyPageTitle(t){ return String(t || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60); }
+function sanitizePageHtmlAdmin(html){
+  /* Storefront sanitizePageHtml ki copy — admin aur storefront alag files
+  hain, shared module nahi (mergeSettings bhi dono mein duplicate hai).
+  Dono ka output aik jaisa hona chahiye (harness H-P). */
+  var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, A: 1, UL: 1, OL: 1, LI: 1, P: 1, BR: 1, H2: 1, H3: 1 };
+  var drop = { SCRIPT: 1, STYLE: 1, IFRAME: 1, OBJECT: 1, EMBED: 1, FORM: 1, INPUT: 1, BUTTON: 1, IMG: 1, VIDEO: 1, AUDIO: 1 };
+  var div = document.createElement("div");
+  div.innerHTML = String(html || "");
+  var walk = function(node){
+    var i = 0;
+    while (i < node.childNodes.length){
+      var ch = node.childNodes[i];
+      if (ch.nodeType === 3){ i++; continue; }
+      if (ch.nodeType !== 1){ ch.remove(); continue; }
+      if (drop[ch.tagName]){ ch.remove(); continue; }
+      /* Disallowed tag: unwrap — children move up to this spot and are
+      re-scanned in place (a <script> inside a <div> must not survive
+      the unwrap — the first draft only walked the snapshot). */
+      if (!allowed[ch.tagName]){ while (ch.firstChild) node.insertBefore(ch.firstChild, ch); ch.remove(); continue; }
+      if (ch.tagName === "A"){
+        var href = (ch.getAttribute("href") || "").trim();
+        if (!/^(https?:|mailto:|page:)/i.test(href)) ch.removeAttribute("href");
+        else if (!/^page:/i.test(href)){ ch.setAttribute("target", "_blank"); ch.setAttribute("rel", "noopener"); }
+      }
+      Array.prototype.slice.call(ch.attributes).forEach(function(a){ if (a.name !== "href" && a.name !== "target" && a.name !== "rel") ch.removeAttribute(a.name); });
+      walk(ch);
+      i++;
+    }
+  };
+  walk(div);
+  return div.innerHTML;
+}
+function customPageRowHtml(p){
+  p = p || {};
+  const slug = escAttr(p.slug || "");
+  const link = slug ? ("index.html?store=" + encodeURIComponent(STORE_SLUG || "shopnest") + "&page=" + encodeURIComponent(slug)) : "";
+  return `<div class="cnt-row" data-custompage-row>
+    <label style="font-size:13px;color:var(--muted)">Page title</label>
+    <input data-f="title" type="text" value="${escAttr(p.title || "")}" placeholder="About Us">
+    <label style="font-size:13px;color:var(--muted)">Slug (link ka hissa — English, unique)</label>
+    <input data-f="slug" type="text" value="${slug}" placeholder="about-us"${slug ? ' data-touched="1"' : ""}>
+    <p data-page-link style="color:var(--muted);font-size:13px;margin:6px 0 0">${link ? ("Page ka link: <a href=\"" + escAttr(link) + "\" target=\"_blank\" rel=\"noopener\">" + escAttr(link) + "</a>") : "Slug likhte hi page ka link yahan dikhega."}</p>
+    <label style="font-size:13px;color:var(--muted)">Page text (rich text)</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0">
+      <button class="btn small" type="button" data-cp-bold><b>B</b></button>
+      <button class="btn small" type="button" data-cp-italic><i>I</i></button>
+      <input type="url" data-cp-linkurl placeholder="https://... ya page:slug" style="flex:1;min-width:140px">
+      <button class="btn small" type="button" data-cp-link>🔗 Link</button>
+      <button class="btn small" type="button" data-cp-list>• List</button>
+    </div>
+    <textarea data-f="body" rows="5" maxlength="20000" placeholder="Page ka text likhein...">${escAttr(p.body || "")}</textarea>
+    <div data-cp-preview style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;font-size:14px;line-height:1.7;"></div>
+    <label style="font-size:13px;color:var(--muted)">SEO title (khaali ho to page title)</label>
+    <input data-f="seoTitle" type="text" value="${escAttr(p.seoTitle || "")}" placeholder="About Us — Store Name">
+    <label class="checkline"><input type="checkbox" data-f="showInHeader"${p.showInHeader ? " checked" : ""}> Header menu mein dikhayein</label>
+    <label class="checkline"><input type="checkbox" data-f="showInFooter"${p.showInFooter ? " checked" : ""}> Footer menu mein dikhayein</label>
+    <div class="cnt-row-actions"><button class="btn small" type="button" data-cnt-up>↑ Upar</button><button class="btn small" type="button" data-cnt-down>↓ Neeche</button><button class="btn small danger" type="button" data-cnt-del>Delete</button></div></div>`;
+}
+function cpWrap(ta, open, close){
+  if (!ta) return;
+  const s = (ta.selectionStart === null ? ta.value.length : ta.selectionStart);
+  const e = (ta.selectionEnd === null ? ta.value.length : ta.selectionEnd);
+  const sel = ta.value.slice(s, e);
+  if (sel) ta.setRangeText(open + sel + close, s, e, "end");
+  else { ta.setRangeText(open + close, s, e, "end"); ta.setSelectionRange(s + open.length, s + open.length); }
+  ta.focus();
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
+}
+function cpList(ta){
+  if (!ta) return;
+  const s = (ta.selectionStart === null ? 0 : ta.selectionStart);
+  const e = (ta.selectionEnd === null ? ta.value.length : ta.selectionEnd);
+  const sel = ta.value.slice(s, e) || ta.value;
+  const items = sel.split(/\n/).map(x => x.trim()).filter(Boolean);
+  if (!items.length) return;
+  const html = "<ul>\n" + items.map(x => "<li>" + x + "</li>").join("\n") + "\n</ul>";
+  if (ta.value.slice(s, e)) ta.setRangeText(html, s, e, "end");
+  else ta.value = html;
+  ta.focus();
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
+}
+function cpUpdateRow(row){
+  if (!row) return;
+  const titleEl = row.querySelector('[data-f="title"]');
+  const slugEl = row.querySelector('[data-f="slug"]');
+  const bodyEl = row.querySelector('[data-f="body"]');
+  const linkEl = row.querySelector("[data-page-link]");
+  const prevEl = row.querySelector("[data-cp-preview]");
+  if (slugEl && titleEl && !slugEl.dataset.touched){
+    const auto = slugifyPageTitle(titleEl.value);
+    if (auto) slugEl.value = auto;
+  }
+  if (linkEl && slugEl){
+    const slug = slugifyPageTitle(slugEl.value);
+    const href = "index.html?store=" + encodeURIComponent(STORE_SLUG || "shopnest") + "&page=" + encodeURIComponent(slug);
+    linkEl.innerHTML = slug ? ("Page ka link: <a href=\"" + escAttr(href) + "\" target=\"_blank\" rel=\"noopener\">" + escAttr(href) + "</a>") : "Slug likhte hi page ka link yahan dikhega.";
+  }
+  if (prevEl && bodyEl) prevEl.innerHTML = sanitizePageHtmlAdmin(bodyEl.value);
+}
+function bindCustomPageRows(wrap){
+  if (!wrap) return;
+  wrap.querySelectorAll("[data-custompage-row]").forEach(row => {
+    row.querySelector("[data-cnt-up]").onclick = () => { const p = row.previousElementSibling; if (p) wrap.insertBefore(row, p); };
+    row.querySelector("[data-cnt-down]").onclick = () => { const n = row.nextElementSibling; if (n) wrap.insertBefore(n, row); };
+    row.querySelector("[data-cnt-del]").onclick = () => row.remove();
+    const titleEl = row.querySelector('[data-f="title"]');
+    const slugEl = row.querySelector('[data-f="slug"]');
+    const bodyEl = row.querySelector('[data-f="body"]');
+    if (titleEl) titleEl.oninput = () => cpUpdateRow(row);
+    if (slugEl) slugEl.oninput = () => { slugEl.dataset.touched = "1"; cpUpdateRow(row); };
+    if (bodyEl) bodyEl.oninput = () => cpUpdateRow(row);
+    const boldBtn = row.querySelector("[data-cp-bold]");
+    if (boldBtn) boldBtn.onclick = () => cpWrap(bodyEl, "<b>", "</b>");
+    const itBtn = row.querySelector("[data-cp-italic]");
+    if (itBtn) itBtn.onclick = () => cpWrap(bodyEl, "<i>", "</i>");
+    const linkBtn = row.querySelector("[data-cp-link]");
+    if (linkBtn) linkBtn.onclick = () => {
+      const urlInp = row.querySelector("[data-cp-linkurl]");
+      const url = urlInp ? urlInp.value.trim() : "";
+      if (!/^(https?:|mailto:|page:)/i.test(url)){ toast("Link ke liye https://... ya page:slug likhein"); return; }
+      cpWrap(bodyEl, '<a href="' + url.replace(/"/g, "") + '">', "</a>");
+    };
+    const listBtn = row.querySelector("[data-cp-list]");
+    if (listBtn) listBtn.onclick = () => cpList(bodyEl);
+    cpUpdateRow(row);
+  });
+}
+function renderCustomPages(rows){
+  const wrap = document.getElementById("cntCustomPagesWrap");
+  if (!wrap) return;
+  wrap.innerHTML = (rows || []).map(p => customPageRowHtml(p)).join("");
+  bindCustomPageRows(wrap);
+}
+function addCustomPageRow(){
+  const wrap = document.getElementById("cntCustomPagesWrap");
+  if (!wrap) return;
+  wrap.insertAdjacentHTML("beforeend", customPageRowHtml({}));
+  bindCustomPageRows(wrap);
+}
+function readCustomPages(){
+  const wrap = document.getElementById("cntCustomPagesWrap");
+  if (!wrap) return [];
+  const seen = {};
+  return [...wrap.querySelectorAll("[data-custompage-row]")].map((row, i) => {
+    const val = k => { const el = row.querySelector(`[data-f="${k}"]`); return el ? el.value.trim() : ""; };
+    const chk = k => { const el = row.querySelector(`[data-f="${k}"]`); return !!(el && el.checked); };
+    let slug = slugifyPageTitle(val("slug") || val("title"));
+    if (!slug) slug = "page-" + (i + 1);
+    if (seen[slug]){ let n = 2; while (seen[slug + "-" + n]) n++; slug = slug + "-" + n; }
+    seen[slug] = true;
+    return { slug, title: val("title"), body: val("body").slice(0, CUSTOM_PAGE_BODY_MAX), seoTitle: val("seoTitle"), showInHeader: chk("showInHeader"), showInFooter: chk("showInFooter") };
+  }).filter(p => p.title || p.body).slice(0, CUSTOM_PAGE_MAX);
+}
 function fillContent(s){
   const g = id => document.getElementById(id);
   if (g("cntAboutHeading")) g("cntAboutHeading").value = s.about_heading || "";
@@ -2488,7 +2652,7 @@ function fillContent(s){
   renderCntList("cntFaqWrap", s.faqs || [], FAQ_FIELDS);
   renderCntList("cntReviewsWrap", s.reviews || [], REVIEW_FIELDS);
   renderCntList("cntBudgetWrap", s.budgetTiles || [], BUDGET_FIELDS);
-  renderCntList("cntTrustWrap", s.trustItems || [], TRUST_FIELDS); /* V3.6: Instagram + blog (checkboxes: stored false ho to uncheck). */ if (g("cntInstaHandle")) g("cntInstaHandle").value = s.instaHandle || ""; if (g("cntShowReels")) g("cntShowReels").checked = s.showReels !== false; if (g("cntShowBlog")) g("cntShowBlog").checked = s.showBlog !== false; /* V3.9: fashion toggles + section/PDP text. */ if (g("cntShowSizes")) g("cntShowSizes").checked = s.showSizes !== false; if (g("cntShowColors")) g("cntShowColors").checked = s.showColors !== false; if (g("cntShowDisclaimer")) g("cntShowDisclaimer").checked = s.showDisclaimer !== false; SECTION_TEXT_KEYS_ADMIN.forEach(k => { if (g("cntSec_" + k + "_eyebrow")) g("cntSec_" + k + "_eyebrow").value = (s.sectionText && s.sectionText[k] && s.sectionText[k].eyebrow) || ""; if (g("cntSec_" + k + "_title")) g("cntSec_" + k + "_title").value = (s.sectionText && s.sectionText[k] && s.sectionText[k].title) || "";}); if (g("cntPdpDetails")) g("cntPdpDetails").value = (s.pdpText && s.pdpText.details) || ""; if (g("cntPdpRelated")) g("cntPdpRelated").value = (s.pdpText && s.pdpText.related) || ""; if (g("cntPdpDelivery")) g("cntPdpDelivery").value = (s.pdpText && s.pdpText.delivery) || ""; /* V3.10: Luxury tiles/tabs/banner. */ renderCntList("cntLuxTilesWrap", s.luxuryTiles || [], LUX_TILE_FIELDS); renderCntList("cntLuxTabsWrap", s.luxuryTabs || [], LUX_TAB_FIELDS); /* V3.11: Ready To Wear tabs + Editorial slider banners. */ renderCntList("cntLuxRtwTabsWrap", s.luxuryRtwTabs || [], LUX_TAB_FIELDS); renderCntList("cntLuxBannersWrap", s.luxuryBanners || [], LUX_BANNER_FIELDS); renderCntList("cntCollPagesWrap", s.collectionPages || [], COLL_PAGE_FIELDS); renderCntList("cntReelsWrap", s.instaReels || [], REEL_FIELDS); renderCntList("cntBlogWrap", s.blogPosts || [], BLOG_FIELDS);
+  renderCntList("cntTrustWrap", s.trustItems || [], TRUST_FIELDS); /* V3.6: Instagram + blog (checkboxes: stored false ho to uncheck). */ if (g("cntInstaHandle")) g("cntInstaHandle").value = s.instaHandle || ""; if (g("cntShowReels")) g("cntShowReels").checked = s.showReels !== false; if (g("cntShowBlog")) g("cntShowBlog").checked = s.showBlog !== false; /* V3.9: fashion toggles + section/PDP text. */ if (g("cntShowSizes")) g("cntShowSizes").checked = s.showSizes !== false; if (g("cntShowColors")) g("cntShowColors").checked = s.showColors !== false; if (g("cntShowDisclaimer")) g("cntShowDisclaimer").checked = s.showDisclaimer !== false; SECTION_TEXT_KEYS_ADMIN.forEach(k => { if (g("cntSec_" + k + "_eyebrow")) g("cntSec_" + k + "_eyebrow").value = (s.sectionText && s.sectionText[k] && s.sectionText[k].eyebrow) || ""; if (g("cntSec_" + k + "_title")) g("cntSec_" + k + "_title").value = (s.sectionText && s.sectionText[k] && s.sectionText[k].title) || "";}); if (g("cntPdpDetails")) g("cntPdpDetails").value = (s.pdpText && s.pdpText.details) || ""; if (g("cntPdpRelated")) g("cntPdpRelated").value = (s.pdpText && s.pdpText.related) || ""; if (g("cntPdpDelivery")) g("cntPdpDelivery").value = (s.pdpText && s.pdpText.delivery) || ""; /* V3.10: Luxury tiles/tabs/banner. */ renderCntList("cntLuxTilesWrap", s.luxuryTiles || [], LUX_TILE_FIELDS); renderCntList("cntLuxTabsWrap", s.luxuryTabs || [], LUX_TAB_FIELDS); /* V3.11: Ready To Wear tabs + Editorial slider banners. */ renderCntList("cntLuxRtwTabsWrap", s.luxuryRtwTabs || [], LUX_TAB_FIELDS); renderCntList("cntLuxBannersWrap", s.luxuryBanners || [], LUX_BANNER_FIELDS); renderCntList("cntCollPagesWrap", s.collectionPages || [], COLL_PAGE_FIELDS); renderCustomPages(s.customPages || []); renderCntList("cntReelsWrap", s.instaReels || [], REEL_FIELDS); renderCntList("cntBlogWrap", s.blogPosts || [], BLOG_FIELDS);
   contentFilled = true;
 }
 function addCntRow(wrapId, fields, rowClass){
@@ -2501,7 +2665,7 @@ $("#addCntHowBtn").onclick = () => addCntRow("cntHowWrap", HOW_FIELDS);
 $("#addCntFaqBtn").onclick = () => addCntRow("cntFaqWrap", FAQ_FIELDS);
 $("#addCntReviewsBtn").onclick = () => addCntRow("cntReviewsWrap", REVIEW_FIELDS);
 $("#addCntBudgetBtn").onclick = () => addCntRow("cntBudgetWrap", BUDGET_FIELDS);
-$("#addCntTrustBtn").onclick = () => addCntRow("cntTrustWrap", TRUST_FIELDS); $("#addCntReelsBtn").onclick = () => addCntRow("cntReelsWrap", REEL_FIELDS); $("#addCntBlogBtn").onclick = () => addCntRow("cntBlogWrap", BLOG_FIELDS); document.getElementById("addCntLuxTilesBtn").onclick = () => addCntRow("cntLuxTilesWrap", LUX_TILE_FIELDS); document.getElementById("addCntLuxTabsBtn").onclick = () => addCntRow("cntLuxTabsWrap", LUX_TAB_FIELDS); $("#addCntLuxRtwTabsBtn").onclick = () => addCntRow("cntLuxRtwTabsWrap", LUX_TAB_FIELDS); $("#addCntLuxBannersBtn").onclick = () => addCntRow("cntLuxBannersWrap", LUX_BANNER_FIELDS); document.getElementById("addCntCollPagesBtn").onclick = () => addCntRow("cntCollPagesWrap", COLL_PAGE_FIELDS);
+$("#addCntTrustBtn").onclick = () => addCntRow("cntTrustWrap", TRUST_FIELDS); $("#addCntReelsBtn").onclick = () => addCntRow("cntReelsWrap", REEL_FIELDS); $("#addCntBlogBtn").onclick = () => addCntRow("cntBlogWrap", BLOG_FIELDS); document.getElementById("addCntLuxTilesBtn").onclick = () => addCntRow("cntLuxTilesWrap", LUX_TILE_FIELDS); document.getElementById("addCntLuxTabsBtn").onclick = () => addCntRow("cntLuxTabsWrap", LUX_TAB_FIELDS); $("#addCntLuxRtwTabsBtn").onclick = () => addCntRow("cntLuxRtwTabsWrap", LUX_TAB_FIELDS); $("#addCntLuxBannersBtn").onclick = () => addCntRow("cntLuxBannersWrap", LUX_BANNER_FIELDS); document.getElementById("addCntCollPagesBtn").onclick = () => addCntRow("cntCollPagesWrap", COLL_PAGE_FIELDS); /* V5 Phase 4: null-guard — HTML box (commit 3) se pehle JS aaye to admin na toote. */ const _acpb = document.getElementById("addCntCustomPagesBtn"); if (_acpb) _acpb.onclick = () => addCustomPageRow();
 $("#addSpEntryBtn").onclick = () => addCntRow("spEntriesWrap", SP_FIELDS, "sp-row cnt-row");
 function renderSpEntries(entries){
   renderCntList("spEntriesWrap", entries || [], SP_FIELDS, "sp-row cnt-row");
@@ -2625,7 +2789,7 @@ function readSpEntries(){
         return { ...r, rating: Number.isFinite(v) ? Math.min(5, Math.max(1, v)) : 5 };
       });
       data.budgetTiles = readCntList("cntBudgetWrap", BUDGET_FIELDS);
-      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; /* V3.9: fashion toggles + section/PDP text. */ data.showSizes = document.getElementById("cntShowSizes") ? document.getElementById("cntShowSizes").checked : true; data.showColors = document.getElementById("cntShowColors") ? document.getElementById("cntShowColors").checked : true; data.showDisclaimer = document.getElementById("cntShowDisclaimer") ? document.getElementById("cntShowDisclaimer").checked : true; if (contentTextDirty){ data.sectionText = {}; SECTION_TEXT_KEYS_ADMIN.forEach(k => { const eb = document.getElementById("cntSec_" + k + "_eyebrow"); const ti = document.getElementById("cntSec_" + k + "_title"); const e = eb ? eb.value.trim() : "", t = ti ? ti.value.trim() : ""; if (e || t) data.sectionText[k] = { eyebrow: e, title: t };}); } data.pdpText = { details: document.getElementById("cntPdpDetails") ? document.getElementById("cntPdpDetails").value.trim() : "", related: document.getElementById("cntPdpRelated") ? document.getElementById("cntPdpRelated").value.trim() : "", delivery: document.getElementById("cntPdpDelivery") ? document.getElementById("cntPdpDelivery").value.trim() : "" }; /* V3.10: Luxury tiles/tabs/banner. */ data.luxuryTiles = readCntList("cntLuxTilesWrap", LUX_TILE_FIELDS); data.luxuryTabs = readCntList("cntLuxTabsWrap", LUX_TAB_FIELDS); /* V3.11: Ready To Wear tabs + Editorial slider banners. */ data.luxuryRtwTabs = readCntList("cntLuxRtwTabsWrap", LUX_TAB_FIELDS); data.luxuryBanners = readCntList("cntLuxBannersWrap", LUX_BANNER_FIELDS); data.collectionPages = readCntList("cntCollPagesWrap", COLL_PAGE_FIELDS); data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
+      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; /* V3.9: fashion toggles + section/PDP text. */ data.showSizes = document.getElementById("cntShowSizes") ? document.getElementById("cntShowSizes").checked : true; data.showColors = document.getElementById("cntShowColors") ? document.getElementById("cntShowColors").checked : true; data.showDisclaimer = document.getElementById("cntShowDisclaimer") ? document.getElementById("cntShowDisclaimer").checked : true; if (contentTextDirty){ data.sectionText = {}; SECTION_TEXT_KEYS_ADMIN.forEach(k => { const eb = document.getElementById("cntSec_" + k + "_eyebrow"); const ti = document.getElementById("cntSec_" + k + "_title"); const e = eb ? eb.value.trim() : "", t = ti ? ti.value.trim() : ""; if (e || t) data.sectionText[k] = { eyebrow: e, title: t };}); } data.pdpText = { details: document.getElementById("cntPdpDetails") ? document.getElementById("cntPdpDetails").value.trim() : "", related: document.getElementById("cntPdpRelated") ? document.getElementById("cntPdpRelated").value.trim() : "", delivery: document.getElementById("cntPdpDelivery") ? document.getElementById("cntPdpDelivery").value.trim() : "" }; /* V3.10: Luxury tiles/tabs/banner. */ data.luxuryTiles = readCntList("cntLuxTilesWrap", LUX_TILE_FIELDS); data.luxuryTabs = readCntList("cntLuxTabsWrap", LUX_TAB_FIELDS); /* V3.11: Ready To Wear tabs + Editorial slider banners. */ data.luxuryRtwTabs = readCntList("cntLuxRtwTabsWrap", LUX_TAB_FIELDS); data.luxuryBanners = readCntList("cntLuxBannersWrap", LUX_BANNER_FIELDS); data.collectionPages = readCntList("cntCollPagesWrap", COLL_PAGE_FIELDS); /* V5 Phase 4: wrap na ho to customPages bilkul nahi likhte (purani values mehfooz). */ if (document.getElementById("cntCustomPagesWrap")) data.customPages = readCustomPages(); data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
     }
     if (sectionsTextDirty){ data.sectionText = readSectionsText();}
  /* Per-store settings: upsert store_id par hota hai (platform migration
