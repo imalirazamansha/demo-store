@@ -476,7 +476,7 @@ function renderOrders(){
   if (!list.length){ wrap.innerHTML = `<p class="empty-note">Is search/filter par koi order nahi mila.</p>`; return; }
   wrap.innerHTML = `<table>
     <thead><tr><th>#</th><th>Customer</th><th>Phone / City</th><th>Address</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
-    <tbody>${list.map(o => { const lines = orderLines(o); const meta = orderMeta(o); return `<tr>
+    <tbody>${list.map(o => { const lines = orderLines(o); const meta = orderMeta(o); return `<tr data-order="${o.id}">
       <td><strong>#${o.id}</strong><br><small style="color:var(--muted)">${new Date(o.created_at).toLocaleString("en-PK",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</small></td>
       <td><strong>${esc(o.customer_name)}</strong></td>
       <td>${esc(o.phone)}<br><small style="color:var(--muted)">${esc(o.city)}</small></td>
@@ -487,6 +487,10 @@ function renderOrders(){
       <td style="white-space:nowrap"><button class="btn small ghost" data-edit-order="${o.id}">✎ Edit</button> <button class="btn small danger" data-del-order="${o.id}">Delete</button></td>
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-edit-order]").forEach(b => b.onclick = () => openOrderEdit(+b.dataset.editOrder));
+  wrap.querySelectorAll("tbody tr[data-order]").forEach(tr => tr.onclick = e => {
+    if (e.target.closest("button, select, input, a, label")) return;
+    openOrderDetails(+tr.dataset.order);
+  });
   wrap.querySelectorAll("[data-status]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("orders").update({ status: sel.value }).eq("id", +sel.dataset.status).eq("store_id", STORE_ID);
     if (error) showToast("Status update fail: " + error.message, "err"); else { await loadOrders(); loadDashboard(); showToast("✅ Order status update ho gaya.", "ok"); }
@@ -634,6 +638,70 @@ $("#oeSaveBtn").onclick = async () => {
     btn.disabled = false; btn.textContent = "💾 Order Save karein";
   }
 };
+
+/* ------------ Order Details (read-only modal) ------------
+   Orders tab ki row par click → popup mein order ki poori detail.
+   Read-only hai – kuch save nahi hota; Edit button maujooda
+   #orderEditModal kholta hai. Data ORDERS_CACHE se aata hai. */
+let OD_ID = null;
+function closeOrderDetails(){
+  OD_ID = null;
+  const m = $("#orderDetailsModal");
+  if (m) m.classList.add("hidden");
+}
+function openOrderDetails(id){
+  const o = ORDERS_CACHE.find(x => x.id === id);
+  if (!o) return;
+  if (!$("#orderDetailsModal") || !$("#odBody") || !$("#odTitle")) return;
+  OD_ID = id;
+  const lines = orderLines(o);
+  const meta = orderMeta(o);
+  const sub = lines.reduce((s, l) => s + (Number(l.price) || 0) * (Number(l.qty) || 0), 0);
+  const del = lines.reduce((s, l) => s + (Number(l.delivery_fee) || 0), 0);
+  const disc = meta.discount || 0;
+  const computed = Math.max(0, sub + del - disc);
+  const storedTotal = Number(o.total) || 0;
+  const hasFee = lines.some(l => l.delivery_fee !== undefined && l.delivery_fee !== null);
+  const dateStr = o.created_at ? new Date(o.created_at).toLocaleString("en-PK", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+  const pillColor = STATUS_COLORS[o.status] || "#64748b";
+  $("#odTitle").textContent = "#" + o.id;
+  $("#odBody").innerHTML = `<div class="od-kv">
+    <div><small>Store</small><strong>${esc(STORE_NAME || STORE_SLUG || "—")}</strong></div>
+    <div><small>Date</small><strong>${esc(dateStr)}</strong></div>
+    <div><small>Status</small><span class="pill" style="background:${pillColor};color:#fff">${esc(o.status || "—")}</span></div>
+    <div><small>Order ID</small><strong>#${esc(o.id)}</strong></div>
+    <div><small>Customer</small><strong>${esc(o.customer_name || "—")}</strong></div>
+    <div><small>Phone</small><strong>${esc(o.phone || "—")}</strong></div>
+    <div><small>City</small><strong>${esc(o.city || "—")}</strong></div>
+    <div class="wide"><small>Address</small><strong>${esc(o.address || "—")}</strong></div>
+    <div class="wide"><small>Tracking note</small><strong>${esc(o.tracking_note || "—")}</strong></div>
+  </div>
+  <label style="font-size:12px;font-weight:700;color:var(--muted)">Items</label>
+  ${lines.length ? `<div class="od-items"><div class="od-head"><span>Product</span><span>Qty × Price</span><span>Total</span></div>${lines.map(l => {
+    const v = [];
+    if (l.size) v.push("Size: " + l.size);
+    if (l.color) v.push("Color: " + l.color);
+    const fee = (l.delivery_fee !== undefined && l.delivery_fee !== null) ? `<small>Delivery: ${Number(l.delivery_fee) === 0 ? "FREE" : fmt(l.delivery_fee)}</small>` : "";
+    return `<div class="od-item"><span class="od-name">${esc(l.name || "—")}${v.length ? `<small>(${v.map(esc).join(", ")})</small>` : ""}${fee}</span><span class="od-num">${Number(l.qty) || 0} × ${fmt(l.price)}</span><span class="od-num"><strong>${fmt((Number(l.price) || 0) * (Number(l.qty) || 0))}</strong></span></div>`;
+  }).join("")}</div>` : `<p class="empty-note">Is order mein koi item nahi hai.</p>`}
+  <div>
+    <div class="od-sumrow"><span>Items subtotal</span><strong>${fmt(sub)}</strong></div>
+    <div class="od-sumrow"><span>Delivery</span><strong>${hasFee ? (del === 0 ? "FREE" : fmt(del)) : "—"}</strong></div>
+    ${disc > 0 ? `<div class="od-sumrow"><span>Discount${meta.coupon ? ` (🎟️ ${esc(meta.coupon)})` : ""}</span><strong>− ${fmt(disc)}</strong></div>` : ""}
+    <div class="od-sumrow total"><span>Total</span><strong>${fmt(storedTotal)}</strong></div>
+  </div>
+  ${computed !== storedTotal ? `<p class="hint">Note: items ke hisaab se ${fmt(computed)} banta hai — Total haath se ${fmt(storedTotal)} likha gaya hai.</p>` : ""}`;
+$("#orderDetailsModal").classList.remove("hidden");
+const cb = $("#odCloseBtn");
+if (cb) cb.focus({ preventScroll: true });
+}
+const odCloseBtn = $("#odCloseBtn");
+if (odCloseBtn) odCloseBtn.onclick = () => closeOrderDetails();
+const odEditBtn = $("#odEditBtn");
+if (odEditBtn) odEditBtn.onclick = () => { const id = OD_ID; closeOrderDetails(); if (id != null) openOrderEdit(id); };
+const odModal = $("#orderDetailsModal");
+if (odModal) odModal.addEventListener("click", e => { if (e.target.id === "orderDetailsModal") closeOrderDetails(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeOrderDetails(); });
 
 /* ---------- Products ---------- */
 async function loadProducts(){
