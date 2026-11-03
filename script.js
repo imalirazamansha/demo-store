@@ -1655,7 +1655,24 @@ $("#checkoutForm").onsubmit = async e => {
     items, total, status: "Pending"
   };
   if (STORE_ID) orderRow.store_id = STORE_ID;
-  const { error } = await sb.from("orders").insert(orderRow, { returning: "minimal" });
+    /* Checkout fix: anon has no SELECT policy on orders, so the insert must not
+       ask for the row back (PostgREST defaults to return=representation, and the
+          JS client's insert() has no returning option — verified in the library).
+             Direct REST call with Prefer: return=minimal (proven: HTTP 201). */
+   let error = null;
+   try {
+      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+         method: "POST",
+         headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+         },
+         body: JSON.stringify(orderRow)
+      });
+      if (!orderRes.ok) error = await orderRes.json().catch(() => ({ message: "Order save failed" }));
+   } catch (e) { error = e; }
   btn.disabled = false; btn.innerHTML = `${icon("check", "ic-inline")} ORDER PLACE KAREIN`;
   if (error){
     console.error(error);
