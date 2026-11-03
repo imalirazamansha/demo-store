@@ -1563,6 +1563,7 @@ if (themeKey !== V4_APPLIED_THEME){
 V4_APPLIED_THEME = themeKey;
 if (typeof homepageFilled !== "undefined" && homepageFilled && typeof seedHomepage === "function") seedHomepage(SETTINGS_STATE);
 if (typeof styleFilled !== "undefined" && styleFilled && typeof renderStyleSections === "function") renderStyleSections((SETTINGS_STATE && SETTINGS_STATE.style && SETTINGS_STATE.style.sections) || {});
+if (typeof sectionsFilled !== "undefined" && sectionsFilled && typeof renderSectionsTab === "function") renderSectionsTab((SETTINGS_STATE && SETTINGS_STATE.sectionStyles) || {}, (SETTINGS_STATE && SETTINGS_STATE.sectionText) || {});
 }
 }
 function mergeAdminSettings(raw){
@@ -1658,7 +1659,7 @@ function mergeAdminSettings(raw){
   out.checkout_fields = cleanFields(raw.checkout_fields);
   out.product_fields = cleanFields(raw.product_fields);
 /* V4 Phase 2: theme schema loop (additive — V3 lines upar rehti hain; luxuryBanners def shape se overwrite hota hai). */
-applyAdminThemeSchema(out, raw);
+mergeAdminSectionStyles(out, raw); applyAdminThemeSchema(out, raw);
   return out;
 }
 function renderHeroEditor(){
@@ -1728,6 +1729,194 @@ $("#addSlideBtn").onclick = () => {
   heroState.push({ pill: "", title: "", subtitle: "", button: "SHOP NOW", image: "", visible: true });
   renderHeroEditor();
 };
+/* ---------- V5 Phase 2a: "Sections" tab — sab section editing aik jagah ----------
+   Har section (SECTION_DEFS, 21 keys) ka aik card: style controls
+   (settings.sectionStyles) + heading eyebrow/title (settings.sectionText).
+   Cards/total sirf product-grid sections par; price/badge colors sirf grids par;
+   bannerText sirf hero + editorial par; baaqi sections par container controls.
+   Purane tabs (Homepage/Content/Style/Settings) untouched rehte hain — yeh tab
+   unhi keys ko parhta/likhta hai, duplicate source nahi banta. sectionText ke
+   liye dirty-flag rule: jo tab badla gaya, usi ki values save hoti hain
+   (dono badle hon to Sections tab jeet-ta hai — §6 flag). */
+let sectionsFilled = false;
+let sectionsTextDirty = false;
+let contentTextDirty = false;
+let sectionsListenersBound = false;
+const SECTION_STYLE_GRID_KEYS = ["best_sellers", "new_arrivals", "deals", "all_products"];
+const SECTION_STYLE_BAND_KEYS = ["featured", "hero", "editorial"];
+const SECTION_TO_TEXT_KEY = { categories: "categories", best_sellers: "best", hot: "hot", new_arrivals: "arrivals", deals: "deals", budget: "budget", how_to_order: "howto", faq: "faq", testimonials: "reviews", festive: "festive", unstitched_tabs: "unstitched_tabs", readytowear_tabs: "readytowear_tabs" };
+function clampSsInt(v, lo, hi){ const n = parseInt(v, 10); if (!Number.isFinite(n)) return 0; return Math.max(lo, Math.min(hi, n)); }
+function sanitizeSectionStyleAdmin(raw){
+  if (!raw || typeof raw !== "object") return null;
+  const o = {};
+  const cd = clampSsInt(raw.cardsDesktop, 1, 6); if (cd) o.cardsDesktop = cd;
+  const cm = clampSsInt(raw.cardsMobile, 1, 3); if (cm) o.cardsMobile = cm;
+  const tt = clampSsInt(raw.total, 1, 50); if (tt) o.total = tt;
+  const hd = clampSsInt(raw.heightDesktop, 0, 1200); if (hd) o.heightDesktop = hd;
+  const hm = clampSsInt(raw.heightMobile, 0, 1200); if (hm) o.heightMobile = hm;
+  if (["full", "boxed", "narrow"].indexOf(String(raw.widthMode || "")) !== -1) o.widthMode = String(raw.widthMode);
+  const mw = clampSsInt(raw.maxWidth, 320, 1600); if (mw) o.maxWidth = mw;
+  if (["left", "center", "right"].indexOf(String(raw.align || "")) !== -1) o.align = String(raw.align);
+  if (raw.bold === true) o.bold = true;
+  if (raw.italic === true) o.italic = true;
+  const cols = {};
+  if (raw.colors && typeof raw.colors === "object"){
+    ["heading", "text", "buttonBg", "buttonText", "price", "badge", "badgeText", "bannerText"].forEach(function(f){ const c = adminStyleColor(raw.colors[f]); if (c) cols[f] = c; });
+  }
+  if (Object.keys(cols).length) o.colors = cols;
+  const bg = adminStyleColor(raw.bg); if (bg) o.bg = bg;
+  const pd = clampSsInt(raw.padding, 0, 120); if (pd) o.padding = pd;
+  const mg = clampSsInt(raw.margin, 0, 120); if (mg) o.margin = mg;
+  return Object.keys(o).length ? o : null;
+}
+function mergeAdminSectionStyles(out, raw){
+  if (!raw || !raw.sectionStyles || typeof raw.sectionStyles !== "object") return;
+  if (!out.sectionStyles || typeof out.sectionStyles !== "object") out.sectionStyles = {};
+  SECTION_DEFS.forEach(function(d){
+    const s = sanitizeSectionStyleAdmin(raw.sectionStyles[d.key]);
+    if (s) out.sectionStyles[d.key] = s;
+  });
+}
+function renderSectionsTab(styles, text){
+  const wrap = document.getElementById("secStyleWrap");
+  if (!wrap) return;
+  styles = styles || {};
+  text = text || {};
+  const themeKey = v4AdminThemeKey();
+  const renderable = v4AdminRenderableSectionsFor(themeKey);
+  wrap.innerHTML = SECTION_DEFS.map(function(d){
+    const key = d.key;
+    const st = (styles[key] && typeof styles[key] === "object") ? styles[key] : {};
+    const cols = st.colors || {};
+    const isGrid = SECTION_STYLE_GRID_KEYS.indexOf(key) !== -1;
+    const isBand = SECTION_STYLE_BAND_KEYS.indexOf(key) !== -1;
+    const isHot = key === "hot";
+    const tKey = SECTION_TO_TEXT_KEY[key];
+    const t = (tKey && text[tKey]) || {};
+    const ok = renderable.indexOf(key) !== -1;
+    const field = function(inner){ return '<div class="ss-field">' + inner + '</div>'; };
+    const num = function(f, label, min, max, ph){
+      return field('<label>' + label + '</label><input type="number" data-ss-field="' + f + '" min="' + min + '" max="' + max + '" placeholder="' + (ph || "") + '" value="' + esc(st[f] == null ? "" : String(st[f])) + '">');
+    };
+    const colPair = function(f, label){
+      const v = cols[f] || "";
+      return field('<label>' + label + '</label><div class="color-row"><input type="color" data-ss-color="' + f + '" value="' + (isHexColor(v) ? v : "#ffffff") + '"><input type="text" data-ss-hex="' + f + '" placeholder="#RRGGBB ya khaali" value="' + esc(v) + '"></div>');
+    };
+    const sel = function(f, label, opts){
+      let s = field('<label>' + label + '</label><select data-ss-field="' + f + '">');
+      opts.forEach(function(o){ s += '<option value="' + o[0] + '"' + (String(st[f] || "") === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; });
+      return s + '</select></div>';
+    };
+    let h = '<div class="settings-box" data-ss-key="' + esc(key) + '"' + (ok ? '' : ' style="opacity:.55"') + '>';
+    h += '<h4>' + esc(d.label) + (ok ? '' : ' <span style="font-size:12px;color:var(--muted)">(is theme par nahi dikhta)</span>') + '</h4>';
+    h += '<p style="color:var(--muted);font-size:13px;margin-bottom:10px">' + esc(d.sub || "") + '</p>';
+    h += '<div class="ss-grid">';
+    if (isGrid){
+      h += num("cardsDesktop", "Desktop — aik row mein cards (1–6)", 1, 6, "4");
+      h += num("cardsMobile", "Mobile — aik row mein cards (1–3)", 1, 3, "2");
+      h += num("total", "Kul cards (khaali = default)", 1, 50, key === "best_sellers" ? "8" : key === "new_arrivals" ? "20" : key === "deals" ? "8" : "sab");
+    } else if (isHot){
+      h += num("total", "Kul cards (khaali = 10)", 1, 50, "10");
+    }
+    h += num("heightDesktop", "Height — desktop (px, khaali = auto)", 0, 1200, "");
+    h += num("heightMobile", "Height — mobile (px, khaali = auto)", 0, 1200, "");
+    h += sel("widthMode", "Width", [["", "Theme default"], ["full", "Full width"], ["boxed", "Boxed"], ["narrow", "Narrow"]]);
+    h += num("maxWidth", "Max width — Boxed/Narrow (px)", 320, 1600, "1180");
+    h += sel("align", "Text alignment", [["", "Theme default"], ["left", "Left"], ["center", "Center"], ["right", "Right"]]);
+    h += field('<label class="checkline"><input type="checkbox" data-ss-field="bold"' + (st.bold ? " checked" : "") + '> Bold</label>');
+    h += field('<label class="checkline"><input type="checkbox" data-ss-field="italic"' + (st.italic ? " checked" : "") + '> Italic</label>');
+    h += colPair("heading", "Heading rang");
+    h += colPair("text", "Text rang");
+    if (isGrid || isBand) h += colPair("buttonBg", "Button background");
+    if (isGrid || isBand) h += colPair("buttonText", "Button text rang");
+    if (isGrid) h += colPair("price", "Price rang");
+    if (isGrid) h += colPair("badge", "Discount badge background");
+    if (isGrid) h += colPair("badgeText", "Discount badge text");
+    if (key === "hero" || key === "editorial") h += colPair("bannerText", "Banner text rang");
+    h += field('<label>Section background</label><div class="color-row"><input type="color" data-ss-color="bg" value="' + (isHexColor(st.bg) ? st.bg : "#ffffff") + '"><input type="text" data-ss-hex="bg" placeholder="#RRGGBB ya khaali" value="' + esc(st.bg || "") + '"></div>');
+    h += num("padding", "Padding — upar/neeche (px)", 0, 120, "52");
+    h += num("margin", "Margin — upar/neeche (px)", 0, 120, "0");
+    if (tKey){
+      h += field('<label>Heading — chhota upar wala text</label><input type="text" data-ss-eyebrow value="' + esc(t.eyebrow || "") + '" placeholder="Khaali = asal heading">');
+      h += field('<label>Heading — bara title</label><input type="text" data-ss-title value="' + esc(t.title || "") + '" placeholder="Khaali = asal heading">');
+    }
+    h += '</div></div>';
+    return h;
+  }).join("");
+  wrap.querySelectorAll("[data-ss-key]").forEach(function(card){
+    card.querySelectorAll("[data-ss-color]").forEach(function(cEl){
+      const hexEl = card.querySelector('[data-ss-hex="' + cEl.dataset.ssColor + '"]');
+      bindColorPair(cEl, hexEl);
+    });
+  });
+  sectionsTextDirty = false;
+}
+function fillSections(s){
+  const styles = (s && s.sectionStyles) || {};
+  const text = (s && s.sectionText) || {};
+  renderSectionsTab(styles, text);
+  if (!sectionsListenersBound){
+    sectionsListenersBound = true;
+    const wrap = document.getElementById("secStyleWrap");
+    if (wrap) wrap.addEventListener("input", function(e){
+      const t = e.target;
+      if (t && (t.hasAttribute("data-ss-eyebrow") || t.hasAttribute("data-ss-title"))) sectionsTextDirty = true;
+    });
+    const cp = document.getElementById("contentPanel");
+    if (cp) cp.addEventListener("input", function(e){
+      const t = e.target;
+      if (t && t.id && t.id.indexOf("cntSec_") === 0) contentTextDirty = true;
+    });
+  }
+  sectionsFilled = true;
+}
+function readSectionStyles(){
+  const base = JSON.parse(JSON.stringify((SETTINGS_STATE && SETTINGS_STATE.sectionStyles) || {}));
+  if (!sectionsFilled) return base;
+  const wrap = document.getElementById("secStyleWrap");
+  if (!wrap) return base;
+  wrap.querySelectorAll("[data-ss-key]").forEach(function(card){
+    const key = card.dataset.ssKey;
+    if (!key) return;
+    const raw = {};
+    card.querySelectorAll("[data-ss-field]").forEach(function(inp){
+      const f = inp.dataset.ssField;
+      if (!f) return;
+      if (inp.type === "checkbox") raw[f] = !!inp.checked;
+      else raw[f] = inp.value;
+    });
+    const cols = {};
+    card.querySelectorAll("[data-ss-hex]").forEach(function(hexEl){
+      const f = hexEl.dataset.ssHex;
+      if (!f || f === "bg") return;
+      const v = adminStyleColor(hexEl.value);
+      if (v) cols[f] = v;
+    });
+    if (Object.keys(cols).length) raw.colors = cols;
+    const bgEl = card.querySelector('[data-ss-hex="bg"]');
+    const bg = bgEl ? adminStyleColor(bgEl.value) : "";
+    if (bg) raw.bg = bg;
+    const s = sanitizeSectionStyleAdmin(raw);
+    if (s) base[key] = s; else delete base[key];
+  });
+  return base;
+}
+function readSectionsText(){
+  const out = {};
+  const wrap = document.getElementById("secStyleWrap");
+  if (!wrap) return out;
+  wrap.querySelectorAll("[data-ss-key]").forEach(function(card){
+    const key = card.dataset.ssKey;
+    const tKey = SECTION_TO_TEXT_KEY[key];
+    if (!tKey) return;
+    const eb = card.querySelector("[data-ss-eyebrow]");
+    const ti = card.querySelector("[data-ss-title]");
+    const e = eb ? eb.value.trim() : "", t = ti ? ti.value.trim() : "";
+    if (e || t) out[tKey] = { eyebrow: e, title: t };
+  });
+  return out;
+}
+
 function fillSettings(s){
   $("#setStoreName").value = s.store_name;
   $("#setWhatsapp").value = s.whatsapp_number;
@@ -1757,6 +1946,7 @@ function fillSettings(s){
   fillAppearance(s);
   fillStyle(s);
   fillContent(s);
+  fillSections(s);
   /* V4 Phase 2: active theme ke controls dikhayein/chhupayein. */
   applyThemeVisibility();
 }
@@ -2329,7 +2519,7 @@ function readSpEntries(){
   const saveBtns = [...document.querySelectorAll(".js-save, #globalSaveBtn")];
   const savedLabels = saveBtns.map(b => b.innerHTML);
   saveBtns.forEach(b => { b.disabled = true; b.textContent = "Saving…"; });
-  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg"), style: $("#styleMsg"), content: $("#contentMsg") };
+  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg"), style: $("#styleMsg"), content: $("#contentMsg"), sections: $("#sectionsMsg") };
   Object.values(msgEls).forEach(m => { if (m){ m.textContent = ""; m.className = "msg"; } });
   const topMsg = $("#topSaveMsg");
   if (topMsg) topMsg.textContent = "";
@@ -2424,6 +2614,7 @@ function readSpEntries(){
     /* V3.2 Style Editor — shared save ka hissa; baaki tabs ki tarah
        SETTINGS_STATE clone se shuru hone ki wajah se koi tab wipe nahi hota. */
     data.style = readStyle();
+    data.sectionStyles = readSectionStyles();
     /* V3.3 Content — sirf jab Content tab bhara gaya ho; warna SETTINGS_STATE
        ki values (stored ya defaults) waisi ki waisi rehti hain. */
     if (contentFilled){
@@ -2434,9 +2625,10 @@ function readSpEntries(){
         return { ...r, rating: Number.isFinite(v) ? Math.min(5, Math.max(1, v)) : 5 };
       });
       data.budgetTiles = readCntList("cntBudgetWrap", BUDGET_FIELDS);
-      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; /* V3.9: fashion toggles + section/PDP text. */ data.showSizes = document.getElementById("cntShowSizes") ? document.getElementById("cntShowSizes").checked : true; data.showColors = document.getElementById("cntShowColors") ? document.getElementById("cntShowColors").checked : true; data.showDisclaimer = document.getElementById("cntShowDisclaimer") ? document.getElementById("cntShowDisclaimer").checked : true; data.sectionText = {}; SECTION_TEXT_KEYS_ADMIN.forEach(k => { const eb = document.getElementById("cntSec_" + k + "_eyebrow"); const ti = document.getElementById("cntSec_" + k + "_title"); const e = eb ? eb.value.trim() : "", t = ti ? ti.value.trim() : ""; if (e || t) data.sectionText[k] = { eyebrow: e, title: t };}); data.pdpText = { details: document.getElementById("cntPdpDetails") ? document.getElementById("cntPdpDetails").value.trim() : "", related: document.getElementById("cntPdpRelated") ? document.getElementById("cntPdpRelated").value.trim() : "", delivery: document.getElementById("cntPdpDelivery") ? document.getElementById("cntPdpDelivery").value.trim() : "" }; /* V3.10: Luxury tiles/tabs/banner. */ data.luxuryTiles = readCntList("cntLuxTilesWrap", LUX_TILE_FIELDS); data.luxuryTabs = readCntList("cntLuxTabsWrap", LUX_TAB_FIELDS); /* V3.11: Ready To Wear tabs + Editorial slider banners. */ data.luxuryRtwTabs = readCntList("cntLuxRtwTabsWrap", LUX_TAB_FIELDS); data.luxuryBanners = readCntList("cntLuxBannersWrap", LUX_BANNER_FIELDS); data.collectionPages = readCntList("cntCollPagesWrap", COLL_PAGE_FIELDS); data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
+      data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; /* V3.9: fashion toggles + section/PDP text. */ data.showSizes = document.getElementById("cntShowSizes") ? document.getElementById("cntShowSizes").checked : true; data.showColors = document.getElementById("cntShowColors") ? document.getElementById("cntShowColors").checked : true; data.showDisclaimer = document.getElementById("cntShowDisclaimer") ? document.getElementById("cntShowDisclaimer").checked : true; if (contentTextDirty){ data.sectionText = {}; SECTION_TEXT_KEYS_ADMIN.forEach(k => { const eb = document.getElementById("cntSec_" + k + "_eyebrow"); const ti = document.getElementById("cntSec_" + k + "_title"); const e = eb ? eb.value.trim() : "", t = ti ? ti.value.trim() : ""; if (e || t) data.sectionText[k] = { eyebrow: e, title: t };}); } data.pdpText = { details: document.getElementById("cntPdpDetails") ? document.getElementById("cntPdpDetails").value.trim() : "", related: document.getElementById("cntPdpRelated") ? document.getElementById("cntPdpRelated").value.trim() : "", delivery: document.getElementById("cntPdpDelivery") ? document.getElementById("cntPdpDelivery").value.trim() : "" }; /* V3.10: Luxury tiles/tabs/banner. */ data.luxuryTiles = readCntList("cntLuxTilesWrap", LUX_TILE_FIELDS); data.luxuryTabs = readCntList("cntLuxTabsWrap", LUX_TAB_FIELDS); /* V3.11: Ready To Wear tabs + Editorial slider banners. */ data.luxuryRtwTabs = readCntList("cntLuxRtwTabsWrap", LUX_TAB_FIELDS); data.luxuryBanners = readCntList("cntLuxBannersWrap", LUX_BANNER_FIELDS); data.collectionPages = readCntList("cntCollPagesWrap", COLL_PAGE_FIELDS); data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
     }
-    /* Per-store settings: upsert store_id par hota hai (platform migration
+    if (sectionsTextDirty){ data.sectionText = readSectionsText();}
+ /* Per-store settings: upsert store_id par hota hai (platform migration
        mein settings.store_id par unique index hai; id sequence se auto
        aata hai nayi row par). */
     const { error } = await sb.from("settings").upsert({ store_id: STORE_ID, data }, { onConflict: "store_id" });
@@ -2658,6 +2850,7 @@ $("#saveHomepageBtn").onclick = persistAllSettings;
 $("#saveAppearanceBtn").onclick = persistAllSettings;
 $("#saveStyleBtn").onclick = persistAllSettings;
 $("#saveContentBtn").onclick = persistAllSettings;
+$("#saveSectionsBtn").onclick = persistAllSettings;
 $("#globalSaveBtn").onclick = persistAllSettings;
 
 /* ---------- Tabs ---------- */
@@ -2669,13 +2862,14 @@ const TAB_VIEWS = {
   coupons: ["tabCoupons", "couponsPanel"],
   team: ["tabTeam", "teamPanel"],
   homepage: ["tabHomepage", "homepagePanel"],
+  sections: ["tabSections", "sectionsPanel"],
   appearance: ["tabAppearance", "appearancePanel"],
   style: ["tabStyle", "stylePanel"],
   content: ["tabContent", "contentPanel"],
   settings: ["tabSettings", "settingsPanel"]
 };
 /* In tabs par topbar wala global Save button nazar aata hai. */
-const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style", "content"];
+const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style", "content", "sections"];
 Object.entries(TAB_VIEWS).forEach(([view, [tabId]]) => {
   document.getElementById(tabId).onclick = () => switchTab(view);
 });
