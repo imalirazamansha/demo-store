@@ -1394,7 +1394,7 @@ function normalizeHeroSlides(rawHero){
     return d;
   });
 }
-/* V3.9: section titles editor — keys storefront SECTION_TEXT_KEY se match karte hain. */ const SECTION_TEXT_KEYS_ADMIN = ["categories", "best", "hot", "arrivals", "deals", "budget", "howto", "faq", "reviews", "festive", "unstitched_tabs", "readytowear_tabs"]; /* ---------- V4 Phase 2: theme registry helpers (admin, def-driven) ----------
+/* V3.9: section titles editor — keys storefront SECTION_TEXT_KEY se match karte hain. */ const SECTION_TEXT_KEYS_ADMIN = ["categories", "best", "hot", "arrivals", "deals", "budget", "howto", "faq", "reviews", "festive", "unstitched_tabs", "readytowear_tabs", "all_products"]; /* ---------- V4 Phase 2: theme registry helpers (admin, def-driven) ----------
    Behaviour contract: koi def na mile to V3 path — sab boxes dikhte hain,
    builder poori list dikhata hai, Style table 13 rows. Def mile to sirf
    uske controls dikhte hain; HIDE sirf CSS display:none se hota hai —
@@ -1497,9 +1497,9 @@ return o;
 }
 /* V4 admin schema loop — def ki keys whitelist mein. ADDITIVE: V3 lines
    upar rehti hain aur same values likhti hain; loop unhein dobara same tarah
-   likhta hai — SIWA luxuryBanners ke: V3 line admin shape {img,alt,title,cat}
-   likhti hai, loop def shape {img,eyebrow,title,button,cat} se OVERWRITE
-   karta hai (single-schema fix; alt kabhi display nahi hota tha).
+   likhta hai. luxuryBanners ki V3 line V5 Phase 2b mein DELETE ho chuki —
+   loop ab us ka WAHID writer hai (def shape {img,eyebrow,title,button,cat};
+   alt kabhi display nahi hota tha).
    'deferred' keys skip (showDisclaimer — admin V3 line usay likhti hai).
    Maps: sectionText fixed 12 keys (SECTION_TEXT_KEYS_ADMIN), pdpText fixed
    3 keys — def ka kind "open" storefront semantics hai; admin ke paas
@@ -1584,7 +1584,7 @@ function mergeAdminSettings(raw){
     return { product: cs(x.product), name: cs(x.name), city: cs(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cs(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cs(x.label), amount: cs(x.amount), note: cs(x.note), budget: cs(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cs(x.user), avatar: cs(x.avatar), video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (typeof raw.showDisclaimer === "boolean") out.showDisclaimer = raw.showDisclaimer; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxCs = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat), img: luxCs(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.luxuryBanners)) out.luxuryBanners = raw.luxuryBanners.filter(x => x && typeof x === "object").map(x => ({ img: luxCs(x.img), alt: luxCs(x.alt), title: luxCs(x.title), cat: luxCs(x.cat) })).filter(x => x.img).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxCs(x.cat), title: luxCs(x.title), subtitle: luxCs(x.subtitle) })).filter(x => x.cat).slice(0, 12);
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cs(x.user), avatar: cs(x.avatar), video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (typeof raw.showDisclaimer === "boolean") out.showDisclaimer = raw.showDisclaimer; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxCs = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat), img: luxCs(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxCs(x.cat), title: luxCs(x.title), subtitle: luxCs(x.subtitle) })).filter(x => x.cat).slice(0, 12);
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
@@ -1658,7 +1658,7 @@ function mergeAdminSettings(raw){
   })) : [];
   out.checkout_fields = cleanFields(raw.checkout_fields);
   out.product_fields = cleanFields(raw.product_fields);
-/* V4 Phase 2: theme schema loop (additive — V3 lines upar rehti hain; luxuryBanners def shape se overwrite hota hai). */
+/* V5 Phase 2b: theme schema loop (additive — V3 lines upar rehti hain; luxuryBanners ka wahid writer loop hai, V3 line delete ho chuki). */
 mergeAdminSectionStyles(out, raw); applyAdminThemeSchema(out, raw);
   return out;
 }
@@ -1744,7 +1744,7 @@ let contentTextDirty = false;
 let sectionsListenersBound = false;
 const SECTION_STYLE_GRID_KEYS = ["best_sellers", "new_arrivals", "deals", "all_products"];
 const SECTION_STYLE_BAND_KEYS = ["featured", "hero", "editorial"];
-const SECTION_TO_TEXT_KEY = { categories: "categories", best_sellers: "best", hot: "hot", new_arrivals: "arrivals", deals: "deals", budget: "budget", how_to_order: "howto", faq: "faq", testimonials: "reviews", festive: "festive", unstitched_tabs: "unstitched_tabs", readytowear_tabs: "readytowear_tabs" };
+const SECTION_TO_TEXT_KEY = { categories: "categories", best_sellers: "best", hot: "hot", new_arrivals: "arrivals", deals: "deals", budget: "budget", how_to_order: "howto", faq: "faq", testimonials: "reviews", festive: "festive", unstitched_tabs: "unstitched_tabs", readytowear_tabs: "readytowear_tabs", all_products: "all_products" };
 function clampSsInt(v, lo, hi){ const n = parseInt(v, 10); if (!Number.isFinite(n)) return 0; return Math.max(lo, Math.min(hi, n)); }
 function sanitizeSectionStyleAdmin(raw){
   if (!raw || typeof raw !== "object") return null;
