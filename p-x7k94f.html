@@ -269,6 +269,7 @@
     <button id="tabStyle"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="#fff"/><circle cx="15" cy="12" r="2.2" fill="#fff"/><circle cx="7" cy="17" r="2.2" fill="#fff"/></svg>Style</button>
     <button id="tabContent"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="9" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="8" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg>Content</button>
     <button id="tabSettings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+    <button id="tabMeta">📊 Meta</button>
     <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
   </div>
 
@@ -510,7 +511,55 @@
     </div>
 
     <button class="btn js-save" id="saveSettingsBtn" style="margin-top:16px">💾 Save Settings</button>
-    <p class="msg" id="settingsMsg"></p>
+        <p class="msg" id="settingsMsg"></p>
+  </div>
+
+  <!-- META (V5 Phase 5: Pixel + Conversions API + custom code) -->
+  <div class="card hidden" id="metaPanel">
+    <h3 style="margin-bottom:6px">📊 Meta — Pixel + Conversions API + Custom Code</h3>
+    <div class="settings-box">
+      <b>Pixel ID kahan se milega?</b>
+      <ol style="margin:6px 0 0 18px;color:var(--muted);font-size:13px;line-height:1.7">
+        <li>Meta Events Manager kholein → Data Sources → apna Pixel chunein (ya naya banayein).</li>
+        <li>Pixel ki ID (sirf number, jaise 1234567890123456) copy karke neeche paste karein → Save dabayein.</li>
+        <li>Test: neeche "Pixel test karein" dabayein, phir Events Manager → Test Events mein PageView nazar aana chahiye.</li>
+      </ol>
+    </div>
+    <div class="settings-box">
+      <label>Meta Pixel ID</label>
+      <input id="metaPixelId" type="text" inputmode="numeric" placeholder="1234567890123456" autocomplete="off">
+      <p class="hint">Sirf number — ID save karte hi store ke har page par Pixel chalne lagta hai. Khali chhodein to Pixel band rehta hai.</p>
+    </div>
+    <div class="settings-box">
+      <label><input id="metaCapiEnabled" type="checkbox"> Conversions API (server events) ON karein</label>
+      <p class="hint">iPhone/ad-blocker wale customers ke orders bhi Meta tak pahunchein ge. Is ke liye neeche token chahiye — bina token ke ye option kaam nahi karega.</p>
+      <label>CAPI Access Token (Events Manager → Settings → Conversions API → Generate access token)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="metaCapiToken" type="password" placeholder="Meta Events Manager se token paste karein" autocomplete="off" style="flex:1">
+        <button type="button" class="btn small ghost" id="metaTokenToggle">👁 dikhayein</button>
+      </div>
+      <p class="hint" id="metaTokenState">Koi CAPI token save nahi — Pixel akela bhi kaam karega.</p>
+      <label><input id="metaCapiDelete" type="checkbox"> Save karte waqt purana token delete kar dein</label>
+      <label style="margin-top:8px">Test Event Code (sirf test ke liye — optional)</label>
+      <input id="metaTestEventCode" type="text" placeholder="TEST12345" autocomplete="off">
+      <p class="hint">Events Manager → Test Events se code copy karein; test khatam ho to khali karke Save dabayein.</p>
+    </div>
+    <div class="settings-box">
+      <label>Custom code — &lt;head&gt; ke end mein</label>
+      <textarea id="metaCodeHead" rows="5" placeholder="&lt;!-- yahan head wala code paste karein --&gt;"></textarea>
+      <label style="margin-top:8px">Custom code — &lt;/body&gt; se pehle (body ke end mein)</label>
+      <textarea id="metaCodeBody" rows="5" placeholder="&lt;!-- yahan body-end wala code paste karein --&gt;"></textarea>
+      <p class="hint" style="color:#b3261e">⚠️ Ye code store ke HAR page par waise ka waise chalega — sirf pehchana hua code (jaise Google Analytics ya chat widget) paste karein. Ghalat code store ko kharab kar sakta hai. Pixel/Analytics ke liye upar wale ID fields use karein, raw code mein Pixel na daalein.</p>
+    </div>
+    <div class="settings-box">
+      <button type="button" class="btn small" id="metaTestPixelBtn">🧪 Pixel test karein</button>
+      <button type="button" class="btn small ghost" id="metaClearLogBtn" style="margin-left:8px">Log saaf karein</button>
+      <p class="hint">Test dabane ke baad Meta Events Manager → Test Events kholein — 1–2 minute mein PageView nazar aana chahiye.</p>
+      <label style="margin-top:8px">Event log (is browser mein, aakhri 20 events)</label>
+      <div id="metaEventLog" style="font-size:12px;color:var(--muted);max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">Abhi koi event log nahi.</div>
+    </div>
+    <button class="btn js-save" id="saveMetaBtn">💾 Save Meta</button>
+    <p class="msg" id="metaMsg"></p>
   </div>
 
   <!-- HOMEPAGE BUILDER -->
