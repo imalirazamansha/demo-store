@@ -2840,14 +2840,13 @@ async function persistAllSettings(){
     if (metaRead){
       data.meta = metaRead;
       data.customCode = readCustomCode();
-      /* CAPI token — secrets table (Part B). Sirf jab naya token likha ho ya delete tick ho:
-         tab hi secrets ko chhedein; warna Part B ke baghair bhi har save chalta hai.
-         FIX 2026-11-04 (RETURNING bug — checkout wala bug bhi yehi tha): store_meta_secrets
-         par koi SELECT policy nahi (token kabhi client se parha na jaye — by design).
-         supabase-js ka upsert()/delete() hamesha row wapas mangta hai (return=representation)
-         aur uska koi returning option nahi (library mein verified); is liye RETURNING hi
-         42501 se fail hota hai, INSERT khud nahi. Is liye seedha fetch + Prefer:
-         return=minimal — row wapas nahi mangi jati, INSERT/DELETE ka WITH CHECK hi chalta hai. */
+/* CAPI token — server-side save (Part B2 Edge Function "meta-token-save").
+         FIX 2026-11-04 (UPSERT/UPDATE bug): store_meta_secrets par koi SELECT policy
+         nahi (token kabhi client se parha na jaye — by design), is liye client-side
+         UPSERT/DELETE purani row ko dekh hi nahi sakta aur 403 deta hai (plain INSERT
+         chalta hai, UPDATE/DELETE nahi — test se prove). Is liye token save ab Edge
+         Function se hota hai — function caller ka JWT verify karke (owner/admin/
+         platform admin) aur service_role se upsert/delete karta hai (RLS bypass). */
       const tokEl = $("#metaCapiToken");
       const delEl = $("#metaCapiDelete");
       const newTok = tokEl ? String(tokEl.value || "").trim() : "";
@@ -2855,14 +2854,10 @@ async function persistAllSettings(){
         const { data: sessData } = await sb.auth.getSession();
         const accessToken = sessData && sessData.session ? sessData.session.access_token : "";
         if (!accessToken) throw new Error("CAPI token save nahi ho saka — admin session nahi mili, dobara sign in karein.");
-        const metaHeaders = { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + accessToken, "Content-Type": "application/json", Prefer: "return=minimal" };
-        if (delEl && delEl.checked){
-          const delResp = await fetch(SUPABASE_URL + "/rest/v1/store_meta_secrets?store_id=eq." + STORE_ID, { method: "DELETE", headers: metaHeaders });
-          if (!delResp.ok) throw new Error("CAPI token delete nahi ho saka — Supabase migration (Part B) abhi nahi chali: HTTP " + delResp.status);
-        } else if (newTok){
-          const upResp = await fetch(SUPABASE_URL + "/rest/v1/store_meta_secrets?on_conflict=store_id", { method: "POST", headers: { ...metaHeaders, Prefer: "return=minimal,resolution=merge-duplicates" }, body: JSON.stringify({ store_id: STORE_ID, capi_token: newTok, updated_at: new Date().toISOString() }) });
-          if (!upResp.ok) throw new Error("CAPI token save nahi ho saka — Supabase migration (Part B) abhi nahi chali: HTTP " + upResp.status);
-        }
+        const tokResp = await fetch(SUPABASE_URL + "/functions/v1/meta-token-save", { method: "POST", headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ store_id: STORE_ID, capi_token: newTok, delete: !!(delEl && delEl.checked) }) });
+        let tokJson = {};
+      try { tokJson = await tokResp.json(); } catch (e) {}
+          if (!tokResp.ok || !tokJson.ok) throw new Error("CAPI token save nahi ho saka — " + (tokJson.error || ("HTTP " + tokResp.status)));
       }
       if (tokEl) tokEl.value = "";
       if (delEl) delEl.checked = false;
