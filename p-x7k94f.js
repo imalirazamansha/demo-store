@@ -154,7 +154,7 @@ const ADMIN_DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
-  /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* V3.9: fashion options + editable section/PDP text */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* V3.10: Luxury theme content (Festive tiles, Collection tabs, Editorial banner) */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* V3.11: Ready To Wear tabs + Editorial slider banners */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages --- */ customPages: [], sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
+  /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* V3.9: fashion options + editable section/PDP text */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* V3.10: Luxury theme content (Festive tiles, Collection tabs, Editorial banner) */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* V3.11: Ready To Wear tabs + Editorial slider banners */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages --- */ customPages: [], /* --- V5 Phase 5: Meta + custom code (har theme) --- */ meta: { pixelId: "", capiEnabled: false, testEventCode: "", hasCapiToken: false, capiTokenLast4: "" }, customCode: { head: "", body: "" }, sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
   policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
   profile: { logo_url: "", email: "", phone: "", address: "" },
   /* V2 keys — storefront inhein consume karega (Part B) */
@@ -321,7 +321,7 @@ function showDash(){
   $("#logoutBtn").classList.remove("hidden");
   /* Role gating (current store ki role par): staff ko Categories/Coupons/Team/Settings nahi; admin ko Team nahi. */
   $("#tabTeam").classList.toggle("hidden", effRole() !== "owner");
-  const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings", "tabHomepage", "tabAppearance", "tabStyle", "tabContent"];
+  const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings", "tabHomepage", "tabAppearance", "tabStyle", "tabContent", "tabMeta"]; /* V5 Phase 5: Meta tab sirf Owner/Admin — staff ko token fields kabhi nahi. */
   adminOnlyTabs.forEach(id => document.getElementById(id).classList.toggle("hidden", !isAdminPlus()));
   switchTab("dashboard");
   loadAll();
@@ -1585,7 +1585,7 @@ function mergeAdminSettings(raw){
     return { product: cs(x.product), name: cs(x.name), city: cs(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cs(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cs(x.label), amount: cs(x.amount), note: cs(x.note), budget: cs(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cs(x.user), avatar: cs(x.avatar), video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (typeof raw.showDisclaimer === "boolean") out.showDisclaimer = raw.showDisclaimer; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxCs = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat), img: luxCs(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxCs(x.cat), title: luxCs(x.title), subtitle: luxCs(x.subtitle), img: luxCs(x.img) })).filter(x => x.cat).slice(0, 12); if (Array.isArray(raw.customPages)) out.customPages = raw.customPages.filter(x => x && typeof x === "object").map(x => ({ slug: String(x.slug || "").trim().toLowerCase(), title: luxCs(x.title), body: String(x.body || "").slice(0, 20000), seoTitle: luxCs(x.seoTitle), showInHeader: x.showInHeader === true, showInFooter: x.showInFooter === true })).filter(x => x.slug).slice(0, 20);
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cs(x.user), avatar: cs(x.avatar), video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (typeof raw.showDisclaimer === "boolean") out.showDisclaimer = raw.showDisclaimer; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxCs = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat), img: luxCs(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxCs(x.cat), title: luxCs(x.title), subtitle: luxCs(x.subtitle), img: luxCs(x.img) })).filter(x => x.cat).slice(0, 12); if (Array.isArray(raw.customPages)) out.customPages = raw.customPages.filter(x => x && typeof x === "object").map(x => ({ slug: String(x.slug || "").trim().toLowerCase(), title: luxCs(x.title), body: String(x.body || "").slice(0, 20000), seoTitle: luxCs(x.seoTitle), showInHeader: x.showInHeader === true, showInFooter: x.showInFooter === true })).filter(x => x.slug).slice(0, 20); /* V5 Phase 5: Meta + custom code — whitelist rebuild; capiToken yahan KABHI nahi (wo store_meta_secrets mein hai, Part B). */ if (raw.meta && typeof raw.meta === "object"){ out.meta = { pixelId: String(raw.meta.pixelId || "").replace(/[^0-9]/g, "").slice(0, 20), capiEnabled: raw.meta.capiEnabled === true, testEventCode: String(raw.meta.testEventCode || "").slice(0, 64), hasCapiToken: raw.meta.hasCapiToken === true, capiTokenLast4: String(raw.meta.capiTokenLast4 || "").slice(-4) }; } if (raw.customCode && typeof raw.customCode === "object"){ out.customCode = { head: String(raw.customCode.head || "").slice(0, 50000), body: String(raw.customCode.body || "").slice(0, 50000) }; }
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
@@ -1948,6 +1948,7 @@ function fillSettings(s){
   fillStyle(s);
   fillContent(s);
   fillSections(s);
+  fillMeta(s); /* V5 Phase 5: Meta tab bharein. */
   /* V4 Phase 2: active theme ke controls dikhayein/chhupayein. */
   applyThemeVisibility();
 }
@@ -2679,11 +2680,66 @@ function readSpEntries(){
    saare tabs ke DOM se values parh kar EK settings.data upsert hota hai,
    taa ke kisi ek tab ki save doosre tab ki values ko wipe na kare.
    Upar wala topbar Save button bhi yehi routine chalata hai. */
-/* ---------- (A) Luxury auto-seed: theme-apply par 7 categories ----------    Jab admin Appearance se Luxury theme save karta hai aur store ka Luxury    content bilkul khaali hai (tiles/tabs/banners/reels — sab khaali), to 7    Luxury categories auto-ban jati hain jo store mein pehle se na hon.    VALUES seed nahi hoti (na shopnest ki, na images/handle) — sirf structure.    Kabhi overwrite nahi: koi bhi Luxury list non-empty ho to kuch nahi hota.    Seed condition "values empty" hai, "keys absent" nahi — persistAllSettings    har Save par poora merged object likhta hai, is liye khaali keys DB mein    maujood hoti hain. */ const LUXURY_CATEGORIES = ["Luxury", "Daily Wear", "Embroidered", "Pret", "Luxury Pret", "Daily Wear Pret", "Embroidered Pret"]; async function seedLuxuryCategories(savedData){   const empty = v => !Array.isArray(v) || v.length === 0;   try {     if (!savedData || savedData.theme !== "luxury") return { created: 0, skipped: true };     if (!empty(savedData.luxuryTiles) || !empty(savedData.luxuryTabs) || !empty(savedData.luxuryRtwTabs) || !empty(savedData.luxuryBanners) || !empty(savedData.instaReels)) return { created: 0, skipped: true };     const { data: existing, error: e0 } = await sb.from("categories").select("name, sort").eq("store_id", STORE_ID);     if (e0) throw e0;     const have = new Set((existing || []).map(c => String(c.name || "").trim().toLowerCase()));     let maxSort = (existing || []).reduce((m, c) => Math.max(m, Number(c.sort) || 0), 0);     const missing = LUXURY_CATEGORIES.filter(n => !have.has(n.toLowerCase()));     if (!missing.length) return { created: 0, skipped: false };     const rows = missing.map(n => { maxSort += 1; return { store_id: STORE_ID, name: n, image: "", visible: true, sort: maxSort }; });     const { error } = await sb.from("categories").insert(rows);     if (error) throw error;     if (typeof loadCategories === "function") loadCategories();     showToast("👑 Luxury theme: " + rows.length + " categories ban gayin.", "ok");     return { created: rows.length, skipped: false };   } catch (e) {     showToast("Luxury categories seed fail: " + (e && e.message ? e.message : e), "err");     return { created: 0, error: e };   } } async function persistAllSettings(){
+/* ---------- (A) Luxury auto-seed: theme-apply par 7 categories ----------    Jab admin Appearance se Luxury theme save karta hai aur store ka Luxury    content bilkul khaali hai (tiles/tabs/banners/reels — sab khaali), to 7    Luxury categories auto-ban jati hain jo store mein pehle se na hon.    VALUES seed nahi hoti (na shopnest ki, na images/handle) — sirf structure.    Kabhi overwrite nahi: koi bhi Luxury list non-empty ho to kuch nahi hota.    Seed condition "values empty" hai, "keys absent" nahi — persistAllSettings    har Save par poora merged object likhta hai, is liye khaali keys DB mein    maujood hoti hain. */ const LUXURY_CATEGORIES = ["Luxury", "Daily Wear", "Embroidered", "Pret", "Luxury Pret", "Daily Wear Pret", "Embroidered Pret"]; async function seedLuxuryCategories(savedData){   const empty = v => !Array.isArray(v) || v.length === 0;   try {     if (!savedData || savedData.theme !== "luxury") return { created: 0, skipped: true };     if (!empty(savedData.luxuryTiles) || !empty(savedData.luxuryTabs) || !empty(savedData.luxuryRtwTabs) || !empty(savedData.luxuryBanners) || !empty(savedData.instaReels)) return { created: 0, skipped: true };     const { data: existing, error: e0 } = await sb.from("categories").select("name, sort").eq("store_id", STORE_ID);     if (e0) throw e0;     const have = new Set((existing || []).map(c => String(c.name || "").trim().toLowerCase()));     let maxSort = (existing || []).reduce((m, c) => Math.max(m, Number(c.sort) || 0), 0);     const missing = LUXURY_CATEGORIES.filter(n => !have.has(n.toLowerCase()));     if (!missing.length) return { created: 0, skipped: false };     const rows = missing.map(n => { maxSort += 1; return { store_id: STORE_ID, name: n, image: "", visible: true, sort: maxSort }; });     const { error } = await sb.from("categories").insert(rows);     if (error) throw error;     if (typeof loadCategories === "function") loadCategories();     showToast("👑 Luxury theme: " + rows.length + " categories ban gayin.", "ok");     return { created: rows.length, skipped: false };   } catch (e) {     showToast("Luxury categories seed fail: " + (e && e.message ? e.message : e), "err");     return { created: 0, error: e };   } } /* ================= V5 Phase 5: Meta tab (Pixel + CAPI + custom code) =================
+   Token kabhi settings.data mein nahi jata — sirf store_meta_secrets (Part B).
+   fillMeta: token field hamesha khali rehta hai; placeholder mein •••• + last4 dikhta hai. */
+function fillMeta(s){
+  const pid = $("#metaPixelId"); if (!pid) return; /* Panel abhi DOM mein nahi. */
+  const m = (s && s.meta) || {};
+  const cc = (s && s.customCode) || {};
+  pid.value = String(m.pixelId || "");
+  const en = $("#metaCapiEnabled"); if (en) en.checked = m.capiEnabled === true;
+  const tec = $("#metaTestEventCode"); if (tec) tec.value = String(m.testEventCode || "");
+  const tok = $("#metaCapiToken"); if (tok){ tok.value = ""; tok.placeholder = m.hasCapiToken ? ("••••••••" + String(m.capiTokenLast4 || "")) : "Meta Events Manager se token paste karein"; }
+  const del = $("#metaCapiDelete"); if (del) del.checked = false;
+  const st = $("#metaTokenState"); if (st) st.textContent = m.hasCapiToken ? ("Token save hai ••••" + String(m.capiTokenLast4 || "") + " — naya token paste karke Save dabayein, ya delete tick karke Save karein.") : "Koi CAPI token save nahi — Pixel akela bhi kaam karega.";
+  const ch = $("#metaCodeHead"); if (ch) ch.value = String(cc.head || "");
+  const cb = $("#metaCodeBody"); if (cb) cb.value = String(cc.body || "");
+  metaRenderLog();
+}
+function readMeta(){
+  const pidEl = $("#metaPixelId");
+  if (!pidEl) return null; /* Meta panel DOM mein nahi (HTML commit abhi nahi aaya) — SETTINGS_STATE ki values rehti hain. */
+  const prev = (SETTINGS_STATE && SETTINGS_STATE.meta) || {};
+  const tokEl = $("#metaCapiToken");
+  const delEl = $("#metaCapiDelete");
+  let hasTok = prev.hasCapiToken === true, last4 = String(prev.capiTokenLast4 || "");
+  const newTok = tokEl ? String(tokEl.value || "").trim() : "";
+  if (delEl && delEl.checked){ hasTok = false; last4 = ""; }
+  else if (newTok){ hasTok = true; last4 = newTok.slice(-4); }
+  return { pixelId: String(pidEl.value || "").replace(/[^0-9]/g, "").slice(0, 20), capiEnabled: !!($("#metaCapiEnabled") && $("#metaCapiEnabled").checked), testEventCode: String((($("#metaTestEventCode") || {}).value) || "").slice(0, 64), hasCapiToken: hasTok, capiTokenLast4: last4 };
+}
+function readCustomCode(){
+  return { head: String((($("#metaCodeHead") || {}).value) || "").slice(0, 50000), body: String((($("#metaCodeBody") || {}).value) || "").slice(0, 50000) };
+}
+function metaRenderLog(){
+  const box = $("#metaEventLog"); if (!box) return;
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem("sn_meta_log_v1") || "[]"); if (!Array.isArray(arr)) arr = []; } catch (e){ arr = []; }
+  if (!arr.length){ box.textContent = "Abhi koi event log nahi — test button dabayein ya store par koi action karein."; return; }
+  box.innerHTML = arr.map(e => "<div>" + esc(e.t || "") + " — " + esc(e.kind || "") + " " + esc(e.name || "") + " — " + (e.ok ? "OK" : "FAIL") + " — " + esc(e.detail || "") + "</div>").join("");
+}
+function metaTestPixel(){
+  const pid = String((($("#metaPixelId") || {}).value) || "").replace(/[^0-9]/g, "");
+  const msg = $("#metaMsg");
+  if (!pid){ if (msg){ msg.textContent = "Pehle Pixel ID likhein, phir test karein."; msg.className = "msg err"; } return; }
+  try {
+    if (typeof window.fbq === "function"){ window.fbq("track", "PageView", {}, { eventID: "test_" + Date.now().toString(36) }); }
+    try { const arr = JSON.parse(localStorage.getItem("sn_meta_log_v1") || "[]"); arr.unshift({ t: new Date().toISOString(), kind: "test", name: "PageView", ok: true, detail: "admin test — Events Manager → Test Events mein dekhein" }); localStorage.setItem("sn_meta_log_v1", JSON.stringify(arr.slice(0, 20))); } catch (e){}
+    metaRenderLog();
+    if (msg){ msg.textContent = "Test PageView bhej diya — Meta Events Manager → Test Events mein 1–2 minute mein nazar aana chahiye."; msg.className = "msg ok"; }
+  } catch (e){ if (msg){ msg.textContent = "Test nahi bhej saka: " + (e && e.message ? e.message : ""); msg.className = "msg err"; } }
+}
+function bindMetaTab(){
+  const tb = $("#metaTestPixelBtn"); if (tb) tb.onclick = metaTestPixel;
+  const cl = $("#metaClearLogBtn"); if (cl) cl.onclick = () => { try { localStorage.removeItem("sn_meta_log_v1"); } catch (e){} metaRenderLog(); };
+  const tg = $("#metaTokenToggle"); if (tg) tg.onclick = () => { const tok = $("#metaCapiToken"); if (!tok) return; tok.type = tok.type === "password" ? "text" : "password"; tg.textContent = tok.type === "password" ? "👁 dikhayein" : "🙈 chhupayein"; };
+}
+async function persistAllSettings(){
   const saveBtns = [...document.querySelectorAll(".js-save, #globalSaveBtn")];
   const savedLabels = saveBtns.map(b => b.innerHTML);
   saveBtns.forEach(b => { b.disabled = true; b.textContent = "Saving…"; });
-  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg"), style: $("#styleMsg"), content: $("#contentMsg"), sections: $("#sectionsMsg") };
+  const msgEls = { settings: $("#settingsMsg"), homepage: $("#homepageMsg"), appearance: $("#appearanceMsg"), style: $("#styleMsg"), content: $("#contentMsg"), sections: $("#sectionsMsg"), meta: $("#metaMsg") }; /* V5 Phase 5: metaMsg. */
   Object.values(msgEls).forEach(m => { if (m){ m.textContent = ""; m.className = "msg"; } });
   const topMsg = $("#topSaveMsg");
   if (topMsg) topMsg.textContent = "";
@@ -2779,6 +2835,26 @@ function readSpEntries(){
        SETTINGS_STATE clone se shuru hone ki wajah se koi tab wipe nahi hota. */
     data.style = readStyle();
     data.sectionStyles = readSectionStyles();
+    /* V5 Phase 5: Meta + custom code — sirf jab Meta panel DOM mein ho (HTML commit pehle aaya). */
+    const metaRead = readMeta();
+    if (metaRead){
+      data.meta = metaRead;
+      data.customCode = readCustomCode();
+      /* CAPI token — secrets table (Part B). Sirf jab naya token likha ho ya delete tick ho:
+         tab hi secrets ko chhedein; warna Part B ke baghair bhi har save chalta hai. */
+      const tokEl = $("#metaCapiToken");
+      const delEl = $("#metaCapiDelete");
+      const newTok = tokEl ? String(tokEl.value || "").trim() : "";
+      if (delEl && delEl.checked){
+        const { error: delErr } = await sb.from("store_meta_secrets").delete().eq("store_id", STORE_ID);
+        if (delErr) throw new Error("CAPI token delete nahi ho saka — Supabase migration (Part B) abhi nahi chali: " + (delErr.message || delErr));
+      } else if (newTok){
+        const { error: upErr } = await sb.from("store_meta_secrets").upsert({ store_id: STORE_ID, capi_token: newTok, updated_at: new Date().toISOString() }, { onConflict: "store_id" });
+        if (upErr) throw new Error("CAPI token save nahi ho saka — Supabase migration (Part B) abhi nahi chali: " + (upErr.message || upErr));
+      }
+      if (tokEl) tokEl.value = "";
+      if (delEl) delEl.checked = false;
+    }
     /* V3.3 Content — sirf jab Content tab bhara gaya ho; warna SETTINGS_STATE
        ki values (stored ya defaults) waisi ki waisi rehti hain. */
     if (contentFilled){
@@ -3015,7 +3091,9 @@ $("#saveAppearanceBtn").onclick = persistAllSettings;
 $("#saveStyleBtn").onclick = persistAllSettings;
 $("#saveContentBtn").onclick = persistAllSettings;
 $("#saveSectionsBtn").onclick = persistAllSettings;
+$("#saveMetaBtn").onclick = persistAllSettings; /* V5 Phase 5. */
 $("#globalSaveBtn").onclick = persistAllSettings;
+bindMetaTab(); /* V5 Phase 5: Meta tab buttons (null-guarded — panel na ho to bhi safe). */
 
 /* ---------- Tabs ---------- */
 const TAB_VIEWS = {
@@ -3030,10 +3108,11 @@ const TAB_VIEWS = {
   appearance: ["tabAppearance", "appearancePanel"],
   style: ["tabStyle", "stylePanel"],
   content: ["tabContent", "contentPanel"],
-  settings: ["tabSettings", "settingsPanel"]
+  settings: ["tabSettings", "settingsPanel"],
+  meta: ["tabMeta", "metaPanel"] /* V5 Phase 5: Meta tab (Pixel + CAPI + custom code). */
 };
 /* In tabs par topbar wala global Save button nazar aata hai. */
-const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style", "content", "sections"];
+const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style", "content", "sections", "meta"]; /* V5 Phase 5: Meta tab bhi global Save se save hota hai. */
 Object.entries(TAB_VIEWS).forEach(([view, [tabId]]) => {
   document.getElementById(tabId).onclick = () => switchTab(view);
 });
