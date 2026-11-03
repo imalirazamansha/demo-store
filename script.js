@@ -152,7 +152,7 @@ const DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
-  /* --- V3.6 Playful Pop layout: Instagram reels + blog (Content tab se) --- */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* --- V3.9 Fashion options + editable section/PDP text --- */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* --- V3.10 Luxury theme content (Festive tiles, Collection tabs, Editorial banner) --- */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* --- V3.11 Luxury: Ready To Wear tabs + Editorial slider --- */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages (har theme, menu + SEO) --- */ customPages: [], /* --- V2 keys (Part A admin contract) --- */
+  /* --- V3.6 Playful Pop layout: Instagram reels + blog (Content tab se) --- */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* --- V3.9 Fashion options + editable section/PDP text --- */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* --- V3.10 Luxury theme content (Festive tiles, Collection tabs, Editorial banner) --- */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* --- V3.11 Luxury: Ready To Wear tabs + Editorial slider --- */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages (har theme, menu + SEO) --- */ customPages: [], /* --- V5 Phase 5: Meta (Pixel + CAPI) + custom code (har theme) --- */ meta: { pixelId: "", capiEnabled: false, testEventCode: "", hasCapiToken: false, capiTokenLast4: "" }, customCode: { head: "", body: "" }, /* --- V2 keys (Part A admin contract) --- */
   font_family: { name: "", stack: "", google: "" },
   theme_color: "",
   logo_url: "",
@@ -374,7 +374,7 @@ function mergeSettings(raw){
     return { product: cleanStr(x.product), name: cleanStr(x.name), city: cleanStr(x.city), rating: Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : 5, text: cleanStr(x.text) };
   });
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cleanStr(x.label), amount: cleanStr(x.amount), note: cleanStr(x.note), budget: cleanStr(x.budget) }));
-  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), sub: cleanStr(x.sub) })); /* V3.6: Instagram reels + blog — key maujood ho to wahi (khaali = delete). */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cleanStr(x.user), avatar: cleanStr(x.avatar), video: cleanStr(x.video), poster: cleanStr(x.poster), title: cleanStr(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), excerpt: cleanStr(x.excerpt), img: cleanStr(x.img), link: cleanStr(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (raw.sectionText && typeof raw.sectionText === "object"){ Object.keys(raw.sectionText).forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxStr = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxStr(x.label), cat: luxStr(x.cat), img: luxStr(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxStr(x.label), cat: luxStr(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxStr(x.label), cat: luxStr(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.luxuryBanners)) out.luxuryBanners = raw.luxuryBanners.filter(x => x && typeof x === "object").map(x => ({ img: luxStr(x.img), eyebrow: luxStr(x.eyebrow), title: luxStr(x.title), button: luxStr(x.button), cat: luxStr(x.cat) })).filter(x => x.img).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxStr(x.cat), title: luxStr(x.title), subtitle: luxStr(x.subtitle), img: luxStr(x.img) })).filter(x => x.cat).slice(0, 12); if (Array.isArray(raw.customPages)) out.customPages = raw.customPages.filter(x => x && typeof x === "object").map(x => ({ slug: String(x.slug || "").trim().toLowerCase(), title: luxStr(x.title), body: String(x.body || "").slice(0, 20000), seoTitle: luxStr(x.seoTitle), showInHeader: x.showInHeader === true, showInFooter: x.showInFooter === true })).filter(x => x.slug).slice(0, 20);
+  if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), sub: cleanStr(x.sub) })); /* V3.6: Instagram reels + blog — key maujood ho to wahi (khaali = delete). */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cleanStr(x.user), avatar: cleanStr(x.avatar), video: cleanStr(x.video), poster: cleanStr(x.poster), title: cleanStr(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cleanStr(x.title), excerpt: cleanStr(x.excerpt), img: cleanStr(x.img), link: cleanStr(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (raw.sectionText && typeof raw.sectionText === "object"){ Object.keys(raw.sectionText).forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxStr = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxStr(x.label), cat: luxStr(x.cat), img: luxStr(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxStr(x.label), cat: luxStr(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxStr(x.label), cat: luxStr(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.luxuryBanners)) out.luxuryBanners = raw.luxuryBanners.filter(x => x && typeof x === "object").map(x => ({ img: luxStr(x.img), eyebrow: luxStr(x.eyebrow), title: luxStr(x.title), button: luxStr(x.button), cat: luxStr(x.cat) })).filter(x => x.img).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxStr(x.cat), title: luxStr(x.title), subtitle: luxStr(x.subtitle), img: luxStr(x.img) })).filter(x => x.cat).slice(0, 12); if (Array.isArray(raw.customPages)) out.customPages = raw.customPages.filter(x => x && typeof x === "object").map(x => ({ slug: String(x.slug || "").trim().toLowerCase(), title: luxStr(x.title), body: String(x.body || "").slice(0, 20000), seoTitle: luxStr(x.seoTitle), showInHeader: x.showInHeader === true, showInFooter: x.showInFooter === true })).filter(x => x.slug).slice(0, 20); /* V5 Phase 5: Meta + custom code — whitelist rebuild; capiToken yahan KABHI nahi aata (wo store_meta_secrets mein hai, Part B). */ if (raw.meta && typeof raw.meta === "object"){ out.meta = { pixelId: String(raw.meta.pixelId || "").replace(/[^0-9]/g, "").slice(0, 20), capiEnabled: raw.meta.capiEnabled === true, testEventCode: String(raw.meta.testEventCode || "").slice(0, 64), hasCapiToken: raw.meta.hasCapiToken === true, capiTokenLast4: String(raw.meta.capiTokenLast4 || "").slice(-4) }; } if (raw.customCode && typeof raw.customCode === "object"){ out.customCode = { head: String(raw.customCode.head || "").slice(0, 50000), body: String(raw.customCode.body || "").slice(0, 50000) }; }
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* Deep merge: sections toggles */
   if (raw.sections && typeof raw.sections === "object")
@@ -478,6 +478,7 @@ async function loadSettings(){
   applySettings();
   /* V5 Phase 4: shareable page link (?page=<slug>) — settings load ke baad, sirf aik dafa. */
   if (!__customPageOpened){ __customPageOpened = true; try { var pg = new URLSearchParams(location.search).get("page"); if (pg) openCustomPage(pg); } catch (e){} }
+  initMetaTracking(); /* V5 Phase 5: Pixel + custom code init (settings load ke baad, ?page= ke baad — taa ke pehli view sahi ho). */
 }
 function applySettings(){
   const name = SETTINGS.store_name || DEFAULT_SETTINGS.store_name;
@@ -1228,11 +1229,98 @@ function trackPage(page){
 /* ---------- Pages ---------- */
 const PAGE_IDS = ["homeView", "productPage", "collectionPage", "customPage", "cartPage", "checkoutPage", "successPage"];
 const PAGE_TRACK = { homeView: "home", productPage: "product", collectionPage: "collection", customPage: "custom", cartPage: "cart", checkoutPage: "checkout" };
+/* ================= V5 Phase 5: Meta Pixel + Conversions API + custom code =================
+   Data model: SETTINGS.meta { pixelId, capiEnabled, testEventCode, hasCapiToken, capiTokenLast4 }
+   + SETTINGS.customCode { head, body }. CAPI TOKEN kabhi settings.data mein nahi — wo
+   store_meta_secrets table mein hai (Part B); storefront ko sirf hasCapiToken pata hota hai.
+   Fail-open rule: tracking ki koi bhi ghalti kabhi checkout/store ko nahi rokegi. */
+const META_CAPI_URL = SUPABASE_URL + "/functions/v1/meta-capi";
+const META_LOG_KEY = "sn_meta_log_v1";
+let __metaInit = false;
+function metaEventId(){ try { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); } catch (e){} return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10); }
+function metaFbpFbc(){ const out = {}; try { const m = document.cookie.match(/(?:^|; )_fbp=([^;]*)/); if (m) out.fbp = decodeURIComponent(m[1]); const c = document.cookie.match(/(?:^|; )_fbc=([^;]*)/); if (c) out.fbc = decodeURIComponent(c[1]); } catch (e){} return out; }
+function metaLog(entry){ try { const arr = JSON.parse(localStorage.getItem(META_LOG_KEY) || "[]"); if (!Array.isArray(arr)) throw 0; arr.unshift({ t: new Date().toISOString(), ...entry }); localStorage.setItem(META_LOG_KEY, JSON.stringify(arr.slice(0, 20))); } catch (e){} }
+function metaPixelId(){ const m = (SETTINGS && SETTINGS.meta) || {}; return String(m.pixelId || "").replace(/[^0-9]/g, ""); }
+function metaCapiOn(){ const m = (SETTINGS && SETTINGS.meta) || {}; return m.capiEnabled === true && m.hasCapiToken === true; }
+async function sendCapiEvent(payload){
+  try {
+    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const to = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e){} }, 8000) : null;
+    const r = await fetch(META_CAPI_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY }, body: JSON.stringify(payload), signal: ctrl ? ctrl.signal : undefined });
+    if (to) clearTimeout(to);
+    const j = await r.json().catch(() => ({}));
+    metaLog({ kind: "capi", name: payload.event_name, ok: !!j.events_received, detail: j.events_received ? ("events_received=" + j.events_received) : (j.error || ("http " + r.status)) });
+  } catch (e){ metaLog({ kind: "capi", name: payload.event_name, ok: false, detail: "send fail: " + (e && e.message ? e.message : "network") }); }
+}
+function metaTrack(name, params, opts){
+  opts = opts || {};
+  try {
+    const eid = opts.eventId || metaEventId();
+    const m = (SETTINGS && SETTINGS.meta) || {};
+    /* Browser Pixel (agar load hai aur ID save hai). */
+    if (typeof window.fbq === "function" && metaPixelId()){ try { window.fbq("track", name, params || {}, { eventID: eid }); } catch (e){} }
+    /* Server CAPI (agar ON hai + token save hai) — fire-and-forget, checkout kabhi nahi rukta. */
+    if (metaCapiOn()){
+      const payload = { store_slug: STORE_SLUG, event_name: name, event_time: Math.floor(Date.now() / 1000), event_id: eid, action_source: "website", user_data: metaFbpFbc(), custom_data: params || {} };
+      if (opts.phone) payload.user_data.ph = opts.phone;
+      if (m.testEventCode) payload.test_event_code = m.testEventCode;
+      sendCapiEvent(payload);
+    }
+    const channels = (metaPixelId() ? "pixel " : "") + (metaCapiOn() ? "capi" : "");
+    metaLog({ kind: "event", name: name, ok: true, detail: channels ? channels : "no tracking configured" });
+  } catch (e){}
+}
+function metaPageView(){ if (!metaPixelId() && !metaCapiOn()) return; metaTrack("PageView", {}); }
+function metaViewContent(p){ if (!p || (!metaPixelId() && !metaCapiOn())) return; metaTrack("ViewContent", { content_ids: [String(p.id)], content_type: "product", content_name: p.name, value: Number(p.price) || 0, currency: "PKR" }); }
+function metaAddToCart(id, qty){ const p = findP(id); if (!p || (!metaPixelId() && !metaCapiOn())) return; metaTrack("AddToCart", { content_ids: [String(p.id)], content_type: "product", content_name: p.name, value: (Number(p.price) || 0) * (Number(qty) || 1), currency: "PKR" }); }
+function metaInitiateCheckout(){ if (!metaPixelId() && !metaCapiOn()) return; const t = checkoutTotals(); const entries = checkoutState ? checkoutState.entries : []; const ids = entries.map(([k]) => String(parseCartKey(k).id)); metaTrack("InitiateCheckout", { content_ids: ids, num_items: entries.reduce((a,[,q]) => a + Number(q || 0), 0), value: Number(t.sub) || 0, currency: "PKR" }); }
+function metaPurchase(total, lines, phone){ if (!metaPixelId() && !metaCapiOn()) return; const contents = (lines || []).map(l => ({ id: String(l.id), quantity: Number(l.qty) || 1, item_price: Number(l.price) || 0 })); metaTrack("Purchase", { content_ids: contents.map(c => c.id), contents: contents, num_items: contents.reduce((a,c) => a + c.quantity, 0), value: Number(total) || 0, currency: "PKR" }, { phone: phone || "" }); }
+function injectRawHtml(target, html){
+  if (!target || !html || !String(html).trim()) return;
+  try {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = String(html);
+    const frag = tpl.content || tpl;
+    const nodes = Array.from(frag.childNodes || []);
+    nodes.forEach(n => {
+      if (n.nodeType === 1 && n.tagName === "SCRIPT"){
+        const sc = document.createElement("script");
+        /* Attribute-based (hasAttribute/getAttribute) — IDL reflection (n.src/n.async)
+           par depend nahi karte; fake DOM aur real browser dono mein chalta hai. */
+        if (n.getAttribute("src")) sc.src = n.getAttribute("src");
+        if (n.hasAttribute("async")) sc.async = true;
+        if (n.hasAttribute("defer")) sc.defer = true;
+        if (n.getAttribute("type")) sc.type = n.getAttribute("type");
+        sc.textContent = n.textContent || "";
+        target.appendChild(sc);
+      } else {
+        target.appendChild(n);
+      }
+    });
+  } catch (e){}
+}
+function initMetaTracking(){
+  if (__metaInit) return; __metaInit = true;
+  try {
+    const cc = (SETTINGS && SETTINGS.customCode) || {};
+    if (cc.head) injectRawHtml(document.head, cc.head);
+    if (cc.body) injectRawHtml(document.body, cc.body);
+    const pid = metaPixelId();
+    if (pid && typeof window.fbq !== "function"){
+      /* Meta Pixel base code (Meta ka official snippet — verbatim). */
+      !function(f,b,e,v,n,t,s){ if(f.fbq) return; n=f.fbq=function(){ n.callMethod ? n.callMethod.apply(n,arguments) : n.queue.push(arguments); }; if(!f._fbq) f._fbq=n; n.push=n; n.loaded=!0; n.version="2.0"; n.queue=[]; t=b.createElement(e); t.async=!0; t.src=v; s=b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t,s); }(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
+      try { window.fbq("init", pid); } catch (e){}
+    }
+    /* Pehli view ka PageView — loadSettings mein ?page= ke baad chalta hai, is liye current view settled hai. */
+    metaPageView();
+  } catch (e){}
+}
 function showPage(id){
   PAGE_IDS.forEach(pid => { document.getElementById(pid).hidden = pid !== id; }); /* V3.12 FIX F5: PDP par transparent header ke peeche koi hero nahi — white-on-white. lux-pdp class se header ko solid white + dark text milta hai (CSS). Collection page par bhi koi hero nahi, is liye wahi class wahan bhi lagti hai. */ document.body.classList.toggle("lux-pdp", id === "productPage" || id === "collectionPage" || id === "customPage" || id === "cartPage" || id === "checkoutPage" || id === "successPage");
   if (id !== "homeView") window.scrollTo({ top: 0 });
   if (typeof updatePdpSticky === "function") updatePdpSticky();
   if (PAGE_TRACK[id]) trackPage(PAGE_TRACK[id]);
+  metaPageView(); /* V5 Phase 5: Meta PageView (har view par). */
 }
 function showHome(){ showPage("homeView"); window.scrollTo({ top: 0 }); updateLuxNav(); }
 
@@ -1302,6 +1390,7 @@ function openProduct(id){
   /* V3.12: Luxury PDP par Disclaimer + delivery lines + badges dikhayein (admin toggle showDisclaimer, default ON). */
   if (isLuxury()){ const showDisc = SETTINGS.showDisclaimer !== false; document.body.classList.toggle("lux-no-disclaimer", !showDisc); ["pdpDisclaimer", "pdpDeliveryLines", "pdpBadges"].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = !showDisc; }); }
   showPage("productPage"); updateLuxNav();
+  metaViewContent(p); /* V5 Phase 5: Meta ViewContent. */
   watchReveals();
 }
 /* V3.12: fabricated live counters (liveSold/liveVisiting) DELETE — Asim Jofa par koi live counter nahi. */
@@ -1377,6 +1466,7 @@ function addToCart(id, qty, variant){
    const k = cartKey(id, variant); cart[k] = (Number(cart[k]) || 0) + qty;
   saveCart(); renderCart();
   const p = findP(id); if (p) toast(`Added: ${p.name}`);
+   metaAddToCart(id, qty); /* V5 Phase 5: Meta AddToCart. */
   /* V3.2 cart bump: icon ek dafa uchhalta hai, animationend par class hat
      jati hai taa ke agla add dobara bump kare. */
   const cb = document.getElementById("cartBtn");
@@ -1508,7 +1598,7 @@ function renderCheckoutFields(){
   }).join("");
   wrap.hidden = fields.length === 0;
 }
-function showCheckoutPage(){ renderCheckoutFields(); renderCheckoutSummary(); showPage("checkoutPage"); }
+function showCheckoutPage(){ renderCheckoutFields(); renderCheckoutSummary(); showPage("checkoutPage"); metaInitiateCheckout(); /* V5 Phase 5: Meta InitiateCheckout. */ }
 function buyNow(id, qty, variant){
   if (!findP(id)) return;
   checkoutState = { source: "buynow", entries: [[cartKey(id, variant), qty]] };
@@ -1572,6 +1662,7 @@ $("#checkoutForm").onsubmit = async e => {
     err.textContent = "Order save nahi ho saka — internet check karke dobara try karein.";
     return;
   }
+  metaPurchase(total, lines, String(f.get("phone") || "").trim()); /* V5 Phase 5: Meta Purchase — order save ke baad, fail-open (tracking fail ho to bhi order save rehta hai). */
   if (checkoutState.source === "cart"){ cart = {}; saveCart(); renderCart(); }
   checkoutState = null;
   appliedCoupon = null;
