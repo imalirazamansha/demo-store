@@ -1618,6 +1618,54 @@ $("#continueBtn").onclick = showHome;
 $("#couponApplyBtn").onclick = applyCoupon;
 $("#couponRemoveBtn").onclick = removeCoupon;
 $("#couponInput").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); applyCoupon(); } });
+/* Idempotency helpers — one key per checkout attempt; the SAME key is reused
+   when the same checkout is submitted again (retry), so a duplicate insert is
+   rejected by the DB unique index instead of creating a second order. */
+/* Idempotency (production): duplicate-order prevention. A UUID key identifies one
+   checkout attempt-set. The key is stored in sessionStorage (survives a page
+      refresh in the same tab) until the order is confirmed, then cleared. A retry
+         reuses the SAME key; a new checkout generates a NEW key. The server enforces
+            uniqueness on (store_id, idempotency_key) — a second insert with the same key
+               is rejected with HTTP 409. A 409 is NEVER treated as success on its own: the
+                  client verifies the existing order via get_order_by_idempotency_key and
+                     confirms the total AND the line items match the submitted purchase. */
+function idemKeyName(){ return "shopnest_idem_" + (STORE_ID || "default"); }
+function idemNewKey(){
+     if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+     return "idem-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10) + "-" + Math.random().toString(36).slice(2, 10);
+}
+function idemGetKey(){ try { return sessionStorage.getItem(idemKeyName()) || ""; } catch (e) { return ""; } }
+function idemSetKey(k){ try { sessionStorage.setItem(idemKeyName(), k); } catch (e) {} }
+function idemClearKey(){ try { sessionStorage.removeItem(idemKeyName()); } catch (e) {} }
+function idemLinesEqual(a, b){
+     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+     const norm = arr => arr.map(l => [l.id, l.qty, l.price, l.size || "", l.color || "", l.delivery_fee || 0].join("|")).sort().join(";");
+     return norm(a) === norm(b);
+}
+async function idemVerifyOrder(storeId, key, total, lines){
+     /* Returns the existing order if it matches this purchase (total + lines),
+          otherwise null. The RPC returns NO customer PII (id/status/total/items/
+               created_at only) and filters by BOTH store_id and key. */
+     try {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_order_by_idempotency_key`, {
+                     method: "POST",
+                     headers: {
+                                apikey: SUPABASE_ANON_KEY,
+                                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                                "Content-Type": "application/json"
+                     },
+                     body: JSON.stringify({ p_store_id: storeId, p_key: key })
+            });
+            if (!res.ok) return null;
+            const rows = await res.json().catch(() => null);
+            const row = Array.isArray(rows) ? rows[0] : null;
+            if (!row) return null;
+            if (Number(row.total) !== Number(total)) return null;
+            const rowLines = (row.items && Array.isArray(row.items.lines)) ? row.items.lines : (Array.isArray(row.items) ? row.items : null);
+            if (!rowLines || !idemLinesEqual(rowLines, lines)) return null;
+            return row;
+     } catch (e) { return null; }
+}
 $("#checkoutForm").onsubmit = async e => {
   e.preventDefault();
   if (!checkoutState || !checkoutState.entries.length) return;
@@ -1656,12 +1704,16 @@ $("#checkoutForm").onsubmit = async e => {
   const items = { lines, coupon: appliedCoupon ? appliedCoupon.code : null, discount };
   if (coFields.length)
     items.custom_fields = coFields.map(cf => ({ label: cf.label, value: String(f.get("cf_" + cf.id) || "").trim() })).filter(x => x.value !== "");
+  /* Idempotency: reuse the stored key for a retry of this checkout, else a new key. */
+  let idemKey = idemGetKey();
+  if (!idemKey){ idemKey = idemNewKey(); idemSetKey(idemKey); }
   const orderRow = {
     customer_name: String(f.get("name") || "").trim(),
     phone: String(f.get("phone") || "").trim(),
     city: String(f.get("city") || "").trim(),
     address: String(f.get("address") || "").trim(),
-    items, total, status: "Pending"
+    items, total, status: "Pending",
+    idempotency_key: idemKey
   };
   if (STORE_ID) orderRow.store_id = STORE_ID;
     /* Checkout fix: anon has no SELECT policy on orders, so the insert must not
@@ -1669,18 +1721,32 @@ $("#checkoutForm").onsubmit = async e => {
           JS client's insert() has no returning option — verified in the library).
              Direct REST call with Prefer: return=minimal (proven: HTTP 201). */
    let error = null;
+   let idemDuplicate = null; /* set when a 409 is verified as the same purchase */
    try {
-      const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
-         method: "POST",
-         headers: {
+      const idemCtrl = new AbortController();
+      const idemTimer = setTimeout(() => idemCtrl.abort(), 90000); /* 90s client timeout */
+      let orderRes;
+      try {
+        orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+           method: "POST",
+           headers: {
             apikey: SUPABASE_ANON_KEY,
             Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
             "Content-Type": "application/json",
             Prefer: "return=minimal"
-         },
-         body: JSON.stringify(orderRow)
-      });
-      if (!orderRes.ok) error = await orderRes.json().catch(() => ({ message: "Order save failed" }));
+           },
+           body: JSON.stringify(orderRow),
+           signal: idemCtrl.signal
+        });
+      } finally { clearTimeout(idemTimer); }
+      if (orderRes.status === 409){
+        /* Duplicate key: the order may already exist. Verify it is THIS purchase
+           (total + lines) before treating it as success. Never assume 409 = success. */
+        idemDuplicate = await idemVerifyOrder(STORE_ID, idemKey, total, lines);
+        if (!idemDuplicate) error = { message: "Order verify nahi ho saka — store se rabta karein." };
+      } else if (!orderRes.ok) {
+        error = await orderRes.json().catch(() => ({ message: "Order save failed" }));
+      }
    } catch (e) { error = e; }
   btn.disabled = false; btn.innerHTML = `${icon("check", "ic-inline")} ORDER PLACE KAREIN`;
   if (error){
@@ -1688,7 +1754,10 @@ $("#checkoutForm").onsubmit = async e => {
     err.textContent = "Order save nahi ho saka — internet check karke dobara try karein.";
     return;
   }
-  metaPurchase(total, lines, String(f.get("phone") || "").trim()); /* V5 Phase 5: Meta Purchase — order save ke baad, fail-open (tracking fail ho to bhi order save rehta hai). */
+  /* On a verified duplicate (409), the order already exists — do NOT re-fire the
+     Meta Purchase event (it may already have fired on the first attempt). */
+  if (!idemDuplicate) metaPurchase(total, lines, String(f.get("phone") || "").trim()); /* V5 Phase 5: Meta Purchase — order save ke baad, fail-open (tracking fail ho to bhi order save rehta hai). */
+  idemClearKey(); /* checkout confirmed (new order or verified duplicate) — new key next time */
   if (checkoutState.source === "cart"){ cart = {}; saveCart(); renderCart(); }
   checkoutState = null;
   appliedCoupon = null;
