@@ -1667,6 +1667,38 @@ async function idemVerifyOrder(storeId, key, total, lines){
             return row;
      } catch (e) { return null; }
 }
+/* ---------- Module 6: server-authoritative checkout helpers ---------- */
+/* Map a create_order RPC error code to a user-friendly message. */
+function m6CheckoutErrorMessage(code){
+     switch (String(code || "")){
+        case "INVALID_COUPON": return "Coupon valid nahi hai — dobara check karein ya coupon hata dein.";
+        case "INVALID_PRODUCT":
+        case "INVALID_VARIANT": return "Kuch products ab available nahi hain — cart refresh karein.";
+        case "INVALID_QTY": return "Quantity theek nahi hai — dobara check karein.";
+        case "STORE_NOT_ACTIVE": return "Store load nahi ho saka — internet check karke dobara try karein.";
+        case "INVALID_CUSTOMER":
+        case "INVALID_KEY":
+        case "EMPTY_CART":
+        case "TOO_MANY_LINES":
+        case "INVALID_TOTAL":
+        default: return "Order save nahi ho saka — internet check karke dobara try karein.";
+     }
+}
+/* Verify a duplicate order returned by create_order is THIS purchase.
+   Compares purchase IDENTITY only (product ids, quantities, variants,
+      coupon code) — NOT prices or the total, because the server's total wins
+         when a price changed between page load and checkout. */
+function m6OrderMatchesCart(serverOrder, rpcLines, couponCode){
+     const items = serverOrder && serverOrder.items;
+     const storedLines = (items && Array.isArray(items.lines)) ? items.lines : null;
+     if (!storedLines || storedLines.length !== rpcLines.length) return false;
+     const norm = ls => ls.map(l => [Number(l.id), Number(l.qty), String(l.size || ""), String(l.color || "")].join("|")).sort().join(";");
+     if (norm(storedLines) !== norm(rpcLines)) return false;
+     const storedCoupon = (items && items.coupon) ? String(items.coupon).toUpperCase() : null;
+     const wantCoupon = couponCode ? String(couponCode).toUpperCase() : null;
+     return storedCoupon === wantCoupon;
+}
+
 $("#checkoutForm").onsubmit = async e => {
   e.preventDefault();
   if (!checkoutState || !checkoutState.entries.length) return;
@@ -1694,70 +1726,78 @@ $("#checkoutForm").onsubmit = async e => {
     return;
   }
   btn.disabled = true; btn.textContent = "Order save ho raha hai…";
-  const { total, discount } = checkoutTotals();
-  const lines = checkoutState.entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k); const p = findP(id);
-    const line = { id: p.id, name: p.name, price: p.price, qty: q, delivery_fee: feeOf(p) }; if (size) line.size = size; if (color) line.color = color; return line;
+     /* Module 6: server-authoritative checkout. The browser sends NO price, NO
+          delivery fee, NO total — only product ids, quantities, variants and the
+               coupon code. The create_order RPC validates every line against the
+                    canonical catalogue and computes the total server-side. */
+  const rpcLines = checkoutState.entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k);
+    const line = { id, qty: q }; if (size) line.size = size; if (color) line.color = color; return line;
   });
-  /* items jsonb ab ek object hai: { lines, coupon, discount } — line items ke
-     saath coupon meta bhi save hota hai. Purane orders plain array thay;
-     admin dono shapes ko parh leta hai. Custom checkout fields ki values
-     custom_fields: [{label, value}] mein jati hain (shape break nahi hota). */
-  const items = { lines, coupon: appliedCoupon ? appliedCoupon.code : null, discount };
-  if (coFields.length)
-    items.custom_fields = coFields.map(cf => ({ label: cf.label, value: String(f.get("cf_" + cf.id) || "").trim() })).filter(x => x.value !== "");
+    /* Custom checkout fields: [{label, value}] — not price-relevant, stored as-is. */
+  const rpcCustomFields = coFields.length
+    ? coFields.map(cf => ({ label: cf.label, value: String(f.get("cf_" + cf.id) || "").trim() })).filter(x => x.value !== "")
+    : null;
   /* Idempotency: reuse the stored key for a retry of this checkout, else a new key. */
   let idemKey = idemGetKey();
   if (!idemKey){ idemKey = idemNewKey(); idemSetKey(idemKey); }
-  const orderRow = {
-    customer_name: String(f.get("name") || "").trim(),
-    phone: String(f.get("phone") || "").trim(),
-    city: String(f.get("city") || "").trim(),
-    address: String(f.get("address") || "").trim(),
-    items, total, status: "Pending",
-    idempotency_key: idemKey
+    const rpcBody = {
+           p_store_id: STORE_ID,
+           p_customer_name: String(f.get("name") || "").trim(),
+           p_phone: String(f.get("phone") || "").trim(),
+           p_city: String(f.get("city") || "").trim(),
+           p_address: String(f.get("address") || "").trim(),
+           p_lines: rpcLines,
+           p_coupon_code: appliedCoupon ? appliedCoupon.code : null,
+           p_idempotency_key: idemKey,
+           p_custom_fields: rpcCustomFields
   };
-  if (STORE_ID) orderRow.store_id = STORE_ID;
-    /* Checkout fix: anon has no SELECT policy on orders, so the insert must not
-       ask for the row back (PostgREST defaults to return=representation, and the
-          JS client's insert() has no returning option — verified in the library).
-             Direct REST call with Prefer: return=minimal (proven: HTTP 201). */
-   let error = null;
-   let idemDuplicate = null; /* set when a 409 is verified as the same purchase */
+     let error = null;
+   let serverOrder = null; /* the order row returned by create_order */
+    let idemDuplicate = false; /* true when the RPC returned an existing order */   
    try {
       const idemCtrl = new AbortController();
       const idemTimer = setTimeout(() => idemCtrl.abort(), 90000); /* 90s client timeout */
       let orderRes;
       try {
-        orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+        orderRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_order`, {
            method: "POST",
            headers: {
             apikey: SUPABASE_ANON_KEY,
+              
             Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json",
-            Prefer: "return=minimal"
-           },
-           body: JSON.stringify(orderRow),
+            "Content-Type": "application/json"
+          },
+           body: JSON.stringify(rpcBody),
            signal: idemCtrl.signal
         });
       } finally { clearTimeout(idemTimer); }
-      if (orderRes.status === 409){
-        /* Duplicate key: the order may already exist. Verify it is THIS purchase
-           (total + lines) before treating it as success. Never assume 409 = success. */
-        idemDuplicate = await idemVerifyOrder(STORE_ID, idemKey, total, lines);
-        if (!idemDuplicate) error = { message: "Order verify nahi ho saka — store se rabta karein." };
-      } else if (!orderRes.ok) {
-        error = await orderRes.json().catch(() => ({ message: "Order save failed" }));
+            if (!orderRes.ok){
+                       const errBody = await orderRes.json().catch(() => ({}));
+                       error = { code: (errBody && errBody.message) || "", message: "Order save failed" };
+            } else {
+                       const rows = await orderRes.json().catch(() => null);
+                       serverOrder = Array.isArray(rows) ? rows[0] : null;
+                       if (!serverOrder || typeof serverOrder.order_id !== "number"){ error = { message: "Order verify nahi ho saka — store se rabta karein." }; }
+                       else {
+                                    idemDuplicate = !!serverOrder.is_duplicate;
+                                    if (idemDuplicate && !m6OrderMatchesCart(serverOrder, rpcLines, appliedCoupon ? appliedCoupon.code : null)){
+                                                   error = { message: "Order verify nahi ho saka — store se rabta karein." };
+                                    }
+                       }
       }
    } catch (e) { error = e; }
   btn.disabled = false; btn.innerHTML = `${icon("check", "ic-inline")} ORDER PLACE KAREIN`;
   if (error){
     console.error(error);
-    err.textContent = "Order save nahi ho saka — internet check karke dobara try karein.";
+    err.textContent = m6CheckoutErrorMessage(error.code || "");
     return;
   }
-  /* On a verified duplicate (409), the order already exists — do NOT re-fire the
-     Meta Purchase event (it may already have fired on the first attempt). */
-  if (!idemDuplicate) metaPurchase(total, lines, String(f.get("phone") || "").trim()); /* V5 Phase 5: Meta Purchase — order save ke baad, fail-open (tracking fail ho to bhi order save rehta hai). */
+  /* Server total wins (the RPC computed it from the canonical catalogue).
+       On a duplicate, the order already exists — do NOT re-fire the Meta
+            Purchase event (it may already have fired on the first attempt). */
+     const serverTotal = Number(serverOrder.total) || 0;
+     const serverLines = (serverOrder.items && Array.isArray(serverOrder.items.lines)) ? serverOrder.items.lines : [];
+     if (!idemDuplicate) metaPurchase(serverTotal, serverLines, String(f.get("phone") || "").trim()); /* V5 Phase 5: Meta Purchase — order save ke baad, fail-open (tracking fail ho to bhi order save rehta hai). */
   idemClearKey(); /* checkout confirmed (new order or verified duplicate) — new key next time */
   if (checkoutState.source === "cart"){ cart = {}; saveCart(); renderCart(); }
   checkoutState = null;
@@ -1767,7 +1807,7 @@ $("#checkoutForm").onsubmit = async e => {
   renderCouponUI();
   e.target.reset();
   $("#successText").textContent = "Shukriya! Aapka order save ho gaya hai — hum jald call karke confirm karein ge.";
-  $("#successOrderId").textContent = "Total (COD): " + fmt(total);
+  $("#successOrderId").textContent = "Order #" + serverOrder.order_id + " • Total (COD): " + fmt(serverTotal);
   showPage("successPage");
 };
 
