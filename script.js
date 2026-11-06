@@ -466,11 +466,11 @@ async function loadSettings(){
     if (!STORE_ID){
       SETTINGS = mergeSettings(null);
     } else {
-      let q = sb.from("settings").select("data");
-      q = q.eq("store_id", STORE_ID);
-      const { data, error } = await q.maybeSingle();
-      if (error) throw error;
-      const raw = data && data.data;
+      /* Module 1: settings come from the get_public_storefront RPC result
+         (cached by resolveStore for this STORE_ID). No direct settings read.
+         Cache mismatch ho to defaults (kisi aur store ki settings nahi). */
+      const cached = (__publicStorefront && __publicStorefront.store && __publicStorefront.store.id === STORE_ID) ? __publicStorefront.settings : null;
+      const raw = cached || null;
       const isEmpty = !raw || (typeof raw === "object" && Object.keys(raw).length === 0);
       /* Settings khaali hon to store ka naam stores table wale name se —
          header/footer mein client ka asal naam nazar aaye. */
@@ -883,11 +883,11 @@ async function loadCategories(){
   /* Module 4: fail-closed — store ID ke baghair categories query na karein. */
   if (!STORE_ID) return;
   try {
-    let q = sb.from("categories").select("*");
-    if (STORE_ID) q = q.eq("store_id", STORE_ID);
-    const { data, error } = await q.order("sort", { ascending: true }).order("id", { ascending: true });
-    if (error) throw error;
-    CATEGORIES = data || [];
+    /* Module 1: categories come from the get_public_storefront RPC result
+       (cached by resolveStore for this STORE_ID). No direct categories read. */
+    const cachedCats = (__publicStorefront && __publicStorefront.store && __publicStorefront.store.id === STORE_ID && Array.isArray(__publicStorefront.categories)) ? __publicStorefront.categories : null;
+    if (!cachedCats) throw new Error("Categories cache nahi mila");
+    CATEGORIES = cachedCats;
   } catch (e) {
     /* Table na ho / fail ho to purana behaviour: products se categories derive. */
     console.warn("Categories table load nahi hui; products se derive hoga.", e);
@@ -897,16 +897,17 @@ async function loadCategories(){
 async function loadProducts(){
   /* Module 4: fail-closed — store ID ke baghair products query na karein. */
   if (!STORE_ID) return;
-  let q = sb.from("products").select("*").eq("active", true);
-  if (STORE_ID) q = q.eq("store_id", STORE_ID);
-  const { data, error } = await q.order("id", { ascending: true });
-  if (error){
-    console.error(error);
+  /* Module 1: products come from the get_public_storefront RPC result
+     (cached by resolveStore; ACTIVE products for this store only).
+     No direct products table read. */
+  const cachedProducts = (__publicStorefront && __publicStorefront.store && __publicStorefront.store.id === STORE_ID && Array.isArray(__publicStorefront.products)) ? __publicStorefront.products : null;
+if (!cachedProducts){
+    console.error("Products cache nahi mila; storefront reload karein.");
     $("#loadError").hidden = false;
     $("#resultsText").textContent = "";
     return;
   }
-  PRODUCTS = data || [];
+  PRODUCTS = cachedProducts;
   if (!categoriesReady) categoriesReady = loadCategories();
   await categoriesReady;
   /* Visible categories table se; hidden categories nav/tiles/footer se gayab
@@ -1992,10 +1993,23 @@ function startSocialProof(){
    Stores lookup hi fail ho jaye (migration abhi nahi chali) to
    SINGLE-TENANT FALLBACK: baghair store filter purana render — live
    shop kabhi is wajah se band nahi hogi. */
-async function fetchStorefrontRow(slug){
-  const { data, error } = await sb.from("storefront_stores").select("*").eq("slug", slug).maybeSingle();
+/* Module 1: public storefront data comes from the get_public_storefront RPC
+   (server-side projection), NOT from direct table reads. Direct anon SELECT
+   on settings/products/categories/storefront_stores is revoked; the RPC is
+   the only path. The RPC returns {store, settings, products, categories}
+   for ONE resolved store, or null. The full result is cached so
+   loadSettings/loadProducts/loadCategories reuse it without a second call. */
+let __publicStorefront = null; /* cached RPC result for the resolved store */
+async function fetchPublicStorefront(slug){
+  const { data, error } = await sb.rpc("get_public_storefront", { p_slug: slug });
   if (error) throw error;
-  return data || null;
+  if (!data || typeof data !== "object") return null;
+  __publicStorefront = data;
+  return data.store || null;
+}
+async function fetchStorefrontRow(slug){
+  /* Kept as a thin wrapper (callers expect a store row). */
+  return fetchPublicStorefront(slug);
 }
 async function resolveStore(){
   const paramSlug = (new URLSearchParams(location.search).get("store") || "").trim().toLowerCase();
@@ -2009,14 +2023,15 @@ async function resolveStore(){
     if (!slug){
       const host = (location.hostname || "").toLowerCase();
       if (host && !PLATFORM_HOSTS.includes(host)){
-        const cands = [host, host.startsWith("www.") ? host.slice(4) : "www." + host];
+        /* Module 1: resolve a custom domain via the RPC (it tries the host
+           as a slug, then as a custom_domain). No direct view query. */
         try {
-          const { data, error } = await sb.from("storefront_stores").select("slug").in("custom_domain", cands).limit(1);
-          if (!error && data && data.length){
-            slug = data[0].slug;
+          const row = await fetchPublicStorefront(host);
+          if (row && row.slug){
+            slug = row.slug;
             try { sessionStorage.setItem("sn_store_slug", slug); } catch (e) {}
           }
-        } catch (e) { /* view nahi mili — default/fallback neeche sambhal lega */ }
+        } catch (e) { /* RPC fail — default/fallback neeche sambhal lega */ }
       }
     }
     if (!slug) slug = "shopnest";
