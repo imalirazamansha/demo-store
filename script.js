@@ -461,16 +461,21 @@ function mergeSettings(raw){
 let __customPageOpened = false; /* V5 Phase 4: ?page= sirf aik dafa khulta hai. */
 async function loadSettings(){
   try {
-    /* Tenant mode: is store ki apni settings row. Fallback: purani id=1 row. */
-    let q = sb.from("settings").select("data");
-    q = STORE_ID ? q.eq("store_id", STORE_ID) : q.eq("id", 1);
-    const { data, error } = await q.maybeSingle();
-    if (error) throw error;
-    const raw = data && data.data;
-    const isEmpty = !raw || (typeof raw === "object" && Object.keys(raw).length === 0);
-    /* Settings khaali hon to store ka naam stores table wale name se —
-       header/footer mein client ka asal naam nazar aaye. */
-    SETTINGS = mergeSettings(isEmpty && STORE && STORE.name ? { store_name: STORE.name } : raw);
+    /* Module 4: fail-closed — store ID ke baghair settings query na karein;
+       defaults use hon (kisi aur store ki settings nahi). */
+    if (!STORE_ID){
+      SETTINGS = mergeSettings(null);
+    } else {
+      let q = sb.from("settings").select("data");
+      q = q.eq("store_id", STORE_ID);
+      const { data, error } = await q.maybeSingle();
+      if (error) throw error;
+      const raw = data && data.data;
+      const isEmpty = !raw || (typeof raw === "object" && Object.keys(raw).length === 0);
+      /* Settings khaali hon to store ka naam stores table wale name se —
+         header/footer mein client ka asal naam nazar aaye. */
+      SETTINGS = mergeSettings(isEmpty && STORE && STORE.name ? { store_name: STORE.name } : raw);
+    }
   } catch (e) {
     console.warn("Settings load nahi huye; defaults use ho rahe hain.", e);
     SETTINGS = mergeSettings(null);
@@ -875,6 +880,8 @@ function startHero(){
 /* ---------- Load products + categories ---------- */
 let categoriesReady = null;
 async function loadCategories(){
+  /* Module 4: fail-closed — store ID ke baghair categories query na karein. */
+  if (!STORE_ID) return;
   try {
     let q = sb.from("categories").select("*");
     if (STORE_ID) q = q.eq("store_id", STORE_ID);
@@ -888,6 +895,8 @@ async function loadCategories(){
   }
 }
 async function loadProducts(){
+  /* Module 4: fail-closed — store ID ke baghair products query na karein. */
+  if (!STORE_ID) return;
   let q = sb.from("products").select("*").eq("active", true);
   if (STORE_ID) q = q.eq("store_id", STORE_ID);
   const { data, error } = await q.order("id", { ascending: true });
@@ -1982,6 +1991,51 @@ function showStoreNotice(title, msg){
   }
   document.title = title;
 }
+/* Module 4: lookup-fail error state — Retry + platform-home link. */
+function showStoreError(){
+  document.body.classList.add("store-closed");
+  const box = $("#storeNotice");
+  if (box){
+    $("#noticeTitle").textContent = "Store load nahi ho saka";
+    $("#noticeText").textContent = "Store load nahi ho saka — internet check karke dobara try karein.";
+    let actions = $("#storeNoticeActions");
+    if (!actions){
+      actions = document.createElement("div");
+      actions.id = "storeNoticeActions";
+      actions.className = "store-notice-actions";
+      actions.style.cssText = "display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap";
+      const card = box.querySelector(".store-notice-card");
+      if (card) card.appendChild(actions);
+    }
+    actions.innerHTML = "";
+    const retryBtn = document.createElement("button");
+    retryBtn.type = "button";
+    retryBtn.id = "storeRetryBtn";
+    retryBtn.className = "btn primary";
+    retryBtn.textContent = "Dobara try karein";
+    retryBtn.onclick = function(){ retryBoot(); };
+    const homeLink = document.createElement("a");
+    homeLink.id = "storeHomeLink";
+    homeLink.className = "btn outline";
+    homeLink.href = "https://imalirazamansha.github.io/webalibabamarketingpro/shopnest.html";
+    homeLink.textContent = "Platform home";
+    actions.appendChild(retryBtn);
+    actions.appendChild(homeLink);
+    box.hidden = false;
+  }
+  document.title = "Store load nahi ho saka";
+}
+/* Module 4: Retry — store resolution + boot dobara chalayeing. */
+async function retryBoot(){
+  const box = $("#storeNotice");
+  if (box) box.hidden = true;
+  document.body.classList.remove("store-closed");
+  PRODUCTS = [];
+  CATEGORIES = [];
+  STORE = null;
+  STORE_ID = null;
+  await boot();
+}
 async function boot(){
   const mode = await resolveStore();
   if (mode === "suspended"){
@@ -1992,7 +2046,12 @@ async function boot(){
     showStoreNotice("Store nahi mila", "Ye store nahi mila — link check karke dobara try karein.");
     return;
   }
-  /* mode "ok" ya "fallback": cart is store ke slug se load karein. */
+  if (mode === "fallback"){
+    /* Module 4: fail-closed — lookup fail ho to kuch load na karein. */
+    showStoreError();
+    return;
+  }
+  /* mode "ok": cart is store ke slug se load karein. */
   CART_KEY = "shopnest_cart_" + STORE_SLUG;
   try { cart = JSON.parse(localStorage.getItem(CART_KEY) || "{}") || {}; } catch (e) { cart = {}; }
   if (!cart || typeof cart !== "object" || Array.isArray(cart)) cart = {};
