@@ -1219,6 +1219,7 @@ function visitSessionId(){
   } catch (e) { return null; }
 }
 function trackPage(page){
+   
   try {
     const flag = "sn_v_" + page;
     if (sessionStorage.getItem(flag)) return;
@@ -1246,13 +1247,14 @@ const PAGE_TRACK = { homeView: "home", productPage: "product", collectionPage: "
    store_meta_secrets table mein hai (Part B); storefront ko sirf hasCapiToken pata hota hai.
    Fail-open rule: tracking ki koi bhi ghalti kabhi checkout/store ko nahi rokegi. */
 const META_CAPI_URL = SUPABASE_URL + "/functions/v1/meta-capi";
+const META_PURCHASE_URL = SUPABASE_URL + "/functions/v1/meta-purchase"; /* Meta CAPI fix: order-bound Purchase dispatch (§2.3). */
 const META_LOG_KEY = "sn_meta_log_v1";
 let __metaInit = false;
 function metaEventId(){ try { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); } catch (e){} return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10); }
 function metaFbpFbc(){ const out = {}; try { const m = document.cookie.match(/(?:^|; )_fbp=([^;]*)/); if (m) out.fbp = decodeURIComponent(m[1]); const c = document.cookie.match(/(?:^|; )_fbc=([^;]*)/); if (c) out.fbc = decodeURIComponent(c[1]); } catch (e){} return out; }
 function metaLog(entry){ try { const arr = JSON.parse(localStorage.getItem(META_LOG_KEY) || "[]"); if (!Array.isArray(arr)) throw 0; arr.unshift({ t: new Date().toISOString(), ...entry }); localStorage.setItem(META_LOG_KEY, JSON.stringify(arr.slice(0, 20))); } catch (e){} }
 function metaPixelId(){ const m = (SETTINGS && SETTINGS.meta) || {}; return String(m.pixelId || "").replace(/[^0-9]/g, ""); }
-function metaCapiOn(){ const m = (SETTINGS && SETTINGS.meta) || {}; return m.capiEnabled === true && m.hasCapiToken === true; }
+function metaCapiOn(){ const m = (SETTINGS && SETTINGS.meta) || {}; return m.capiEnabled === true; }
 async function sendCapiEvent(payload){
   try {
     const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
@@ -1262,6 +1264,23 @@ async function sendCapiEvent(payload){
     const j = await r.json().catch(() => ({}));
     metaLog({ kind: "capi", name: payload.event_name, ok: !!j.events_received, detail: j.events_received ? ("events_received=" + j.events_received) : (j.error || ("http " + r.status)) });
   } catch (e){ metaLog({ kind: "capi", name: payload.event_name, ok: false, detail: "send fail: " + (e && e.message ? e.message : "network") }); }
+}
+/* Meta CAPI fix: order-bound Purchase dispatch (§2.3). Sends ONLY
+   {order_id, store_slug, tracking_token}; the server builds the event
+   from the canonical order row. Fire-and-forget, fail-open — never
+   awaited, never blocks the success page. */
+async function sendMetaPurchase(orderId, token){
+  try {
+    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const to = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e){} }, 8000) : null;
+    const r = await fetch(META_PURCHASE_URL, { method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY },
+      body: JSON.stringify({ order_id: orderId, store_slug: STORE_SLUG, tracking_token: token }),
+      signal: ctrl ? ctrl.signal : undefined });
+    if (to) clearTimeout(to);
+    const j = await r.json().catch(() => ({}));
+    metaLog({ kind: "capi-purchase", name: "Purchase", ok: !!j.ok, detail: j.already_sent ? "already_sent" : (j.events_received ? ("events_received=" + j.events_received) : (j.error || ("http " + r.status))) });
+  } catch (e){ metaLog({ kind: "capi-purchase", name: "Purchase", ok: false, detail: "send fail: " + (e && e.message ? e.message : "network") }); }
 }
 function metaTrack(name, params, opts){
   opts = opts || {};
@@ -1285,7 +1304,22 @@ function metaPageView(){ if (!metaPixelId() && !metaCapiOn()) return; metaTrack(
 function metaViewContent(p){ if (!p || (!metaPixelId() && !metaCapiOn())) return; metaTrack("ViewContent", { content_ids: [String(p.id)], content_type: "product", content_name: p.name, value: Number(p.price) || 0, currency: "PKR" }); }
 function metaAddToCart(id, qty){ const p = findP(id); if (!p || (!metaPixelId() && !metaCapiOn())) return; metaTrack("AddToCart", { content_ids: [String(p.id)], content_type: "product", content_name: p.name, value: (Number(p.price) || 0) * (Number(qty) || 1), currency: "PKR" }); }
 function metaInitiateCheckout(){ if (!metaPixelId() && !metaCapiOn()) return; const t = checkoutTotals(); const entries = checkoutState ? checkoutState.entries : []; const ids = entries.map(([k]) => String(parseCartKey(k).id)); metaTrack("InitiateCheckout", { content_ids: ids, num_items: entries.reduce((a,[,q]) => a + Number(q || 0), 0), value: Number(t.sub) || 0, currency: "PKR" }); }
-function metaPurchase(total, lines, phone){ if (!metaPixelId() && !metaCapiOn()) return; const contents = (lines || []).map(l => ({ id: String(l.id), quantity: Number(l.qty) || 1, item_price: Number(l.price) || 0 })); metaTrack("Purchase", { content_ids: contents.map(c => c.id), contents: contents, num_items: contents.reduce((a,c) => a + c.quantity, 0), value: Number(total) || 0, currency: "PKR" }, { phone: phone || "" }); }
+/* Meta CAPI fix (§2.6.2): Purchase no longer goes through metaTrack /
+   legacy meta-capi (which now rejects Purchase). Browser Pixel fires
+   directly with the deterministic event_id (§2.4); the server copy
+   goes via meta-purchase with the tracking token (memory-only, from
+   the create_order response — never localStorage/sessionStorage).
+   No token → browser Pixel only. No phone leaves the browser. */
+function metaPurchase(orderId, total, lines, token){
+  if (!metaPixelId() && !metaCapiOn()) return;
+  const eid = "purchase_" + STORE_SLUG + "_" + orderId; /* deterministic, §2.4 */
+  const contents = (lines || []).map(l => ({ id: String(l.id), quantity: Number(l.qty) || 1, item_price: Number(l.price) || 0 }));
+  const params = { content_ids: contents.map(c => c.id), contents: contents,
+    num_items: contents.reduce((a,c) => a + c.quantity, 0), value: Number(total) || 0, currency: "PKR" };
+  try { if (typeof window.fbq === "function" && metaPixelId()) window.fbq("track", "Purchase", params, { eventID: eid }); } catch (e){}
+  metaLog({ kind: "event", name: "Purchase", ok: true, detail: "pixel " + eid });
+  if (metaCapiOn() && token) sendMetaPurchase(orderId, token); /* no token → browser Pixel only */
+}
 function injectRawHtml(target, html){
   if (!target || !html || !String(html).trim()) return;
   try {
@@ -1795,11 +1829,9 @@ $("#checkoutForm").onsubmit = async e => {
     return;
   }
   /* Server total wins (the RPC computed it from the canonical catalogue).
-       On a duplicate, the order already exists — do NOT re-fire the Meta
-            Purchase event (it may already have fired on the first attempt). */
+     Meta Purchase fires AFTER the success page renders (see below, §2.6.3). */
      const serverTotal = Number(serverOrder.total) || 0;
      const serverLines = (serverOrder.items && Array.isArray(serverOrder.items.lines)) ? serverOrder.items.lines : [];
-     if (!idemDuplicate) metaPurchase(serverTotal, serverLines, String(f.get("phone") || "").trim()); /* V5 Phase 5: Meta Purchase — order save ke baad, fail-open (tracking fail ho to bhi order save rehta hai). */
   idemClearKey(); /* checkout confirmed (new order or verified duplicate) — new key next time */
   if (checkoutState.source === "cart"){ cart = {}; saveCart(); renderCart(); }
   checkoutState = null;
@@ -1811,6 +1843,14 @@ $("#checkoutForm").onsubmit = async e => {
   $("#successText").textContent = "Shukriya! Aapka order save ho gaya hai — hum jald call karke confirm karein ge.";
   $("#successOrderId").textContent = "Order #" + serverOrder.order_id + " • Total (COD): " + fmt(serverTotal);
   showPage("successPage");
+  /* Meta Purchase — order-bound (meta-purchase). Fired AFTER the success
+     page renders so tracking can never delay it (fail-open, §2.6.3).
+     No idemDuplicate guard anymore: a replay returns a FRESH token
+     (§2.1.4), and the server dedups via the deterministic event_id +
+     sent-flag, so re-firing on a duplicate is safe and DESIRED (it
+     covers a first attempt whose tracking never fired). The token lives
+     only in the serverOrder local — never localStorage/sessionStorage. */
+  metaPurchase(serverOrder.order_id, serverTotal, serverLines, serverOrder.meta_tracking_token || null);
 };
 
 /* ---------- V3 Part B: Order tracking (customer) ----------
