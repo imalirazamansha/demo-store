@@ -1232,7 +1232,8 @@ function trackPage(page){
     const row = { page, referrer_host: refHost, utm_source: utm, device, session_id: visitSessionId() };
     if (STORE_ID) row.store_id = STORE_ID;
     /* await nahi — result/error dono ignore; tracking kabhi store ko nahi rok sakti. */
-    sb.from("visits").insert(row).then(() => {}, () => {});
+    /* Module 7: visits go through the rate-limited track_visit RPC. */
+     sb.rpc("track_visit", { p_store_id: row.store_id || null, p_page: row.page, p_referrer_host: row.referrer_host, p_utm_source: row.utm_source, p_device: row.device, p_session_id: row.session_id }).then(() => {}, () => {});
   } catch (e) { /* tracking fail = silent */ }
 }
 
@@ -1676,6 +1677,7 @@ function m6CheckoutErrorMessage(code){
         case "INVALID_VARIANT": return "Kuch products ab available nahi hain — cart refresh karein.";
         case "INVALID_QTY": return "Quantity theek nahi hai — dobara check karein.";
         case "STORE_NOT_ACTIVE": return "Store load nahi ho saka — internet check karke dobara try karein.";
+        case "RATE_LIMITED": return "Bohat zyada koshishein ho gayi hain — kuch der baad dobara try karein.";
         case "INVALID_CUSTOMER":
         case "INVALID_KEY":
         case "EMPTY_CART":
@@ -1935,7 +1937,7 @@ bindPolicyButtons(document);
 $$("[data-close]").forEach(b => b.onclick = () => $("#policyModal").classList.remove("open"));
 $("#policyModal").addEventListener("click", e => { if (e.target.id === "policyModal") e.currentTarget.classList.remove("open"); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") $("#policyModal").classList.remove("open"); });
-/* V3.10: newsletter ab asal mein save hoti hai (newsletter_subscribers table). Duplicate email (unique store+email) ho to bhi success jaisa jawab — dobara email nahi mangta. Table na ho to saaf error. */ document.getElementById("subForm").onsubmit = async e => { e.preventDefault(); const email = String(document.getElementById("subEmail").value || "").trim(); const msg = document.getElementById("subMsg"); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ msg.textContent = "Sahi email likhein."; return; } msg.textContent = "Subscribe ho raha hai…"; try { const { error } = await sb.from("newsletter_subscribers").insert({ store_id: STORE_ID, email }); if (error && error.code !== "23505") throw error; msg.innerHTML = icon("check", "ic-inline") + " Shukriya! Aap subscribe ho gaye hain."; e.target.reset(); } catch (err) { msg.textContent = "Subscribe nahi ho saka — dobara koshish karein."; } };
+/* V3.10: newsletter ab asal mein save hoti hai (newsletter_subscribers table). Duplicate email (unique store+email) ho to bhi success jaisa jawab — dobara email nahi mangta. Table na ho to saaf error. */ document.getElementById("subForm").onsubmit = async e => { e.preventDefault(); const email = String(document.getElementById("subEmail").value || "").trim(); const msg = document.getElementById("subMsg"); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ msg.textContent = "Sahi email likhein."; return; } msg.textContent = "Subscribe ho raha hai…"; try { const { data, error } = await sb.rpc("subscribe_newsletter", { p_store_id: STORE_ID, p_email: email }); if (error) throw error; if (data === false) throw new Error("subscribe failed"); msg.innerHTML = icon("check", "ic-inline") + " Shukriya! Aap subscribe ho gaye hain."; e.target.reset(); } catch (err) { msg.textContent = "Subscribe nahi ho saka — dobara koshish karein."; } };
 $("#backTop").onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
 window.addEventListener("scroll", () => { $("#backTop").classList.toggle("show", window.scrollY >= 500); }, { passive: true });
 
