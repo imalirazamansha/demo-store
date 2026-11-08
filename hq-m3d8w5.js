@@ -131,6 +131,20 @@ async function mfaListTotp(){
     return (data.totp || []).filter(f => f && f.status === "verified");
   } catch (e) { return []; }
 }
+async function mfaNextFriendlyName(){
+  // B2 fix (2026-11-08): Supabase requires friendlyName to be unique per user.
+  // Factor #1 uses "Authenticator", so factor #2 must be "Authenticator 2"
+  // (then 3, 4...). Check ALL factors (verified + unverified) — an unverified
+  // factor with the same name also causes a conflict.
+  try {
+    const { data, error } = await sb.auth.mfa.listFactors();
+    if (error || !data) return "Authenticator";
+    const taken = new Set((data.totp || []).map(f => String((f && f.friendly_name) || "").toLowerCase()));
+    let name = "Authenticator", n = 2;
+    while (taken.has(name.toLowerCase())) { name = "Authenticator " + n; n++; }
+    return name;
+  } catch (e) { return "Authenticator"; }
+}
 function mfaCodeOf(inputEl){
   const v = String((inputEl && inputEl.value) || "").replace(/\D/g, "").slice(0, 6);
   if (inputEl) inputEl.value = v;
@@ -188,7 +202,10 @@ $("#mfaEnrollStartBtn").onclick = async () => {
   btn.disabled = true;
   msg.textContent = "Authenticator set up ho raha hai…"; msg.className = "msg";
   try {
-    const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "Authenticator" });
+    // B2 fix (2026-11-08): friendlyName must be unique per user — use the next
+    // free name ("Authenticator 2" for factor #2) instead of always "Authenticator".
+    const friendlyName = await mfaNextFriendlyName();
+    const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName });
     if (error || !data || !data.totp) throw new Error((error && error.message) || "Enrol nahi ho saka");
     mfaEnrollFactorId = data.id;
     const qr = $("#mfaQrImg");
