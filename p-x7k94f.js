@@ -98,6 +98,7 @@ let HP_ORDER = []; let HP_LUX_WARN = []; // Is theme par render na hone wali sec
 let HP_CUSTOM = {};          // custom sections content: id -> {heading, text, img, btn_label, btn_link}
 let homepageFilled = false;
 
+/* Client-side per-store helper (effRole par mabni) — dropped DB function is_admin_plus() se is ka koi talluq nahi (Module 3b, R9). */
 const isAdminPlus = () => effRole() === "owner" || effRole() === "admin";
 
 /* Storefront defaults — script.js ke DEFAULT_SETTINGS se match. */
@@ -210,12 +211,13 @@ async function checkAccess(session){
   MY_EMAIL = email;
   try {
     /* Is email ki SAARI team rows (har store ki) + platform admin check.
-       Dono queries RLS-scoped hain: team rows sirf entitled stores ki
-       milti hain; platform_admins mein apni row sirf platform admin ko
-       nazar aati hai. "team by email" wali ye lookup jaan boojh kar
-       store-unscoped hai — yahi login ka entry point hai. */
+       Team rows get_my_stores() RPC se aati hain (Module 3b — staff team
+       table parh nahi sakta, is liye login lookup RPC se hoti hai);
+       platform_admins mein apni row sirf platform admin ko nazar aati hai.
+       "team by email" wali ye lookup jaan boojh kar store-unscoped hai —
+       yahi login ka entry point hai. */
     const [teamRes, platRes] = await Promise.all([
-      sb.from("team").select("email, store_id, role").eq("email", email),
+      sb.rpc("get_my_stores"),
       sb.from("platform_admins").select("email").eq("email", email).maybeSingle()
     ]);
     if (teamRes.error) throw teamRes.error;
@@ -319,13 +321,13 @@ function showDash(){
   $("#storePickerView").classList.add("hidden");
   $("#dashView").classList.remove("hidden");
   $("#logoutBtn").classList.remove("hidden");
-  /* Role gating (current store ki role par): staff ko Categories/Coupons/Team/Settings nahi; admin ko Team nahi. */
-  $("#tabTeam").classList.toggle("hidden", effRole() !== "owner");
-  const adminOnlyTabs = ["tabCategories", "tabCoupons", "tabSettings", "tabHomepage", "tabAppearance", "tabStyle", "tabContent", "tabMeta"]; /* V5 Phase 5: Meta tab sirf Owner/Admin — staff ko token fields kabhi nahi. */
+  /* Role gating (current store ki role par, Module 3b): staff ab Categories/Coupons/Settings/Homepage/Appearance/Style/Content istemal kar sakta hai (real store work); Team Owner/Admin ko; Meta sirf Owner/Admin. */
+  $("#tabTeam").classList.toggle("hidden", !(effRole() === "owner" || effRole() === "admin"));
+  const adminOnlyTabs = ["tabMeta"]; /* V5 Phase 5: Meta tab sirf Owner/Admin — staff ko token fields kabhi nahi. */
   adminOnlyTabs.forEach(id => document.getElementById(id).classList.toggle("hidden", !isAdminPlus()));
   switchTab("dashboard");
   loadAll();
-  if (isAdminPlus() && !settingsLoaded) loadSettings();
+  if (!settingsLoaded) loadSettings();
 }
 $("#refreshBtn").onclick = loadAll;
 
@@ -333,8 +335,8 @@ async function loadAll(){
   await Promise.all([loadOrders(), loadProducts(), loadCategories()]);
   await loadDashboard();
   if (isAdminPlus()) loadDomain();
-  if (isAdminPlus()) loadCoupons();
-  if (effRole() === "owner") loadTeam();
+  loadCoupons();
+  if (effRole() === "owner" || effRole() === "admin") loadTeam();
 }
 
 /* ---------- Image upload (Supabase Storage: product-images) ---------- */
@@ -484,7 +486,7 @@ function renderOrders(){
       <td class="order-items">${lines.map(lineLabel).join("<br>")}${lines.some(i => i.delivery_fee !== undefined) ? `<br><small>Delivery: ${(() => { const d = lines.reduce((s,i) => s + (Number(i.delivery_fee)||0), 0); return d === 0 ? "FREE" : fmt(d); })()}</small>` : ""}${meta.coupon ? `<br><small>🎟️ Coupon ${esc(meta.coupon)}: −${fmt(meta.discount)}</small>` : ""}</td>
       <td><strong>${fmt(o.total)}</strong></td>
       <td><select class="status" data-status="${o.id}">${STATUSES.map(s => `<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select></td>
-      <td style="white-space:nowrap"><button class="btn small ghost" data-edit-order="${o.id}">✎ Edit</button> <button class="btn small danger" data-del-order="${o.id}">Delete</button></td>
+      <td style="white-space:nowrap"><button class="btn small ghost" data-edit-order="${o.id}">✎ Edit</button>${effRole() === "owner" ? ` <button class="btn small danger" data-del-order="${o.id}">Delete</button>` : ""}</td>
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-edit-order]").forEach(b => b.onclick = () => openOrderEdit(+b.dataset.editOrder));
   wrap.querySelectorAll("tbody tr[data-order]").forEach(tr => tr.onclick = e => {
@@ -492,7 +494,7 @@ function renderOrders(){
     openOrderDetails(+tr.dataset.order);
   });
   wrap.querySelectorAll("[data-status]").forEach(sel => sel.onchange = async () => {
-    const { error } = await sb.from("orders").update({ status: sel.value }).eq("id", +sel.dataset.status).eq("store_id", STORE_ID);
+    const { error } = await sb.rpc("update_order_status", { p_order_id: +sel.dataset.status, p_status: sel.value });
     if (error) showToast("Status update fail: " + error.message, "err"); else { await loadOrders(); loadDashboard(); showToast("✅ Order status update ho gaya.", "ok"); }
   });
   wrap.querySelectorAll("[data-del-order]").forEach(b => b.onclick = async () => {
@@ -502,11 +504,11 @@ function renderOrders(){
     b.disabled = true; b.textContent = "Deleting…";
     msg.textContent = `Order #${id} delete ho raha hai…`; msg.className = "msg";
     try {
-      /* .select("id") forces PostgREST to return deleted rows — sirf request
-         success par nahi, asal deleted row par bharosa karte hain. */
-      const { data: deleted, error } = await sb.from("orders").delete().eq("id", id).eq("store_id", STORE_ID).select("id");
+      /* Module 3b: delete sirf Owner — delete_order RPC (audited); direct
+         delete ab Owner-only policy par bhi band hai. */
+      const { data: ok, error } = await sb.rpc("delete_order", { p_order_id: id });
       if (error) throw error;
-      if (!deleted || deleted.length === 0) throw new Error("Koi row delete nahi hui — Supabase ki orders delete RLS policy ya team access check karein.");
+      if (!ok) throw new Error("Order delete nahi hua — sirf Owner delete kar sakta hai.");
       msg.textContent = `✅ Order #${id} delete ho gaya.`; msg.className = "msg ok";
       showToast(`✅ Order #${id} delete ho gaya.`, "ok");
       await loadOrders(); loadDashboard();
@@ -528,15 +530,16 @@ $("#orderStatusFilter").addEventListener("change", renderOrders);
    (discount/coupon ho to object shape mein convert ho jata hai). */
 let OE_ID = null;
 let OE_COUPON = null;
-let OE_TOTAL_TOUCHED = false;
 function openOrderEdit(id){
   const o = ORDERS_CACHE.find(x => x.id === id);
   if (!o) return;
   OE_ID = id;
-  OE_TOTAL_TOUCHED = false;
   const meta = orderMeta(o);
   OE_COUPON = meta.coupon;
   $("#oeTitle").textContent = "#" + o.id;
+   /* Module 3b: financial section (items/discount/total) sirf Owner ko — staff/admin ko sirf details nazar aati hain. */
+   const finSec = $("#oeFinancialSection");
+   if (finSec) finSec.classList.toggle("hidden", effRole() !== "owner");
   $("#oeName").value = o.customer_name || "";
   $("#oePhone").value = o.phone || "";
   $("#oeCity").value = o.city || "";
@@ -549,8 +552,8 @@ function openOrderEdit(id){
   const lines = orderLines(o);
   (lines.length ? lines : [{}]).forEach(l => addOeItemRow(l));
   oeRecalc();
-  /* Total input mein pehle order ka MAUJOODA total dikhao — items badalne
-     par hi auto hisaab usay overwrite karega (jab tak user haath na lagaye). */
+  /* Total mein pehle order ka MAUJOODA total dikhao (sirf display — save par
+     server items se total dobara hisaab karega). */
   $("#oeTotal").value = o.total ?? 0;
   $("#oeMsg").textContent = ""; $("#oeMsg").className = "msg";
   $("#orderEditModal").classList.remove("hidden");
@@ -593,10 +596,9 @@ function oeComputed(){
 }
 function oeRecalc(){
   const c = oeComputed();
-  if (!OE_TOTAL_TOUCHED) $("#oeTotal").value = c.total;
-  $("#oeCalcNote").textContent = `Hisaab: Items ${fmt(c.sub)} + Delivery ${fmt(c.del)} − Discount ${fmt(c.disc)} = ${fmt(c.total)}${OE_COUPON ? ` • 🎟️ Coupon: ${OE_COUPON}` : ""}${OE_TOTAL_TOUCHED ? " • Total haath se likha gaya hai (auto hisaab band)" : ""}`;
+  $("#oeTotal").value = c.total;
+  $("#oeCalcNote").textContent = `Hisaab: Items ${fmt(c.sub)} + Delivery ${fmt(c.del)} − Discount ${fmt(c.disc)} = ${fmt(c.total)}${OE_COUPON ? ` • 🎟️ Coupon: ${OE_COUPON}` : ""} • Total server hisaab karega (haath se nahi badal sakta)`;
 }
-$("#oeTotal").addEventListener("input", () => { OE_TOTAL_TOUCHED = true; oeRecalc(); });
 $("#oeDiscount").addEventListener("input", oeRecalc);
 $("#oeAddItem").onclick = () => { addOeItemRow({}); oeRecalc(); };
 $("#oeCancelBtn").onclick = () => $("#orderEditModal").classList.add("hidden");
@@ -611,21 +613,20 @@ $("#oeSaveBtn").onclick = async () => {
   const items = (orig && Array.isArray(orig.items) && !hasMeta)
     ? c.items
     : { lines: c.items, coupon: OE_COUPON, discount: c.disc };
-  const payload = {
-    customer_name: $("#oeName").value.trim(),
-    phone: $("#oePhone").value.trim(),
-    city: $("#oeCity").value.trim(),
-    address: $("#oeAddress").value.trim(),
-    tracking_note: $("#oeTrackNote") ? $("#oeTrackNote").value.trim() : undefined,
-    status: $("#oeStatus").value,
-    items,
-    total: Math.max(0, parseInt($("#oeTotal").value) || 0)
-  };
-  if (!payload.customer_name){ msg.textContent = "Customer name khaali nahi ho sakta."; msg.className = "msg err"; return; }
+  const customer_name = $("#oeName").value.trim();
+     if (!customer_name){ msg.textContent = "Customer name khaali nahi ho sakta."; msg.className = "msg err"; return; }
   btn.disabled = true; btn.textContent = "Saving…";
   try {
-    const { error } = await sb.from("orders").update(payload).eq("id", OE_ID).eq("store_id", STORE_ID);
-    if (error) throw error;
+    /* Module 3b: details + status + financials — teen alag RPCs. Financial
+    section sirf Owner ko nazar aata hai; server total khud hisaab karta hai. */
+     let r = await sb.rpc("update_order_details", { p_order_id: OE_ID, p_customer_name: customer_name, p_phone: $("#oePhone").value.trim(), p_city: $("#oeCity").value.trim(), p_address: $("#oeAddress").value.trim(), p_tracking_note: $("#oeTrackNote") ? $("#oeTrackNote").value.trim() : null });
+     if (r.error) throw r.error;
+     r = await sb.rpc("update_order_status", { p_order_id: OE_ID, p_status: $("#oeStatus").value });
+     if (r.error) throw r.error;
+     if (effRole() === "owner"){
+        r = await sb.rpc("update_order_financials", { p_order_id: OE_ID, p_items: items, p_discount: c.disc });
+        if (r.error) throw r.error;
+     }
     $("#orderEditModal").classList.add("hidden");
     const om = $("#ordersMsg");
     om.textContent = `✅ Order #${OE_ID} update ho gaya.`; om.className = "msg ok";
@@ -1084,7 +1085,7 @@ function bindProdCards(wrap){
     }
     const discountRaw = get("discount_pct").trim();
     const discountNum = discountRaw === "" ? 0 : parseInt(discountRaw);
-    const payload = {
+    const customer_name = $("#oeName").value.trim();
       name: get("name").trim(),
       price: parseInt(get("price")) || 0,
       old: get("old") ? parseInt(get("old")) : null,
@@ -1251,12 +1252,17 @@ async function loadTeam(){
   const wrap = $("#teamWrap");
   const { data, error } = await sb.from("team").select("*").eq("store_id", STORE_ID).order("created_at", { ascending: true });
   if (error){ wrap.innerHTML = `<p class="empty-note">Team load nahi ho saki: ${esc(error.message)}</p>`; return; }
+   /* Module 3b: Add form mein role options — Owner ko Staff/Admin/Owner; Admin ko sirf Staff. */
+   const roleSel = $("#teamRole");
+   if (roleSel) roleSel.innerHTML = effRole() === "admin"
+   ? '<option value="staff">Staff</option>'
+      : '<option value="staff">Staff</option><option value="admin">Admin</option><option value="owner">Owner</option>';
   wrap.innerHTML = `<table>
     <thead><tr><th>Email</th><th>Role</th><th></th></tr></thead>
     <tbody>${(data || []).map(m => { const self = m.email === MY_EMAIL; return `<tr>
       <td><strong>${esc(m.email)}</strong>${self ? ' <span class="pill green">Aap</span>' : ""}</td>
-      <td><select class="status" data-trole="${esc(m.email)}" ${self ? "disabled" : ""}>${["owner","admin","staff"].map(r => `<option value="${r}" ${r===m.role?"selected":""}>${r[0].toUpperCase()+r.slice(1)}</option>`).join("")}</select></td>
-      <td>${self ? '<small style="color:var(--muted)">Apna owner account remove nahi ho sakta</small>' : `<button class="btn small danger" data-tdel="${esc(m.email)}">Remove</button>`}</td>
+      <td><select class="status" data-trole="${esc(m.email)}" ${(self || effRole() !== "owner") ? "disabled" : ""}>${["owner","admin","staff"].map(r => `<option value="${r}" ${r===m.role?"selected":""}>${r[0].toUpperCase()+r.slice(1)}</option>`).join("")}</select></td>
+      <td>${self ? '<small style="color:var(--muted)">Apna account remove nahi ho sakta</small>' : (effRole() === "owner" || m.role === "staff" ? `<button class="btn small danger" data-tdel="${esc(m.email)}">Remove</button>` : '<small style="color:var(--muted)">Sirf Owner remove kar sakta hai</small>')}</td>
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-trole]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("team").update({ role: sel.value }).eq("store_id", STORE_ID).eq("email", sel.dataset.trole);
@@ -1956,9 +1962,9 @@ async function loadSettings(){
   settingsLoaded = true;
   const msg = $("#settingsMsg");
   try {
-    const { data, error } = await sb.from("settings").select("data").eq("store_id", STORE_ID).maybeSingle();
+    const { data, error } = await sb.rpc("get_store_settings", { p_store_id: STORE_ID });
     if (error) throw error;
-    SETTINGS_STATE = mergeAdminSettings(data && data.data);
+    SETTINGS_STATE = mergeAdminSettings(data);
     fillSettings(SETTINGS_STATE);
   } catch (e) {
     SETTINGS_STATE = mergeAdminSettings(null);
@@ -2875,12 +2881,14 @@ async function persistAllSettings(){
       data.trustItems = readCntList("cntTrustWrap", TRUST_FIELDS); /* V3.6: Instagram + blog (Content tab bhara ho to wahi jeet-ta hai). */ data.instaHandle = (document.getElementById("cntInstaHandle") ? document.getElementById("cntInstaHandle").value.trim() : ""); data.showReels = document.getElementById("cntShowReels") ? document.getElementById("cntShowReels").checked : true; data.showBlog = document.getElementById("cntShowBlog") ? document.getElementById("cntShowBlog").checked : true; /* V3.9: fashion toggles + section/PDP text. */ data.showSizes = document.getElementById("cntShowSizes") ? document.getElementById("cntShowSizes").checked : true; data.showColors = document.getElementById("cntShowColors") ? document.getElementById("cntShowColors").checked : true; data.showDisclaimer = document.getElementById("cntShowDisclaimer") ? document.getElementById("cntShowDisclaimer").checked : true; if (contentTextDirty){ data.sectionText = {}; SECTION_TEXT_KEYS_ADMIN.forEach(k => { const eb = document.getElementById("cntSec_" + k + "_eyebrow"); const ti = document.getElementById("cntSec_" + k + "_title"); const e = eb ? eb.value.trim() : "", t = ti ? ti.value.trim() : ""; if (e || t) data.sectionText[k] = { eyebrow: e, title: t };}); } data.pdpText = { details: document.getElementById("cntPdpDetails") ? document.getElementById("cntPdpDetails").value.trim() : "", related: document.getElementById("cntPdpRelated") ? document.getElementById("cntPdpRelated").value.trim() : "", delivery: document.getElementById("cntPdpDelivery") ? document.getElementById("cntPdpDelivery").value.trim() : "" }; /* V3.10: Luxury tiles/tabs/banner. */ data.luxuryTiles = readCntList("cntLuxTilesWrap", LUX_TILE_FIELDS); data.luxuryTabs = readCntList("cntLuxTabsWrap", LUX_TAB_FIELDS); /* V3.11: Ready To Wear tabs + Editorial slider banners. */ data.luxuryRtwTabs = readCntList("cntLuxRtwTabsWrap", LUX_TAB_FIELDS); data.luxuryBanners = readCntList("cntLuxBannersWrap", LUX_BANNER_FIELDS); data.collectionPages = readCntList("cntCollPagesWrap", COLL_PAGE_FIELDS); /* V5 Phase 4: wrap na ho to customPages bilkul nahi likhte (purani values mehfooz). */ if (document.getElementById("cntCustomPagesWrap")) data.customPages = readCustomPages(); data.instaReels = readCntList("cntReelsWrap", REEL_FIELDS); data.blogPosts = readCntList("cntBlogWrap", BLOG_FIELDS);
     }
     if (sectionsTextDirty){ data.sectionText = readSectionsText();}
- /* Per-store settings: upsert store_id par hota hai (platform migration
-       mein settings.store_id par unique index hai; id sequence se auto
-       aata hai nayi row par). */
-    const { error } = await sb.from("settings").upsert({ store_id: STORE_ID, data }, { onConflict: "store_id" });
+ /* Module 3b: settings save update_store_settings RPC se hoti hai (staff ke
+       meta/customCode server par strip hote hain; direct upsert ab
+       Owner/Admin-only policy par band hai). */
+    const savePayload = JSON.parse(JSON.stringify(data));
+     if (effRole() === "staff"){ delete savePayload.meta; delete savePayload.customCode; }
+     const { data: saved, error } = await sb.rpc("update_store_settings", { p_store_id: STORE_ID, p_data: savePayload });
     if (error) throw error;
-    SETTINGS_STATE = data; /* (A) Luxury auto-seed — theme save ho gaya, ab categories (agar khaali hon). Seed apni ghalti khud pakarta hai (toast) — save is se fail nahi hota. */ await seedLuxuryCategories(data);
+    SETTINGS_STATE = saved || data; /* (A) Luxury auto-seed — theme save ho gaya, ab categories (agar khaali hon). Seed apni ghalti khud pakarta hai (toast) — save is se fail nahi hota. */ await seedLuxuryCategories(data);
     renderHeroEditor();
 /* V4 Phase 2: theme badla ho to Content/builder/Style dobara dikhayein. */
 applyThemeVisibility();
