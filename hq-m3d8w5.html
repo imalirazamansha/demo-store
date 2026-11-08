@@ -44,6 +44,12 @@
   .empty-note{color:var(--muted);text-align:center;padding:26px 0}
   .hint{font-size:12px;color:var(--muted);margin-top:3px}
   .hidden{display:none!important}
+  /* --- MFA (B2): authenticator app — QR + 6-digit code --- */
+  .mfa-qr{width:220px;height:220px;border:1.5px solid var(--line);border-radius:12px;padding:8px;background:#fff;margin:12px auto}
+  .mfa-secret{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;word-break:break-all;background:#f8fafc;border:1.5px dashed var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;text-align:left}
+  .mfa-code{letter-spacing:6px;text-align:center;font-size:20px!important;font-weight:700}
+  .mfa-factor-row{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fbfdff;font-size:14px}
+  .mfa-factor-row small{color:var(--muted)}
   .acards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
   .acard{background:#fbfdff;border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
   .acard strong{display:block;font-size:21px}
@@ -103,12 +109,54 @@
   </div>
 </div>
 
+<!-- MFA — Authenticator App (B2): platform admin ke liye zaroori -->
+<div class="wrap hidden" id="mfaView">
+  <div class="card login-box">
+    <h2>🔐 MFA — Authenticator App</h2>
+    <p id="mfaIntro">Platform admin ke liye <strong>doosri pehchan (MFA)</strong> zaroori hai. Pehle apne authenticator app (Google Authenticator / Authy) se 6-digit code dein.</p>
+    <!-- Challenge: pehle se enrolled factor hai -->
+    <div id="mfaChallengeBox" class="hidden">
+      <div id="mfaFactorPick" class="hidden" style="text-align:left;margin-bottom:10px">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">Kaunsa authenticator?</label>
+        <select id="mfaFactorSelect" style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:10px"></select>
+      </div>
+      <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" id="mfaChallengeCode" class="mfa-code" placeholder="••••••">
+      <button class="btn" id="mfaChallengeBtn" style="width:100%">✅ Verify karein</button>
+      <p class="msg" id="mfaChallengeMsg"></p>
+    </div>
+    <!-- Enrolment: abhi koi factor nahi -->
+    <div id="mfaEnrollBox" class="hidden">
+      <button class="btn" id="mfaEnrollStartBtn" style="width:100%">📱 Authenticator app set up karein</button>
+      <div id="mfaQrWrap" class="hidden">
+        <p style="font-size:14px">Authenticator app se yeh <strong>QR code scan</strong> karein. Agar scan na ho, to neeche wala secret haath se daal lein.</p>
+        <img id="mfaQrImg" class="mfa-qr" alt="Authenticator QR code">
+        <div class="mfa-secret" id="mfaSecretText"></div>
+        <button class="btn ghost small" id="mfaCopySecretBtn">📋 Secret copy karein</button>
+        <p class="hint">Yeh secret sirf abhi dikh raha hai — dobara nahi dikhaya jayega. App mein add karne ke baad neeche 6-digit code likhein.</p>
+        <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" id="mfaEnrollCode" class="mfa-code" placeholder="••••••" style="margin-top:10px">
+        <button class="btn" id="mfaEnrollVerifyBtn" style="width:100%">✅ Verify karke on karein</button>
+      </div>
+      <p class="msg" id="mfaEnrollMsg"></p>
+    </div>
+    <button class="btn ghost" id="mfaLogoutBtn" style="width:100%;margin-top:8px">Logout</button>
+  </div>
+</div>
+
 <!-- PANEL -->
 <div class="wrap hidden" id="dashView">
   <div class="tabs">
     <button id="tabStores" class="active">🏪 Stores</button>
     <button id="tabBilling">💰 Billing</button>
     <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
+  </div>
+
+  <!-- MFA MANAGE (B2): sirf AAL2 par dikhta hai -->
+  <div class="card" id="mfaManageCard">
+    <h3 style="margin-bottom:6px">🔐 MFA — Authenticator App</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Platform admin ka login ab <strong>magic link + authenticator code</strong> se hota hai. Yahan apne enrolled authenticator dekh aur manage kar sakte hain.</p>
+    <div id="mfaFactorsList"><p class="empty-note">Loading…</p></div>
+    <button class="btn ghost small" id="mfaAddFactorBtn">➕ Doosra authenticator add karein</button>
+    <p class="msg" id="mfaManageMsg"></p>
   </div>
 
   <!-- STORES -->

@@ -97,10 +97,208 @@ async function checkPlatform(session){
   if (accessCheckedFor === email) return;
   accessCheckedFor = email;
   MY_EMAIL = email;
+  /* B2 MFA: platform admin ke liye AAL2 zaroori hai. AAL1 par platform_admins
+     row nazar nahi aati (backend RLS), is liye pehle AAL dekhein — AAL1 ho to
+     MFA prompt dikhayein, bare "no access" nahi. */
+  const aal = await mfaGetAAL();
+  if (!aal || aal.currentLevel === "aal1"){
+    accessCheckedFor = null; // MFA ke baad dobara check ho sake
+    await mfaShowGate(email);
+    return;
+  }
   const { data, error } = await sb.from("platform_admins").select("email").eq("email", email).maybeSingle();
   if (error || !data){ showNoAccess(email); return; }
   showDash();
 }
+/* ---------- B2 MFA (authenticator app) ----------
+   Supabase Auth TOTP: magic link (AAL1) ke baad 6-digit code se AAL2.
+   Secret/QR/code kabhi log nahi hota, kabhi localStorage mein nahi jata —
+   sirf memory mein rehta hai aur verify ke baad saaf ho jata hai.
+   Recovery codes istemal NAHI hote (experimental, disabled by default). */
+let mfaEnrollFactorId = null; // sirf enrolment ke dauran, memory mein
+let mfaGateDone = null; // MFA view se wapas aane par kya karna hai
+async function mfaGetAAL(){
+  try {
+    const { data, error } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error || !data) return null;
+    return data; // { currentLevel: "aal1"|"aal2", nextLevel: ... }
+  } catch (e) { return null; }
+}
+async function mfaListTotp(){
+  try {
+    const { data, error } = await sb.auth.mfa.listFactors();
+    if (error || !data) return [];
+    return (data.totp || []).filter(f => f && f.status === "verified");
+  } catch (e) { return []; }
+}
+function mfaCodeOf(inputEl){
+  const v = String((inputEl && inputEl.value) || "").replace(/\D/g, "").slice(0, 6);
+  if (inputEl) inputEl.value = v;
+  return v.length === 6 ? v : null;
+}
+function mfaClearSecrets(){
+  mfaEnrollFactorId = null;
+  const qr = $("#mfaQrImg"); if (qr) qr.removeAttribute("src");
+  const sec = $("#mfaSecretText"); if (sec) sec.textContent = "";
+  ["#mfaChallengeCode", "#mfaEnrollCode"].forEach(s => { const el = $(s); if (el) el.value = ""; });
+}
+function mfaHideAllViews(){
+  ["#loginView", "#dashView", "#noAccessView"].forEach(s => $(s).classList.add("hidden"));
+  $("#mfaView").classList.remove("hidden");
+  $("#logoutBtn").classList.remove("hidden");
+}
+/* MFA gate: AAL1 user ko challenge ya enrolment dikhayein. onDone MFA
+   kamyab hone par chalta hai (dashboard check dobara hota hai). */
+async function mfaShowGate(email){
+  mfaClearSecrets();
+  mfaHideAllViews();
+  $("#mfaChallengeBox").classList.add("hidden");
+  $("#mfaEnrollBox").classList.add("hidden");
+  $("#mfaQrWrap").classList.add("hidden");
+  $("#mfaChallengeMsg").textContent = ""; $("#mfaChallengeMsg").className = "msg";
+  $("#mfaEnrollMsg").textContent = ""; $("#mfaEnrollMsg").className = "msg";
+  $("#mfaIntro").innerHTML = "Platform admin ke liye <strong>doosri pehchan (MFA)</strong> zaroori hai. Pehle apne authenticator app (Google Authenticator / Authy) se 6-digit code dein.";
+  const factors = await mfaListTotp();
+  if (factors.length){
+    // Pehle se enrolled — challenge dikhayein (2 factors hon to select karein).
+    const sel = $("#mfaFactorSelect");
+    sel.innerHTML = factors.map((f, i) => `<option value="${esc(f.id)}">Authenticator ${i + 1}${f.friendly_name ? " — " + esc(f.friendly_name) : ""}</option>`).join("");
+    $("#mfaFactorPick").classList.toggle("hidden", factors.length < 2);
+    $("#mfaChallengeBox").classList.remove("hidden");
+    $("#mfaChallengeCode").focus();
+  } else {
+    // Abhi koi factor nahi — enrolment dikhayein.
+    $("#mfaEnrollBox").classList.remove("hidden");
+  }
+  mfaGateDone = async () => {
+    mfaClearSecrets();
+    accessCheckedFor = null;
+    const { data } = await sb.auth.getSession();
+    if (data.session) checkPlatform(data.session);
+  };
+}
+$("#mfaLogoutBtn").onclick = async () => { mfaClearSecrets(); await sb.auth.signOut(); location.reload(); };
+$("#mfaCopySecretBtn").onclick = async function(){
+  const sec = $("#mfaSecretText").textContent || "";
+  if (!sec) return;
+  await copyText(sec, this);
+};
+$("#mfaEnrollStartBtn").onclick = async () => {
+  const btn = $("#mfaEnrollStartBtn"), msg = $("#mfaEnrollMsg");
+  btn.disabled = true;
+  msg.textContent = "Authenticator set up ho raha hai…"; msg.className = "msg";
+  try {
+    const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "Authenticator" });
+    if (error || !data || !data.totp) throw new Error((error && error.message) || "Enrol nahi ho saka");
+    mfaEnrollFactorId = data.id;
+    const qr = $("#mfaQrImg");
+    if (data.totp.qr_code) qr.src = data.totp.qr_code; // Supabase data-URI SVG deta hai
+    $("#mfaSecretText").textContent = data.totp.secret || "";
+    $("#mfaQrWrap").classList.remove("hidden");
+    $("#mfaEnrollStartBtn").classList.add("hidden");
+    msg.textContent = "QR scan karein ya secret daal lein, phir 6-digit code likh kar verify karein."; msg.className = "msg ok";
+    $("#mfaEnrollCode").focus();
+  } catch (e) {
+    msg.textContent = "Error: " + (e && e.message ? e.message : "Enrol nahi ho saka"); msg.className = "msg err";
+  } finally { btn.disabled = false; }
+};
+$("#mfaEnrollVerifyBtn").onclick = async () => {
+  const msg = $("#mfaEnrollMsg"), btn = $("#mfaEnrollVerifyBtn");
+  if (!mfaEnrollFactorId){ msg.textContent = "Pehle 'Set up' button se QR code lein."; msg.className = "msg err"; return; }
+  const code = mfaCodeOf($("#mfaEnrollCode"));
+  if (!code){ msg.textContent = "6-digit code likhein."; msg.className = "msg err"; return; }
+  btn.disabled = true;
+  msg.textContent = "Verify ho raha hai…"; msg.className = "msg";
+  try {
+    const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: mfaEnrollFactorId, code });
+    if (error) throw new Error(error.message || "Code ghalat ya expire ho gaya");
+    msg.textContent = "✅ MFA on ho gaya — dashboard khul raha hai…"; msg.className = "msg ok";
+    const done = mfaGateDone; mfaGateDone = null;
+    if (done) await done();
+  } catch (e) {
+    msg.textContent = "Error: " + (e && e.message ? e.message : "Code ghalat ya expire ho gaya — dobara try karein."); msg.className = "msg err";
+  } finally { btn.disabled = false; }
+};
+$("#mfaChallengeBtn").onclick = async () => {
+  const msg = $("#mfaChallengeMsg"), btn = $("#mfaChallengeBtn");
+  const factors = await mfaListTotp();
+  if (!factors.length){ msg.textContent = "Koi enrolled authenticator nahi mila — pehle set up karein."; msg.className = "msg err"; return; }
+  const sel = $("#mfaFactorSelect");
+  const factorId = (sel && sel.value) || factors[0].id;
+  const code = mfaCodeOf($("#mfaChallengeCode"));
+  if (!code){ msg.textContent = "6-digit code likhein."; msg.className = "msg err"; return; }
+  btn.disabled = true;
+  msg.textContent = "Verify ho raha hai…"; msg.className = "msg";
+  try {
+    const { error } = await sb.auth.mfa.challengeAndVerify({ factorId, code });
+    if (error) throw new Error(error.message || "Code ghalat ya expire ho gaya");
+    msg.textContent = "✅ Verify ho gaya — dashboard khul raha hai…"; msg.className = "msg ok";
+    const done = mfaGateDone; mfaGateDone = null;
+    if (done) await done();
+  } catch (e) {
+    msg.textContent = "Error: " + (e && e.message ? e.message : "Code ghalat ya expire ho gaya — dobara try karein."); msg.className = "msg err";
+  } finally { btn.disabled = false; }
+};
+/* Enter dabane se bhi verify ho (code input par). */
+["#mfaChallengeCode", "#mfaEnrollCode"].forEach(s => {
+  const el = $(s);
+  if (el) el.addEventListener("keydown", e => {
+    if (e.key === "Enter"){
+      e.preventDefault();
+      const btn = s === "#mfaChallengeCode" ? $("#mfaChallengeBtn") : $("#mfaEnrollVerifyBtn");
+      if (btn && !btn.disabled) btn.click();
+    }
+  });
+});
+/* ---------- MFA manage (dashboard, sirf AAL2) ---------- */
+async function loadMfaManage(){
+  const list = $("#mfaFactorsList"), msg = $("#mfaManageMsg");
+  if (!list) return;
+  list.innerHTML = "<p class='empty-note'>Loading…</p>";
+  if (msg){ msg.textContent = ""; msg.className = "msg"; }
+  const aal = await mfaGetAAL();
+  if (!aal || aal.currentLevel !== "aal2"){ list.innerHTML = "<p class='empty-note'>MFA verify nahi hua — pehle authenticator code se verify karein.</p>"; return; }
+  const factors = await mfaListTotp();
+  if (!factors.length){ list.innerHTML = "<p class='empty-note'>Abhi koi authenticator enrolled nahi hai.</p>"; return; }
+  list.innerHTML = factors.map((f, i) => {
+    const created = f.created_at ? new Date(f.created_at).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" }) : "—";
+    return `<div class="mfa-factor-row"><span>📱 <strong>Authenticator ${i + 1}</strong>${f.friendly_name ? " — " + esc(f.friendly_name) : ""}<br><small>TOTP • Verified • ${esc(created)}</small></span><button class="btn danger small" data-mfa-remove="${esc(f.id)}" data-mfa-last="${factors.length === 1 ? "1" : "0"}">Remove</button></div>`;
+  }).join("");
+  list.querySelectorAll("[data-mfa-remove]").forEach(b => b.onclick = async () => {
+    const factorId = b.dataset.mfaRemove;
+    const isLast = b.dataset.mfaLast === "1";
+    const ok = confirm(isLast
+      ? "⚠️ Yeh AAKHRI authenticator hai — remove karne se MFA BAND ho jayega aur platform admin sirf magic link se login hoga. Kya aap waqai remove karna chahte hain?"
+      : "Is authenticator ko remove kar dein?");
+    if (!ok) return;
+    if (msg){ msg.textContent = "Remove ho raha hai…"; msg.className = "msg"; }
+    try {
+      const { error } = await sb.auth.mfa.unenroll({ factorId });
+      if (error) throw new Error(error.message || "Remove nahi ho saka");
+      if (msg){ msg.textContent = "✅ Authenticator remove ho gaya."; msg.className = "msg ok"; }
+      await loadMfaManage();
+    } catch (e) {
+      if (msg){ msg.textContent = "Error: " + (e && e.message ? e.message : "Remove nahi ho saka"); msg.className = "msg err"; }
+    }
+  });
+}
+$("#mfaAddFactorBtn").onclick = async () => {
+  /* Doosra factor: MFA view mein enrolment dikhayein, phir dashboard par wapas. */
+  mfaClearSecrets();
+  mfaHideAllViews();
+  $("#mfaChallengeBox").classList.add("hidden");
+  $("#mfaEnrollBox").classList.remove("hidden");
+  $("#mfaQrWrap").classList.add("hidden");
+  $("#mfaEnrollStartBtn").classList.remove("hidden");
+  $("#mfaEnrollMsg").textContent = "Doosra authenticator add kar rahe hain — yeh pehle wale se alag device/app par rakhein."; $("#mfaEnrollMsg").className = "msg";
+  $("#mfaIntro").innerHTML = "Doosra authenticator add kar rahe hain — <strong>alag device ya app</strong> par rakhein, taa ke pehla kho jaye to doosra kaam aaye.";
+  mfaGateDone = async () => {
+    mfaClearSecrets();
+    accessCheckedFor = null;
+    const { data } = await sb.auth.getSession();
+    if (data.session) checkPlatform(data.session);
+  };
+};
 /* V3 Part B: Platform audit log — best-effort, action ko kabhi nahi rokta.
    platform_audit table par sirf platform admin ki policy hai (migration 5). */
 async function audit(action, store_id, details){
@@ -118,6 +316,7 @@ async function audit(action, store_id, details){
 function showNoAccess(email){
   $("#loginView").classList.add("hidden");
   $("#dashView").classList.add("hidden");
+  $("#mfaView").classList.add("hidden");
   $("#noAccessView").classList.remove("hidden");
   $("#noAccessEmail").textContent = email || "";
   $("#logoutBtn").classList.remove("hidden");
@@ -125,8 +324,10 @@ function showNoAccess(email){
 function showDash(){
   $("#loginView").classList.add("hidden");
   $("#noAccessView").classList.add("hidden");
+  $("#mfaView").classList.add("hidden");
   $("#dashView").classList.remove("hidden");
   $("#logoutBtn").classList.remove("hidden");
+  loadMfaManage();
   loadAll();
 }
 $("#refreshBtn").onclick = loadAll;
