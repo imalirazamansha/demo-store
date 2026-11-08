@@ -385,7 +385,7 @@
   <!-- TEAM -->
   <div class="card hidden" id="teamPanel">
     <h3 style="margin-bottom:6px">Team</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Jis email ko yahan add karein ge, woh magic link se login karke <strong>isi store</strong> ka dashboard istemal kar sakta hai (dusri stores ka access alag se milta hai). <strong>Owner</strong> sab kuch kar sakta hai; <strong>Admin</strong> Team ke ilawa sab; <strong>Staff</strong> sirf Dashboard, Orders aur Products. Note: naye member ko pehle Supabase dashboard se Auth user banana pare to owner karega; yahan email add karne se unhein access mil jata hai jab woh magic link se login karein.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Jis email ko yahan add karein ge, woh magic link se login karke <strong>isi store</strong> ka dashboard istemal kar sakta hai (dusri stores ka access alag se milta hai). <strong>Owner</strong> sab kuch kar sakta hai (team, order financials, Meta, custom code). <strong>Admin</strong> poora store chala sakta hai aur Staff add/remove kar sakta hai — Owner ko chhoo nahi sakta aur Owner/Admin nahi bana sakta. <strong>Staff</strong> poora store ka kaam kar sakta hai (products, images, categories, coupons, orders, design/settings) — Team, order financials, Meta aur custom code us ke liye band hain. Note: naye member ko pehle Supabase dashboard se Auth user banana pare to owner karega; yahan email add karne se unhein access mil jata hai jab woh magic link se login karein.</p>
     <div class="addform">
       <div><label>Member email</label><input id="teamEmail" type="email" placeholder="member@example.com"></div>
       <div><label>Role</label><select id="teamRole"><option value="staff">Staff</option><option value="admin">Admin</option><option value="owner">Owner</option></select></div>
@@ -853,15 +853,17 @@
     </div>
     <label>Address</label><textarea id="oeAddress" rows="2"></textarea>
     <label>Tracking note (courier/shipping note — customer ko tracking mein dikhega)</label><input id="oeTrackNote" placeholder="e.g. Parcel TCS ko de diya gaya — tracking #12345">
+    <div id="oeFinancialSection">
     <label>Items</label>
     <div class="oe-head"><span>Product</span><span>Qty</span><span>Price</span><span>Delivery</span><span></span></div>
     <div id="oeItems"></div>
     <button class="btn small ghost" id="oeAddItem" type="button">＋ Item add karein</button>
     <div class="settings-grid" style="margin-top:8px">
       <div><label>Discount (Rs)</label><input id="oeDiscount" type="number" min="0"></div>
-      <div><label>Total (Rs) — auto hisaab hota hai; chaaho to haath se bhi likh sakte hain</label><input id="oeTotal" type="number" min="0"></div>
+      <div><label>Total (Rs) — server hisaab karta hai (sirf Owner badal sakta hai)</label><input id="oeTotal" type="number" min="0" readonly></div>
     </div>
     <p class="hint" id="oeCalcNote"></p>
+    </div>
     <p class="msg" id="oeMsg"></p>
     <div style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
       <button class="btn" id="oeSaveBtn">💾 Order Save karein</button>
