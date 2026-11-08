@@ -537,9 +537,9 @@ function openOrderEdit(id){
   const meta = orderMeta(o);
   OE_COUPON = meta.coupon;
   $("#oeTitle").textContent = "#" + o.id;
-   /* Module 3b: financial section (items/discount/total) sirf Owner ko — staff/admin ko sirf details nazar aati hain. */
-   const finSec = $("#oeFinancialSection");
-   if (finSec) finSec.classList.toggle("hidden", effRole() !== "owner");
+  /* Module 3b: financial section (items/discount/total) sirf Owner ko — staff/admin ko sirf details nazar aati hain. */
+  const finSec = $("#oeFinancialSection");
+  if (finSec) finSec.classList.toggle("hidden", effRole() !== "owner");
   $("#oeName").value = o.customer_name || "";
   $("#oePhone").value = o.phone || "";
   $("#oeCity").value = o.city || "";
@@ -599,6 +599,7 @@ function oeRecalc(){
   $("#oeTotal").value = c.total;
   $("#oeCalcNote").textContent = `Hisaab: Items ${fmt(c.sub)} + Delivery ${fmt(c.del)} − Discount ${fmt(c.disc)} = ${fmt(c.total)}${OE_COUPON ? ` • 🎟️ Coupon: ${OE_COUPON}` : ""} • Total server hisaab karega (haath se nahi badal sakta)`;
 }
+
 $("#oeDiscount").addEventListener("input", oeRecalc);
 $("#oeAddItem").onclick = () => { addOeItemRow({}); oeRecalc(); };
 $("#oeCancelBtn").onclick = () => $("#orderEditModal").classList.add("hidden");
@@ -614,19 +615,19 @@ $("#oeSaveBtn").onclick = async () => {
     ? c.items
     : { lines: c.items, coupon: OE_COUPON, discount: c.disc };
   const customer_name = $("#oeName").value.trim();
-     if (!customer_name){ msg.textContent = "Customer name khaali nahi ho sakta."; msg.className = "msg err"; return; }
+  if (!customer_name){ msg.textContent = "Customer name khaali nahi ho sakta."; msg.className = "msg err"; return; }
   btn.disabled = true; btn.textContent = "Saving…";
   try {
     /* Module 3b: details + status + financials — teen alag RPCs. Financial
-    section sirf Owner ko nazar aata hai; server total khud hisaab karta hai. */
-     let r = await sb.rpc("update_order_details", { p_order_id: OE_ID, p_customer_name: customer_name, p_phone: $("#oePhone").value.trim(), p_city: $("#oeCity").value.trim(), p_address: $("#oeAddress").value.trim(), p_tracking_note: $("#oeTrackNote") ? $("#oeTrackNote").value.trim() : null });
-     if (r.error) throw r.error;
-     r = await sb.rpc("update_order_status", { p_order_id: OE_ID, p_status: $("#oeStatus").value });
-     if (r.error) throw r.error;
-     if (effRole() === "owner"){
-        r = await sb.rpc("update_order_financials", { p_order_id: OE_ID, p_items: items, p_discount: c.disc });
-        if (r.error) throw r.error;
-     }
+       section sirf Owner ko nazar aata hai; server total khud hisaab karta hai. */
+    let r = await sb.rpc("update_order_details", { p_order_id: OE_ID, p_customer_name: customer_name, p_phone: $("#oePhone").value.trim(), p_city: $("#oeCity").value.trim(), p_address: $("#oeAddress").value.trim(), p_tracking_note: $("#oeTrackNote") ? $("#oeTrackNote").value.trim() : null });
+    if (r.error) throw r.error;
+    r = await sb.rpc("update_order_status", { p_order_id: OE_ID, p_status: $("#oeStatus").value });
+    if (r.error) throw r.error;
+    if (effRole() === "owner"){
+      r = await sb.rpc("update_order_financials", { p_order_id: OE_ID, p_items: items, p_discount: c.disc });
+      if (r.error) throw r.error;
+    }
     $("#orderEditModal").classList.add("hidden");
     const om = $("#ordersMsg");
     om.textContent = `✅ Order #${OE_ID} update ho gaya.`; om.className = "msg ok";
@@ -1085,7 +1086,7 @@ function bindProdCards(wrap){
     }
     const discountRaw = get("discount_pct").trim();
     const discountNum = discountRaw === "" ? 0 : parseInt(discountRaw);
-    const customer_name = $("#oeName").value.trim();
+    const payload = {
       name: get("name").trim(),
       price: parseInt(get("price")) || 0,
       old: get("old") ? parseInt(get("old")) : null,
@@ -1252,11 +1253,11 @@ async function loadTeam(){
   const wrap = $("#teamWrap");
   const { data, error } = await sb.from("team").select("*").eq("store_id", STORE_ID).order("created_at", { ascending: true });
   if (error){ wrap.innerHTML = `<p class="empty-note">Team load nahi ho saki: ${esc(error.message)}</p>`; return; }
-   /* Module 3b: Add form mein role options — Owner ko Staff/Admin/Owner; Admin ko sirf Staff. */
-   const roleSel = $("#teamRole");
-   if (roleSel) roleSel.innerHTML = effRole() === "admin"
-   ? '<option value="staff">Staff</option>'
-      : '<option value="staff">Staff</option><option value="admin">Admin</option><option value="owner">Owner</option>';
+  /* Module 3b: Add form mein role options — Owner ko Staff/Admin/Owner; Admin ko sirf Staff. */
+  const roleSel = $("#teamRole");
+  if (roleSel) roleSel.innerHTML = effRole() === "admin"
+    ? '<option value="staff">Staff</option>'
+    : '<option value="staff">Staff</option><option value="admin">Admin</option><option value="owner">Owner</option>';
   wrap.innerHTML = `<table>
     <thead><tr><th>Email</th><th>Role</th><th></th></tr></thead>
     <tbody>${(data || []).map(m => { const self = m.email === MY_EMAIL; return `<tr>
@@ -2885,8 +2886,8 @@ async function persistAllSettings(){
        meta/customCode server par strip hote hain; direct upsert ab
        Owner/Admin-only policy par band hai). */
     const savePayload = JSON.parse(JSON.stringify(data));
-     if (effRole() === "staff"){ delete savePayload.meta; delete savePayload.customCode; }
-     const { data: saved, error } = await sb.rpc("update_store_settings", { p_store_id: STORE_ID, p_data: savePayload });
+    if (effRole() === "staff"){ delete savePayload.meta; delete savePayload.customCode; }
+    const { data: saved, error } = await sb.rpc("update_store_settings", { p_store_id: STORE_ID, p_data: savePayload });
     if (error) throw error;
     SETTINGS_STATE = saved || data; /* (A) Luxury auto-seed — theme save ho gaya, ab categories (agar khaali hon). Seed apni ghalti khud pakarta hai (toast) — save is se fail nahi hota. */ await seedLuxuryCategories(data);
     renderHeroEditor();
