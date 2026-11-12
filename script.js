@@ -4,6 +4,14 @@
 const SUPABASE_URL = "https://vyiwiqcbituttdjgsuwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aXdpcWNiaXR1dHRkamdzdXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MTQ0MTYsImV4cCI6MjEwODA5MDQxNn0.fQDW8_b27GzTpu5XBi_Nqw12mmJlJodE0yB3Ei1KLNo";
 
+/* FE-P4: agar supabase-js CDN aur local copy dono fail ho jayein to script.js
+   yahin ruk jaye aur #cdnError banner dikhaye (index.html ke end par hai) —
+   baghair client ke neeche ka code `window.supabase` par throw karega. */
+if (!window.supabase){
+  try { var _ce = document.getElementById("cdnError"); if (_ce) _ce.hidden = false; } catch (e) {}
+  throw new Error("supabase-js load nahi hua (CDN + local copy dono fail)");
+}
+
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const $ = s => document.querySelector(s);
@@ -18,11 +26,22 @@ const escapeHtml = esc;
 function safeUrl(u){
   const t = String(u || "").trim();
   if (!t) return "";
-  if (/^https?:\/\//i.test(t)) return t;
-  if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) return t;
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t; /* relative path, koi scheme nahi */
-  return "";
+  let out = "";
+  if (/^https?:\/\//i.test(t)) out = t;
+  else if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) out = t;
+  else if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) out = t; /* relative path, koi scheme nahi */
+  else return "";
+  /* Attribute-breakout guard (X-1): " ' < > ` aur space ko percent-encode
+     karein — warna src="${...}"/href="${...}" se bahar nikal kar event
+     handler inject ho sakta hai (staff-reachable stored XSS, product
+     image-URL input se). Scheme blocking upar waisa hi rehta hai. */
+  return out.replace(/["'<>` ]/g, c => ({"\"": "%22", "'": "%27", "<": "%3C", ">": "%3E", "`": "%60", " ": "%20"}[c]));
 }
+/* Product image placeholder (F-7): koi image na ho to <img src=""> kabhi
+   render na ho — ye data-URI placeholder lagta hai (koi network nahi). */
+const PLACEHOLDER_IMG = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="100%" height="100%" fill="#eef2f0"/><text x="50%" y="50%" font-size="40" fill="#8a9a94" text-anchor="middle" font-family="sans-serif">ShopNest</text></svg>');
+/* safeUrl ya placeholder — kabhi khaali string nahi lotata. */
+function imgSrc(u){ return safeUrl(u) || PLACEHOLDER_IMG; }
 
 /* ---------- SVG icons (sprite index.html mein hai: #i-* stroke, #b-* brand) ---------- */
 const icon = (name, cls) => `<svg class="ic ${cls || ""}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -180,10 +199,10 @@ const DEFAULT_SETTINGS = {
 let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
 /* ---------- Multi-tenant state ----------
-   STORE = storefront_stores view se resolved row { id, slug, name, status }.
-   STORE_ID null ho to SINGLE-TENANT FALLBACK hai (platform migration abhi
-   nahi chali / stores lookup fail) — saari queries baghair store filter ke
-   chalti hain taa ke live shop kabhi band na ho. */
+   STORE = get_public_storefront RPC se resolved row { id, slug, name, status }.
+   STORE_ID null ho to FAIL-CLOSED hai (Module 4): koi products/settings load
+   nahi hote aur "Store load nahi ho saka" dikhta hai — kabhi baghair store
+   filter ke purana render nahi hota (kisi aur store ka data leak na ho). */
 const PLATFORM_HOSTS = ["localhost", "127.0.0.1", "imalirazamansha.github.io"];
 let STORE = null;
 let STORE_ID = null;
@@ -865,7 +884,7 @@ function applySections(){
     seq.push(el);
   });
   seq.forEach(el => home.appendChild(el)); applySectionText(); } /* ---------- V3.9: editable section titles (Content tab -> settings.sectionText) ---------- Khaali ho to asal HTML heading rehta hai; sirf bhara hua eyebrow/title badalta hai. */ const SECTION_TEXT_DEFAULTS = { categories: { eyebrow: "Apni Pasand Chunein", title: "SHOP BY CATEGORY" }, best: { eyebrow: "SAB SE ZYADA ORDER HONE WALE PRODUCTS", title: "BEST SELLERS" }, all_products: { eyebrow: "Complete Collection", title: "ALL PRODUCTS" }, hot: { eyebrow: "Trending Now", title: "Hot Selling This Week" }, arrivals: { eyebrow: "JUST LAUNCHED", title: "New Arrivals" }, deals: { eyebrow: "LIMITED TIME", title: "MEGA DEALS — HAR GHAR KI ZAROORAT" }, budget: { eyebrow: "Har Budget Ke Liye", title: "SHOP BY BUDGET" }, howto: { eyebrow: "Asaan Tareeqa", title: "HOW TO ORDER" }, faq: { eyebrow: "Aksar Sawalat", title: "FAQ" }, reviews: { eyebrow: "Customer Love", title: "HAPPY CUSTOMERS" }, festive: { eyebrow: "THE FESTIVE EDIT", title: "Festive Couture Edit" }, unstitched_tabs: { eyebrow: "SHOP BY COLLECTION", title: "Unstitched" }, readytowear_tabs: { eyebrow: "SHOP BY COLLECTION", title: "Ready To Wear" } }; const SECTION_TEXT_KEY = { categories: "categories", best_sellers: "best", hot: "hot", new_arrivals: "arrivals", deals: "deals", budget: "budget", how_to_order: "howto", faq: "faq", testimonials: "reviews", festive: "festive", unstitched_tabs: "unstitched_tabs", readytowear_tabs: "readytowear_tabs", all_products: "all_products" }; function applySectionText(){ const custom = (SETTINGS && SETTINGS.sectionText && typeof SETTINGS.sectionText === "object") ? SETTINGS.sectionText : {}; Object.keys(SECTION_TEXT_KEY).forEach(sec => { const el = document.querySelector(`[data-section="${sec}"]`); if (!el) return; const d = SECTION_TEXT_DEFAULTS[SECTION_TEXT_KEY[sec]] || {}; const c = custom[SECTION_TEXT_KEY[sec]] || {}; const eyebrow = String(c.eyebrow || d.eyebrow || "").trim(), title = String(c.title || d.title || "").trim(); const eb = el.querySelector(".eyebrow"), ti = el.querySelector(".section-title"); if (eb && eyebrow) eb.textContent = eyebrow; if (ti && title) ti.textContent = title; }); }
-/* V3.6: hero render (applySettings + products load dono se chalta hai, taa ke Fun-hero ko products ka wait na karna pare — boot race fix). */ function renderHero(){ PLAYFUL_HERO = false; stopFunHero(); if (isPlayful() && funHeroItems().length){ PLAYFUL_HERO = true; clearInterval(heroTimer); const items = funHeroItems(); const head = HERO_SLIDES[0] || {}; const hTitle = (head.title || "").trim() || (SETTINGS.store_name || "ShopNest"); const hSub = (head.subtitle || "").trim() || "Quality checked products — Cash on Delivery ke saath, poore Pakistan mein."; $("#heroSection").hidden = false; $("#heroTrack").innerHTML = `<article class="fun-hero"><div class="fun-hero-bg fh-bg-0"></div><div class="fun-hero-inner"><div class="fun-hero-copy"><h1>${esc(hTitle)}</h1><p>${esc(hSub)}</p></div><div class="fh-stage">${items.map((p, i) => `<div class="fh-item ${i === 0 ? "active" : ""}"><img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}"><div class="fh-meta"><strong>${esc(p.name)}</strong><span>${fmt(p.price)}</span></div></div>`).join("")}</div><div class="fh-ctas"><button class="btn primary" type="button" data-hero-target="bestSection">Shop Now</button><button class="btn outline-light" type="button" data-hero-target="budgetSection">Shop by Budget</button></div></div></article>`; $("#heroDots").innerHTML = items.map((_, i) => `<button type="button" data-fh-dot="${i}" class="${i === 0 ? "active" : ""}" aria-label="Hero product ${i + 1}"></button>`).join(""); $$("[data-fh-dot]").forEach(b => b.onclick = () => showFunHero(+b.dataset.fhDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); $$("#heroTrack .fh-item").forEach((el, i) => el.onclick = () => openProduct(items[i].id)); funHeroIndex = 0; startFunHero(); } else if (isLuxury()) { $("#heroSection").hidden = HERO_SLIDES.length === 0; $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `<article class="hero-slide"><img class="hero-img" src="${safeUrl(s.image)}" alt="${esc(s.title)}"></article>`).join(""); $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join(""); $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot)); if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); } bindHeroSwipe(); } else { $("#heroSection").hidden = HERO_SLIDES.length === 0; $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `<article class="hero-slide ${i % 2 === 1 ? "alt" : ""}"><div class="hero-inner"><div class="hero-content"><span class="hero-pill">${esc(s.pill)}</span><h1>${esc(s.title)}</h1><p>${esc(s.subtitle)}</p><button class="btn primary" type="button" data-hero-target="${i === 0 ? "bestSection" : "dealsSection"}">${esc(s.button)}</button></div><img class="hero-img" src="${safeUrl(s.image)}" alt="${esc(s.title)}"></div></article>`).join(""); $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join(""); $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); } } } /* ROUND 4 (§15): hero finger swipe. #heroTrack transform slider hai (scroll container nahi) — finger swipe ka koi handler nahi tha, sirf dots + 5.2s auto. touch-action:pan-y (CSS C-S1) se horizontal drag JS ko milta hai, vertical page scroll ko jata hai. Drag ke dauran auto pause (clearInterval), chhorne par startHero() se resume. */ function bindHeroSwipe(){ const track = document.getElementById("heroTrack"); if (!track || track.dataset.heroSwipe) return; track.dataset.heroSwipe = "1"; let down = false, startX = 0, moved = 0; track.addEventListener("pointerdown", e => { if (!HERO_SLIDES.length) return; down = true; moved = 0; startX = e.clientX; clearInterval(heroTimer); try { track.setPointerCapture(e.pointerId); } catch (err) {} }); track.addEventListener("pointermove", e => { if (!down) return; const dx = e.clientX - startX; moved = dx; if (Math.abs(dx) > 8){ track.style.transition = "none"; track.style.transform = `translateX(calc(${-heroIndex * 100}% + ${dx}px))`; } }); const endSwipe = commit => { if (!down) return; down = false; track.style.transition = ""; if (commit && Math.abs(moved) > 50) setHero(heroIndex + (moved < 0 ? 1 : -1)); else setHero(heroIndex); startHero(); }; track.addEventListener("pointerup", () => endSwipe(true)); track.addEventListener("pointercancel", () => endSwipe(false)); } function setHero(i){
+/* V3.6: hero render (applySettings + products load dono se chalta hai, taa ke Fun-hero ko products ka wait na karna pare — boot race fix). */ function renderHero(){ PLAYFUL_HERO = false; stopFunHero(); if (isPlayful() && funHeroItems().length){ PLAYFUL_HERO = true; clearInterval(heroTimer); const items = funHeroItems(); const head = HERO_SLIDES[0] || {}; const hTitle = (head.title || "").trim() || (SETTINGS.store_name || "ShopNest"); const hSub = (head.subtitle || "").trim() || "Quality checked products — Cash on Delivery ke saath, poore Pakistan mein."; $("#heroSection").hidden = false; $("#heroTrack").innerHTML = `<article class="fun-hero"><div class="fun-hero-bg fh-bg-0"></div><div class="fun-hero-inner"><div class="fun-hero-copy"><h1>${esc(hTitle)}</h1><p>${esc(hSub)}</p></div><div class="fh-stage">${items.map((p, i) => `<div class="fh-item ${i === 0 ? "active" : ""}"><img src="${imgSrc(p.img || "")}" alt="${esc(p.name)}" loading="lazy" width="800" height="800"><div class="fh-meta"><strong>${esc(p.name)}</strong><span>${fmt(p.price)}</span></div></div>`).join("")}</div><div class="fh-ctas"><button class="btn primary" type="button" data-hero-target="bestSection">Shop Now</button><button class="btn outline-light" type="button" data-hero-target="budgetSection">Shop by Budget</button></div></div></article>`; $("#heroDots").innerHTML = items.map((_, i) => `<button type="button" data-fh-dot="${i}" class="${i === 0 ? "active" : ""}" aria-label="Hero product ${i + 1}"></button>`).join(""); $$("[data-fh-dot]").forEach(b => b.onclick = () => showFunHero(+b.dataset.fhDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); $$("#heroTrack .fh-item").forEach((el, i) => el.onclick = () => openProduct(items[i].id)); funHeroIndex = 0; startFunHero(); } else if (isLuxury()) { $("#heroSection").hidden = HERO_SLIDES.length === 0; $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `<article class="hero-slide"><img class="hero-img" src="${imgSrc(s.image)}" alt="${esc(s.title)}" loading="lazy" width="1200" height="675"></article>`).join(""); $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join(""); $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot)); if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); } bindHeroSwipe(); } else { $("#heroSection").hidden = HERO_SLIDES.length === 0; $("#heroTrack").innerHTML = HERO_SLIDES.map((s, i) => `<article class="hero-slide ${i % 2 === 1 ? "alt" : ""}"><div class="hero-inner"><div class="hero-content"><span class="hero-pill">${esc(s.pill)}</span><h1>${esc(s.title)}</h1><p>${esc(s.subtitle)}</p><button class="btn primary" type="button" data-hero-target="${i === 0 ? "bestSection" : "dealsSection"}">${esc(s.button)}</button></div><img class="hero-img" src="${imgSrc(s.image)}" alt="${esc(s.title)}" loading="lazy" width="1200" height="675"></div></article>`).join(""); $("#heroDots").innerHTML = HERO_SLIDES.map((_, i) => `<button type="button" data-hero-dot="${i}" class="${i === heroIndex ? "active" : ""}" aria-label="Hero slide ${i + 1}"></button>`).join(""); $$("[data-hero-dot]").forEach(b => b.onclick = () => setHero(+b.dataset.heroDot)); $$("[data-hero-target]").forEach(b => b.onclick = () => scrollToId(b.dataset.heroTarget)); if (HERO_SLIDES.length){ setHero(Math.min(heroIndex, HERO_SLIDES.length - 1)); startHero(); } } } /* ROUND 4 (§15): hero finger swipe. #heroTrack transform slider hai (scroll container nahi) — finger swipe ka koi handler nahi tha, sirf dots + 5.2s auto. touch-action:pan-y (CSS C-S1) se horizontal drag JS ko milta hai, vertical page scroll ko jata hai. Drag ke dauran auto pause (clearInterval), chhorne par startHero() se resume. */ function bindHeroSwipe(){ const track = document.getElementById("heroTrack"); if (!track || track.dataset.heroSwipe) return; track.dataset.heroSwipe = "1"; let down = false, startX = 0, moved = 0; track.addEventListener("pointerdown", e => { if (!HERO_SLIDES.length) return; down = true; moved = 0; startX = e.clientX; clearInterval(heroTimer); try { track.setPointerCapture(e.pointerId); } catch (err) {} }); track.addEventListener("pointermove", e => { if (!down) return; const dx = e.clientX - startX; moved = dx; if (Math.abs(dx) > 8){ track.style.transition = "none"; track.style.transform = `translateX(calc(${-heroIndex * 100}% + ${dx}px))`; } }); const endSwipe = commit => { if (!down) return; down = false; track.style.transition = ""; if (commit && Math.abs(moved) > 50) setHero(heroIndex + (moved < 0 ? 1 : -1)); else setHero(heroIndex); startHero(); }; track.addEventListener("pointerup", () => endSwipe(true)); track.addEventListener("pointercancel", () => endSwipe(false)); } function setHero(i){
   if (!HERO_SLIDES.length) return;
   heroIndex = (i + HERO_SLIDES.length) % HERO_SLIDES.length;
   $("#heroTrack").style.transform = `translateX(-${heroIndex * 100}%)`;
@@ -914,6 +933,8 @@ if (!cachedProducts){
      (un ke products All Products grid mein phir bhi aate hain). */
   const visibleCats = CATEGORIES.filter(c => c.visible !== false).map(c => c.name).filter(Boolean);
   CAT_LIST = visibleCats.length ? visibleCats : [...new Set(PRODUCTS.map(p => p.cat).filter(Boolean))];
+  /* F-1: boot + har product load ke baad ghost cart prune (toast sirf tab jab kuch hata ho). */
+  pruneCart();
   renderCats(); renderHero(); applySections(); renderProductSections(); renderGrid(); renderLuxFooter(); renderCart();
   startSocialProof();
 }
@@ -925,7 +946,7 @@ function renderCats(){
     const row = CATEGORIES.find(x => x.name === c);
     const p = PRODUCTS.find(x => x.cat === c);
     const tileImg = (row && row.image) || (p ? p.img : "");
-    return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${safeUrl(tileImg)}" alt="${esc(c)}"><span>${esc(c)}</span></button>`;
+    return `<button class="cat-tile reveal ${c === activeCat ? "active" : ""}" type="button" data-tile-cat="${esc(c)}"><img src="${imgSrc(tileImg)}" alt="${esc(c)}" loading="lazy" width="400" height="400"><span>${esc(c)}</span></button>`;
   }).join("");
   $("#catTiles").innerHTML = `<div class="cat-rail">${tiles}${tiles}</div>`;
   $$("[data-tile-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.tileCat, maxPrice: null }));
@@ -970,7 +991,7 @@ function cardHTML(p, opts = {}){
      ~60 chars, escaped; desc khaali ho to line hi nahi banti. */
   const spec = (ACTIVE_THEME && ACTIVE_THEME.layout && ACTIVE_THEME.layout.card === "spec" && String(p.desc || "").trim())
     ? `<p class="card-spec">${esc(String(p.desc).slice(0, 60))}</p>` : "";
-  /* V3.6: gallery ho (main + extra images) to card image swipeable carousel banti hai — dots + touch swipe + auto-rotate. */ const imgs = [String(p.img || "").trim(), ...galleryOf(p)].filter(Boolean); const imgArea = imgs.length > 1 ? `<div class="card-gallery" data-gallery><div class="cg-track">${imgs.map((u, i) => `<img src="${safeUrl(u)}" alt="${esc(p.name)}" loading="lazy" class="${i === 0 ? "on" : ""}">`).join("")}</div><div class="cg-dots">${imgs.map((_, i) => `<button type="button" data-cg-dot="${i}" class="${i === 0 ? "on" : ""}" aria-label="Image ${i + 1}"></button>`).join("")}</div></div>` : `<img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}" loading="lazy">`; return `<article class="card reveal ${out ? "is-oos" : ""}">
+  /* V3.6: gallery ho (main + extra images) to card image swipeable carousel banti hai — dots + touch swipe + auto-rotate. */ const imgs = [String(p.img || "").trim(), ...galleryOf(p)].filter(Boolean); const imgArea = imgs.length > 1 ? `<div class="card-gallery" data-gallery><div class="cg-track">${imgs.map((u, i) => `<img src="${imgSrc(u)}" alt="${esc(p.name)}" loading="lazy" width="800" height="800" class="${i === 0 ? "on" : ""}">`).join("")}</div><div class="cg-dots">${imgs.map((_, i) => `<button type="button" data-cg-dot="${i}" class="${i === 0 ? "on" : ""}" aria-label="Image ${i + 1}"></button>`).join("")}</div></div>` : `<img src="${imgSrc(p.img || "")}" alt="${esc(p.name)}" loading="lazy" width="800" height="800">`; return `<article class="card reveal ${out ? "is-oos" : ""}">
     <div class="card-imgwrap" data-view="${p.id}">${imgArea}${badge}${oosBadge}${out ? "" : `<button type="button" class="lux-plus" data-add="${p.id}" aria-label="Add to cart">+</button>`}</div>
     <div class="card-body">
       <p class="card-fabric${p.fabric ? " has-fabric" : ""}">${esc(p.fabric || "")}</p> <h3 class="card-title" data-view="${p.id}">${esc(p.name)}</h3>${spec}
@@ -980,10 +1001,16 @@ function cardHTML(p, opts = {}){
       <div class="card-actions">${actions}</div>
     </div></article>`;
 }
-function cgShow(g, i){ const imgs = g.querySelectorAll(".cg-track img"); if (!imgs.length) return; const n = (i + imgs.length) % imgs.length; imgs.forEach((im, j) => im.classList.toggle("on", j === n)); g.querySelectorAll("[data-cg-dot]").forEach((d, j) => d.classList.toggle("on", j === n)); g.dataset.cg = String(n); } /* V3.6: saari card galleries ka EK shared auto-rotate timer (sirf nazar aane wali galleries, sirf jab tab khula ho aur animations on hon). */ let cgTimer = null; function startCardGalleries(){ if (cgTimer) return; cgTimer = setInterval(() => { if (document.hidden || SETTINGS.animations === false || REDUCED_MOTION) return; document.querySelectorAll("[data-gallery]").forEach(g => { const r = g.getBoundingClientRect(); if (r.bottom < 0 || r.top > window.innerHeight) return; cgShow(g, +(g.dataset.cg || 0) + 1); }); }, 3500); } function bindCards(root){
+function cgShow(g, i){ const imgs = g.querySelectorAll(".cg-track img"); if (!imgs.length) return; const n = (i + imgs.length) % imgs.length; imgs.forEach((im, j) => im.classList.toggle("on", j === n)); g.querySelectorAll("[data-cg-dot]").forEach((d, j) => d.classList.toggle("on", j === n)); g.dataset.cg = String(n); } /* V3.6: saari card galleries ka EK shared auto-rotate timer (sirf nazar aane wali galleries, sirf jab tab khula ho aur animations on hon). */ let cgTimer = null; function startCardGalleries(){ if (cgTimer) return; cgTimer = setInterval(() => { if (document.hidden || SETTINGS.animations === false || REDUCED_MOTION) return; document.querySelectorAll("[data-gallery]").forEach(g => { const r = g.getBoundingClientRect(); if (r.bottom < 0 || r.top > window.innerHeight) return; cgShow(g, +(g.dataset.cg || 0) + 1); }); }, 3500); } /* F-2: card-level Add/Buy — product ke sizes/colors hon to PDP kholein taa ke
+   customer variant chune; variant-less line kabhi cart mein na jaye. (Server
+   INVALID_VARIANT reject abhi prepared migration hai — us par depend nahi.) */
+function productHasOptions(p){ const o = productOptions(p); return (o.sizes && o.sizes.length > 0) || (o.colors && o.colors.length > 0); }
+function cardAddToCart(id, qty){ const p = findP(id); if (!p) return; if (productHasOptions(p)){ openProduct(id); return; } addToCart(id, qty); }
+function cardBuyNow(id, qty){ const p = findP(id); if (!p) return; if (productHasOptions(p)){ openProduct(id); return; } buyNow(id, qty); }
+function bindCards(root){
   if (!root) return;
-  root.querySelectorAll("[data-add]").forEach(b => b.onclick = e => { e.stopPropagation(); addToCart(+b.dataset.add, 1); });
-  root.querySelectorAll("[data-order]").forEach(b => b.onclick = e => { e.stopPropagation(); buyNow(+b.dataset.order, 1); });
+  root.querySelectorAll("[data-add]").forEach(b => b.onclick = e => { e.stopPropagation(); cardAddToCart(+b.dataset.add, 1); });
+  root.querySelectorAll("[data-order]").forEach(b => b.onclick = e => { e.stopPropagation(); cardBuyNow(+b.dataset.order, 1); });
   root.querySelectorAll("[data-view]").forEach(el => el.onclick = () => openProduct(+el.dataset.view)); /* V3.6 card gallery: dots + touch swipe (click card kholne se nahi takrata). */ root.querySelectorAll("[data-gallery]").forEach(g => { g.querySelectorAll("[data-cg-dot]").forEach(d => d.onclick = e => { e.stopPropagation(); cgShow(g, +d.dataset.cgDot); }); let sx = null; g.addEventListener("touchstart", e => { sx = e.touches[0].clientX; }, { passive: true }); g.addEventListener("touchend", e => { if (sx === null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 30) cgShow(g, +(g.dataset.cg || 0) + (dx < 0 ? 1 : -1)); sx = null; }, { passive: true }); });
 }
 function renderInto(id, list, opts){
@@ -1020,18 +1047,37 @@ function currentList(){
   if (s === "popular") list = [...list].sort((a,b) => reviewsOf(b) - reviewsOf(a));
   return list;
 }
+/* FE-P1: storefront grid cap — admin ka secTotal ho to wohi, warna default 50
+   + "Load More" (har click +50). SIRF client-side cap hai: server-side
+   LIMIT/OFFSET abhi bana hi nahi (migration 21 — owner approval ke baad),
+   is liye poora catalogue har boot par aata hai aur yahan kaata jata hai. */
+let gridShown = 50;
 function renderGrid(){
-  const _allList = currentList(); const _cap = secTotal("all_products", 0); const list = _cap ? _allList.slice(0, _cap) : _allList;
-  $("#resultsText").textContent = PRODUCTS.length ? list.length + " products" : "";
-  $("#emptyMsg").hidden = !(PRODUCTS.length && list.length === 0);
+  const _allList = currentList(); const _cap = secTotal("all_products", 0);
+  const _limit = _cap ? _cap : gridShown;
+  const list = _allList.slice(0, _limit);
+  /* F-6: zero products — khaali shop ki bajaye dostana message. */
+  const _emptyMsg = $("#emptyMsg");
+  if (!PRODUCTS.length){
+    $("#resultsText").textContent = "";
+    _emptyMsg.textContent = "Abhi products nahi hain — jald aa rahe hain.";
+    _emptyMsg.hidden = false;
+  } else {
+    $("#resultsText").textContent = (_allList.length > list.length) ? (list.length + " of " + _allList.length + " products") : (list.length + " products");
+    _emptyMsg.textContent = "No products found. Search, category ya budget filter change karke dobara dekhein.";
+    _emptyMsg.hidden = list.length !== 0;
+  }
   const _all = activeCat === "All"; $("#shopTitle").textContent = _all ? "ALL PRODUCTS" : activeCat.toUpperCase(); if (_all) applySectionText();
   $("#filterNote").textContent = `${activeCat === "All" ? "Saari categories" : activeCat}${maxPrice !== null ? " • Under " + fmt(maxPrice) : " • Har price range"}`;
   const grid = $("#grid");
   if (luxActiveCount()) document.getElementById("filterNote").textContent += " " + String.fromCharCode(8226) + " " + luxActiveCount() + " filter" + (luxActiveCount() > 1 ? "s" : ""); const luxBtn = document.getElementById("luxFilterBtn"), luxCount = document.getElementById("luxFilterCount"); if (luxBtn) luxBtn.hidden = !isLuxury(); if (luxCount){ luxCount.hidden = !luxActiveCount(); luxCount.textContent = luxActiveCount();} grid.innerHTML = list.map(p => cardHTML(p)).join("");
+  /* FE-P1: Load More sirf tab jab default cap (admin cap nahi) aur mazeed products hon. */
+  const _lm = $("#loadMoreBtn");
+  if (_lm) _lm.hidden = !!_cap || _allList.length <= list.length;
   bindCards(grid);
   watchReveals();
 }
-function setFilter({ cat = activeCat, maxPrice: nextMax = maxPrice, sort, label} = {}){ activeCat = cat; maxPrice = nextMax; if (sort) $("#sortSelect").value = sort; /* V3.12 FIX (collection pages): tile / VIEW ALL clicks open a dedicated collection page under Luxury — the old renderGrid() path updated the hidden All Products grid. (Item 2's Trending re-render is superseded by this page navigation; F4's Filters sheet APPLY -> renderTrending stays as-is.) */ if (isLuxury()){ openCollection({ cat, label: label || (cat === "All"? "All Products": cat), maxPrice: nextMax, sort}); return;}
+function setFilter({ cat = activeCat, maxPrice: nextMax = maxPrice, sort, label} = {}){ gridShown = 50; /* FE-P1: naya filter = pehle 50 se shuru */ activeCat = cat; maxPrice = nextMax; if (sort) $("#sortSelect").value = sort; /* V3.12 FIX (collection pages): tile / VIEW ALL clicks open a dedicated collection page under Luxury — the old renderGrid() path updated the hidden All Products grid. (Item 2's Trending re-render is superseded by this page navigation; F4's Filters sheet APPLY -> renderTrending stays as-is.) */ if (isLuxury()){ openCollection({ cat, label: label || (cat === "All"? "All Products": cat), maxPrice: nextMax, sort}); return;}
 
 
   showPage("homeView");
@@ -1051,24 +1097,24 @@ function renderReviews(){
   const list = (SETTINGS && Array.isArray(SETTINGS.reviews)) ? SETTINGS.reviews : [];
   $("#reviewTrack").innerHTML = list.map(r => {
     const p = PRODUCTS.find(x => x.name === r.product);
-    const media = (p && p.img) ? `<img src="${safeUrl(p.img)}" alt="${esc(r.product)}">` : `<span class="review-glyph">${icon("bag")}</span>`;
+    const media = (p && p.img) ? `<img src="${safeUrl(p.img)}" alt="${esc(r.product)}" loading="lazy" width="200" height="200">` : `<span class="review-glyph">${icon("bag")}</span>`;
     const who = r.city ? `${esc(r.name)} — ${esc(r.city)}` : esc(r.name);
     const rt = Number(r.rating) || 0;
     return `<article class="review-card reveal">
     <div class="review-product">${media}<strong>${esc(r.product)}</strong></div>
     <p class="stars">${stars(rt)} <small>${rt.toFixed(1)}</small></p>
     <p>${esc(r.text)}</p>
-    <p class="verified">✓ Verified Purchase</p><p class="reviewer">${who}</p>
+    <p class="reviewer">${who}</p>
   </article>`;
   }).join("");
 }
-/* ---------- V3.6: Featured pick + Instagram reels + Blog ---------- */ function renderFeatured(){ const el = document.getElementById("featuredSection"); if (!el) return; if (!isPlayful()){ el.hidden = true; return; } const pool = PRODUCTS.filter(p => p.active !== false); const pick = pool.find(p => p.featured) || [...pool].sort((a, b) => reviewsOf(b) - reviewsOf(a))[0]; if (!pick){ el.hidden = true; return; } el.hidden = false; const bullets = String(pick.desc || "").split(String.fromCharCode(10)).map(s => s.trim()).filter(Boolean).slice(0, 4); document.getElementById("featuredBand").innerHTML = `<div class="fb-band"><div class="fb-media"><img src="${safeUrl(pick.img || "")}" alt="${esc(pick.name)}"></div><div class="fb-body"><p class="eyebrow">FEATURED PICK</p><h3>${esc(pick.name)}</h3>${bullets.length ? `<ul>${bullets.map(b => `<li>✓ ${esc(b)}</li>`).join("")}</ul>` : ""}<p class="stars">${stars(pick.rating)} <small>${ratingOf(pick).toFixed(1)} (${reviewsOf(pick)})</small></p><div class="price"><strong>${fmt(pick.price)}</strong>${Number(pick.old) > Number(pick.price) ? `<del>${fmt(pick.old)}</del>` : ""}</div><p class="deliv">${delivText(pick)}</p><div class="fb-actions"><button class="btn primary" type="button" data-fb-add="${pick.id}">Add to Cart</button><button class="btn" type="button" data-fb-view="${pick.id}">See full details →</button></div></div></div>`; const add = document.querySelector("[data-fb-add]"); const view = document.querySelector("[data-fb-view]"); if (add) add.onclick = () => addToCart(pick.id, 1); if (view) view.onclick = () => openProduct(pick.id); } function renderReels(){ const el = document.getElementById("reelsSection"); if (!el) return; const list = (SETTINGS && Array.isArray(SETTINGS.instaReels)) ? SETTINGS.instaReels : []; const show = (isPlayful() || isLuxury()) && SETTINGS.showReels !== false && list.length > 0; el.hidden = !show; if (!show) return; /* V3.12: Luxury par section "Spotted Wearing Asim Jofa" kehlata hai — left-aligned, no eyebrow. */ if (isLuxury()){ const ti = el.querySelector(".section-title"); if (ti){ ti.textContent = "Spotted Wearing Asim Jofa"; ti.classList.add("left"); } } const handle = String(SETTINGS.instaHandle || "").replace(/^@/, "").trim(); /* V3.11: Luxury mein Spotted IG-post card hota hai (neechay). */ if (isLuxury()){ renderReelsLuxury(list, handle); return;} document.getElementById("reelsFollow").innerHTML = handle ? `<a class="btn outline-light" href="https://instagram.com/${encodeURIComponent(handle)}" target="_blank" rel="noopener">Follow @${esc(handle)}</a>` : ""; document.getElementById("reelsRow").innerHTML = list.map(r => { const v = String(r.video || "").trim(); const media = /\.mp4(\?|$)/i.test(v) ? `<video src="${safeUrl(v)}" poster="${safeUrl(r.poster || "")}" muted loop playsinline preload="metadata"></video>` : `<a href="${safeUrl(v) || "#"}" target="_blank" rel="noopener"><img src="${safeUrl(r.poster || "")}" alt="${esc(r.title || "")}"></a>`; return `<article class="reel-card">${media}<p>${esc(r.title || "")}</p></article>`; }).join(""); document.querySelectorAll("#reelsRow video").forEach(v => { try { const pr = v.play(); if (pr) pr.catch(() => {}); } catch (e) {} }); bindReelsDrag(); } function renderBlog(){ const el = document.getElementById("blogSection"); if (!el) return; const list = (SETTINGS && Array.isArray(SETTINGS.blogPosts)) ? SETTINGS.blogPosts : []; const show = isPlayful() && SETTINGS.showBlog !== false && list.length > 0; el.hidden = !show; if (!show) return; document.getElementById("blogGrid").innerHTML = list.map(b => `<article class="blog-card">${b.img ? `<img src="${safeUrl(b.img)}" alt="${esc(b.title)}">` : ""}<h3>${esc(b.title)}</h3><p>${esc(b.excerpt)}</p>${b.link ? `<a href="${safeUrl(b.link)}" target="_blank" rel="noopener">Read more →</a>` : ""}</article>`).join(""); } /* ---------- V3.12 helpers ---------- */
+/* ---------- V3.6: Featured pick + Instagram reels + Blog ---------- */ function renderFeatured(){ const el = document.getElementById("featuredSection"); if (!el) return; if (!isPlayful()){ el.hidden = true; return; } const pool = PRODUCTS.filter(p => p.active !== false); const pick = pool.find(p => p.featured) || [...pool].sort((a, b) => reviewsOf(b) - reviewsOf(a))[0]; if (!pick){ el.hidden = true; return; } el.hidden = false; const bullets = String(pick.desc || "").split(String.fromCharCode(10)).map(s => s.trim()).filter(Boolean).slice(0, 4); document.getElementById("featuredBand").innerHTML = `<div class="fb-band"><div class="fb-media"><img src="${imgSrc(pick.img || "")}" alt="${esc(pick.name)}" loading="lazy" width="800" height="800"></div><div class="fb-body"><p class="eyebrow">FEATURED PICK</p><h3>${esc(pick.name)}</h3>${bullets.length ? `<ul>${bullets.map(b => `<li>✓ ${esc(b)}</li>`).join("")}</ul>` : ""}<p class="stars">${stars(pick.rating)} <small>${ratingOf(pick).toFixed(1)} (${reviewsOf(pick)})</small></p><div class="price"><strong>${fmt(pick.price)}</strong>${Number(pick.old) > Number(pick.price) ? `<del>${fmt(pick.old)}</del>` : ""}</div><p class="deliv">${delivText(pick)}</p><div class="fb-actions"><button class="btn primary" type="button" data-fb-add="${pick.id}">Add to Cart</button><button class="btn" type="button" data-fb-view="${pick.id}">See full details →</button></div></div></div>`; const add = document.querySelector("[data-fb-add]"); const view = document.querySelector("[data-fb-view]"); if (add) add.onclick = () => cardAddToCart(pick.id, 1); if (view) view.onclick = () => openProduct(pick.id); } function renderReels(){ const el = document.getElementById("reelsSection"); if (!el) return; const list = (SETTINGS && Array.isArray(SETTINGS.instaReels)) ? SETTINGS.instaReels : []; const show = (isPlayful() || isLuxury()) && SETTINGS.showReels !== false && list.length > 0; el.hidden = !show; if (!show) return; /* V3.12: Luxury par section "Spotted Wearing Asim Jofa" kehlata hai — left-aligned, no eyebrow. */ if (isLuxury()){ const ti = el.querySelector(".section-title"); if (ti){ ti.textContent = "Spotted Wearing Asim Jofa"; ti.classList.add("left"); } } const handle = String(SETTINGS.instaHandle || "").replace(/^@/, "").trim(); /* V3.11: Luxury mein Spotted IG-post card hota hai (neechay). */ if (isLuxury()){ renderReelsLuxury(list, handle); return;} document.getElementById("reelsFollow").innerHTML = handle ? `<a class="btn outline-light" href="https://instagram.com/${encodeURIComponent(handle)}" target="_blank" rel="noopener">Follow @${esc(handle)}</a>` : ""; document.getElementById("reelsRow").innerHTML = list.map(r => { const v = String(r.video || "").trim(); const media = /\.mp4(\?|$)/i.test(v) ? `<video src="${safeUrl(v)}" poster="${safeUrl(r.poster || "")}" muted loop playsinline preload="metadata"></video>` : `<a href="${safeUrl(v) || "#"}" target="_blank" rel="noopener"><img src="${imgSrc(r.poster || "")}" alt="${esc(r.title || "")}" loading="lazy" width="800" height="800"></a>`; return `<article class="reel-card">${media}<p>${esc(r.title || "")}</p></article>`; }).join(""); document.querySelectorAll("#reelsRow video").forEach(v => { try { const pr = v.play(); if (pr) pr.catch(() => {}); } catch (e) {} }); bindReelsDrag(); } function renderBlog(){ const el = document.getElementById("blogSection"); if (!el) return; const list = (SETTINGS && Array.isArray(SETTINGS.blogPosts)) ? SETTINGS.blogPosts : []; const show = isPlayful() && SETTINGS.showBlog !== false && list.length > 0; el.hidden = !show; if (!show) return; document.getElementById("blogGrid").innerHTML = list.map(b => `<article class="blog-card">${b.img ? `<img src="${safeUrl(b.img)}" alt="${esc(b.title)}">` : ""}<h3>${esc(b.title)}</h3><p>${esc(b.excerpt)}</p>${b.link ? `<a href="${safeUrl(b.link)}" target="_blank" rel="noopener">Read more →</a>` : ""}</article>`).join(""); } /* ---------- V3.12 helpers ---------- */
 function isNewP(p){ return [...PRODUCTS].sort((a, b) => b.id - a.id).slice(0, 20).some(x => x.id === p.id); }
 function pcsOf(p){ const t = String((p.name || "") + " " + (p.desc || "")).toLowerCase(); if (/3\s?pc/.test(t)) return "3pc"; if (/2\s?pc/.test(t)) return "2pc"; if (/1\s?pc/.test(t)) return "1pc"; return null; }
 function luxFabricOptions(){ const set = new Set(); PRODUCTS.forEach(p => { const f = String(p.fabric || "").trim(); if (f) set.add(f); }); return [...set]; }
 function luxPcsOptions(){ const set = new Set(); PRODUCTS.forEach(p => { const v = pcsOf(p); if (v) set.add(v); }); return ["1pc", "2pc", "3pc"].filter(v => set.has(v)); }
 /* V3.12 FIX B2: row arrows that do nothing must not ship — New Arrivals is a vertical grid at desktop (>900px), so its ‹ › arrows scroll nothing. Hide both arrows when the row cannot scroll; at the edges disable the arrow that has nowhere to go. Re-synced on scroll, on resize, and after every re-render (ensureSwipeWrap runs on each one). */ let rowArrowResizeBound = false; function syncRowArrows(grid){ if (!grid) return; const wrap = grid.parentElement; if (!wrap ||!wrap.classList.contains("swipe-wrap")) return; const prev = wrap.querySelector(".row-arrow.prev"), next = wrap.querySelector(".row-arrow.next"); const can = grid.scrollWidth > grid.clientWidth + 4; if (prev) prev.hidden =!can; if (next) next.hidden =!can; if (can){ if (prev) prev.disabled = grid.scrollLeft <= 4; if (next) next.disabled = grid.scrollLeft >= grid.scrollWidth - grid.clientWidth - 4;}} function ensureSwipeWrap(grid){ if (!grid ||!isLuxury()) return; if (!(grid.parentElement && grid.parentElement.classList.contains("swipe-wrap"))){ const wrap = document.createElement("div"); wrap.className = "swipe-wrap"; grid.parentNode.insertBefore(wrap, grid); wrap.appendChild(grid); const mk = (cls, label, dir) => { const b = document.createElement("button"); b.type = "button"; b.className = "row-arrow " + cls; b.textContent = label; b.setAttribute("aria-label", label === "‹" ? "Previous" : "Next"); b.onclick = () => grid.scrollBy({ left: dir * grid.clientWidth * 0.8, behavior: "smooth" }); wrap.appendChild(b); }; mk("prev", "‹", -1); mk("next", "›", 1); if (!grid.dataset.arrowScroll){ grid.dataset.arrowScroll = "1"; grid.addEventListener("scroll", () => syncRowArrows(grid), { passive: true});} if (!rowArrowResizeBound){ rowArrowResizeBound = true; window.addEventListener("resize", () => { document.querySelectorAll(".swipe-wrap >.grid").forEach(syncRowArrows);});}} syncRowArrows(grid);}
-/* ---------- V3.10: Luxury Complete (Asim Jofa) ---------- */ function luxCats(){ const seen = []; PRODUCTS.filter(p => p.active !== false).forEach(p => { if (p.cat && !seen.includes(p.cat)) seen.push(p.cat); }); return seen; } function catFirstImg(cat){ const p = PRODUCTS.find(x => x.cat === cat && x.img); return p ? p.img : ""; } function luxuryTiles(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryTiles)) ? SETTINGS.luxuryTiles : []; if (saved.length) return saved; return [{ label: "Festive Wear", cat: "Festive Wear", img: "" }, { label: "Festive Luxe", cat: "Festive Luxe", img: "" }, { label: "Premium Festive Vol 1", cat: "Premium Festive Vol 1", img: "" }, { label: "Premium Festive Vol 2", cat: "Premium Festive Vol 2", img: "" }]; } function luxuryTabs(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryTabs)) ? SETTINGS.luxuryTabs : []; if (saved.length) return saved; return defaultLuxTabs(); } function renderFestive(){ const el = document.getElementById("festiveSection"); if (!el) return; if (!isLuxury()){ el.hidden = true; return; } const tiles = luxuryTiles(); if (!tiles.length){ el.hidden = true; return; } el.hidden = false; document.getElementById("festiveGrid").innerHTML = tiles.map(t => { const img = t.img || catFirstImg(t.cat); return "<button type=\"button\" class=\"festive-tile\" data-festive-cat=\"" + esc(t.cat) + "\" data-festive-label=\"" + esc(t.label) + "\">" + (img ? "<img src=\"" + safeUrl(img) + "\" alt=\"" + esc(t.label) + "\" loading=\"lazy\">" : "") + "<span>" + esc(t.label) + "</span></button>"; }).join(""); document.querySelectorAll("#festiveGrid [data-festive-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.festiveCat, label: b.dataset.festiveLabel, maxPrice: null })); } let luxTabState = { unstitched: 0, rtw: 0}; function renderTabSection(secId, tabsId, gridId, tabs, stateKey){ const el = document.getElementById(secId); if (!el) return; if (!isLuxury()){ el.hidden = true; return;} if (!tabs.length){ el.hidden = true; return;} el.hidden = false; if (luxTabState[stateKey] >= tabs.length) luxTabState[stateKey] = 0; document.getElementById(tabsId).innerHTML = tabs.map((t, i) => `<button type="button" class="lux-tab${i === luxTabState[stateKey]? " on": ""}" data-luxtab="${i}">${esc(t.label)}</button>`).join(""); const tab = tabs[luxTabState[stateKey]]; const list = PRODUCTS.filter(p => p.active!== false && (!tab.cat || p.cat === tab.cat)); renderInto(gridId, list); appendViewAll(gridId, tab.label.toUpperCase() + " - " + (stateKey === "rtw" ? "PRET" : "UNSTITCHED"), tab.cat); ensureSwipeWrap(document.getElementById(gridId)); $$("#" + tabsId + " [data-luxtab]").forEach(b => b.onclick = () => { luxTabState[stateKey] = +b.dataset.luxtab; renderTabSection(secId, tabsId, gridId, tabs, stateKey);});} function renderUnstitchedTabs(){ renderTabSection("unstitchedSection", "unstitchedTabs", "unstitchedGrid", luxuryTabs(), "unstitched");} function renderRtwTabs(){ renderTabSection("rtwSection", "rtwTabs", "rtwGrid", luxuryRtwTabs(), "rtw");} /* V3.11: VIEW ALL tile (Luxury) — row ke end par "VIEW ALL IN {GROUP}". */ function viewAllTile(label, cat){ const n = (!cat || cat === "All")? PRODUCTS.filter(p => p.active!== false).length: PRODUCTS.filter(p => p.active!== false && p.cat === cat).length; return `<button type="button" class="view-all-tile" data-viewall-cat="${esc(cat || "All")}" data-viewall-label="${esc(label)}"><span>VIEW ALL IN</span><strong>${esc(label)}</strong><small>${n} Products →</small></button>`;} function appendViewAll(gridId, label, cat){ const grid = document.getElementById(gridId); if (!grid) return; grid.insertAdjacentHTML("beforeend", viewAllTile(label, cat)); grid.querySelectorAll("[data-viewall-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.viewallCat, label: b.dataset.viewallLabel, maxPrice: null}));} /* V3.11: Luxury tab defaults — pehle Luxury / Daily Wear / Embroidered naam wali categories, phir baaqi categories (tab label hamesha Asim Jofa jaisa). */ function defaultLuxTabs(){ const cats = luxCats(); const out = []; [["Luxury", /luxury/i], ["Daily Wear", /daily/i], ["Embroidered", /embroider/i]].forEach(([label, re]) => { const c = cats.find(x => re.test(x)); out.push({ label, cat: c || label }); }); return out.slice(0, 3); } function defaultLuxRtwTabs(){ const cats = luxCats(); const out = []; [["Luxury", /luxury/i], ["Daily Wear", /daily/i], ["Embroidered", /embroider/i]].forEach(([label, re]) => { const c = cats.find(x => /pret|stitched/i.test(x) && re.test(x)) || cats.find(x => /pret|stitched/i.test(x)); out.push({ label, cat: c || (label + " Pret") }); }); return out.slice(0, 3); } function luxuryRtwTabs(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryRtwTabs))? SETTINGS.luxuryRtwTabs: []; if (saved.length) return saved; return defaultLuxRtwTabs();} /* V3.11: Editorial slider (Asim Jofa fabric banners — Silk, Cambric...) — dots + 4s auto-rotate. Banners: admin list, warna purana single banner, warna hero slides. */ let editorialTimer = null, editorialIdx = 0; function luxuryBanners(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryBanners))? SETTINGS.luxuryBanners.filter(x => x && String(x.img || "").trim()): []; if (saved.length) return saved; const single = (SETTINGS && SETTINGS.luxuryBanner && typeof SETTINGS.luxuryBanner === "object")? SETTINGS.luxuryBanner: {}; if (String(single.img || "").trim()) return [{ img: single.img, eyebrow: single.eyebrow || "", title: single.title || "", button: single.button || "", cat: single.cat || ""}]; return []; } /* ROUND 4 (§15): editorial finger swipe. #editorialBanner single-img rotator hai — finger swipe ka koi handler nahi tha, sirf dots + 4s auto. touch-action:pan-y (CSS C-S1) se horizontal drag JS ko milta hai. Drag ke dauran timer pause (clearInterval). NOTE: pointerup par renderEditorial() SIRF tab call hota hai jab swipe hua ho (|dx|>50) — tap par re-render innerHTML badal dega aur dot/img ka click swallow ho jayega; tap par sirf timer restart hota hai, DOM nahi badalta. */ function bindEditorialSwipe(){ const ban = document.getElementById("editorialBanner"); if (!ban || ban.dataset.edSwipe) return; ban.dataset.edSwipe = "1"; let down = false, startX = 0, moved = false; const restartTimer = () => { const b = luxuryBanners(); if (b.length > 1 && !editorialTimer) editorialTimer = setInterval(() => { editorialIdx = (editorialIdx + 1) % b.length; renderEditorial(); }, 4000); }; ban.addEventListener("pointerdown", e => { down = true; moved = false; startX = e.clientX; if (editorialTimer){ clearInterval(editorialTimer); editorialTimer = null;}}); ban.addEventListener("pointermove", e => { if (!down) return; if (Math.abs(e.clientX - startX) > 4){ if (!moved){ moved = true; try { ban.setPointerCapture(e.pointerId);} catch (err) {}}}}); ban.addEventListener("pointerup", e => { if (!down) return; down = false; const dx = e.clientX - startX; if (Math.abs(dx) > 50){ const b = luxuryBanners(); if (b.length > 1) editorialIdx = (editorialIdx + (dx < 0 ? 1 : -1) + b.length) % b.length; renderEditorial(); } else restartTimer(); }); ban.addEventListener("pointercancel", () => { down = false; restartTimer(); }); ban.addEventListener("click", e => { if (moved){ e.preventDefault(); e.stopPropagation(); moved = false; } }, true); } function renderEditorial(){ const el = document.getElementById("editorialSection"); if (!el) return; if (editorialTimer){ clearInterval(editorialTimer); editorialTimer = null;} if (!isLuxury()){ el.hidden = true; return;} const banners = luxuryBanners(); if (!banners.length){ el.hidden = true; return;} el.hidden = false; if (editorialIdx >= banners.length) editorialIdx = 0; const b = banners[editorialIdx]; const cat = String(b.cat || "").trim() || "All"; const eb = String(b.eyebrow || "").trim(); const ti = String(b.title || "").trim(); const bt = String(b.button || "").trim(); document.getElementById("editorialBanner").innerHTML = `<img src="${safeUrl(b.img)}" alt="${esc(String(b.alt || b.title || ""))}" loading="lazy" data-ed-cat="${esc(cat)}">${(eb || ti || bt) ? `<div class="editorial-overlay">${eb ? `<p class="editorial-eyebrow">${esc(eb)}</p>` : ""}${ti ? `<h3>${esc(ti)}</h3>` : ""}${bt ? `<button type="button" class="ed-btn" data-ed-btn="${esc(cat)}">${esc(bt)}</button>` : ""}</div>` : ""}<div class="editorial-dots">${banners.map((_, i) => `<button type="button" data-ed-dot="${i}" class="${i === editorialIdx? "on": ""}" aria-label="Banner ${i + 1}"></button>`).join("")}</div>`; const imgEl = document.querySelector("#editorialBanner img"); if (imgEl) imgEl.onclick = () => setFilter({ cat: imgEl.dataset.edCat, label: imgEl.dataset.edCat === "All"? "All Products": imgEl.dataset.edCat, maxPrice: null}); const btnEl = document.querySelector("#editorialBanner [data-ed-btn]"); if (btnEl) btnEl.onclick = () => setFilter({ cat: btnEl.dataset.edBtn, label: btnEl.dataset.edBtn === "All"? "All Products": btnEl.dataset.edBtn, maxPrice: null}); $$("#editorialBanner [data-ed-dot]").forEach(d => d.onclick = () => { editorialIdx = +d.dataset.edDot; renderEditorial();}); bindEditorialSwipe(); if (banners.length > 1) editorialTimer = setInterval(() => { editorialIdx = (editorialIdx + 1) % banners.length; renderEditorial();}, 4000);} function luxSizeOptions(){ const set = new Set(); PRODUCTS.forEach(p => (productOptions(p).sizes || []).forEach(s => set.add(s))); return [...set]; } /* V3.11: Spotted — Instagram post jaisa card (avatar, @username, caption, video, like/share, Shop Now) + Visit Instagram button. Sirf Luxury. */ function renderReelsLuxury(list, handle){ const follow = document.getElementById("reelsFollow"); if (follow) follow.innerHTML = ""; const visit = document.getElementById("reelsVisit"); if (visit) visit.innerHTML = handle? `<a class="btn lux-visit-ig" href="https://instagram.com/${encodeURIComponent(handle)}" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg> Visit Instagram</a>`: ""; document.getElementById("reelsRow").innerHTML = list.map(r => { const v = String(r.video || "").trim(); const user = String(r.user || "").trim() || handle || "instagram"; const ava = String(r.avatar || "").trim() ? `<img class="ig-ava" src="${safeUrl(r.avatar)}" alt="">` : `<span class="ig-ava-txt">${esc((user || "A")[0].toUpperCase())}</span>`; const media = /\.mp4(\?|$)/i.test(v) ? `<video src="${safeUrl(v)}" poster="${safeUrl(r.poster || "")}" muted loop playsinline preload="metadata"></video>` : `<a href="${safeUrl(v) || "#"}" target="_blank" rel="noopener"><img src="${safeUrl(r.poster || "")}" alt="${esc(r.title || "")}"></a>`; return `<article class="reel-card ig"><div class="ig-head">${ava}<div><strong>@${esc(user)}</strong><span>${esc(r.title || "")}</span></div></div><div class="ig-media">${media}</div><div class="ig-foot"><button type="button" class="ig-like" data-ig-like aria-label="Like"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></button><a class="ig-act" href="${safeUrl(v) || "#"}" target="_blank" rel="noopener" aria-label="Comment"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></a><button type="button" class="ig-act" data-ig-share="${esc(v)}" aria-label="Share"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button><a class="ig-shop" href="${safeUrl(v) || "#"}" target="_blank" rel="noopener">Shop Now</a></div></article>`; }).join(""); document.querySelectorAll("#reelsRow video").forEach(v => { try { const pr = v.play(); if (pr) pr.catch(() => {});} catch (e) {}}); $$("#reelsRow [data-ig-like]").forEach(b => b.onclick = () => b.classList.toggle("liked")); $$("#reelsRow [data-ig-share]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.igShare); toast("Reel link copy ho gaya");} catch (e) { toast(b.dataset.igShare);}}); bindReelsDrag();} /* ROUND 4 (§15): unified pointer-drag for swipe rows — B4 generalised. R8 (§14) ne #newGrid/#unstitchedGrid/#rtwGrid/#reelsRow par touch-action:pan-y lagaya: browser horizontal touch scroll nahi karta, drag JS ko milta hai. B4 sirf mouse handle karta tha (touch skip) — is liye finger swipe dead thi. Ye binder SAB pointer types (touch + mouse + pen) handle karta hai; vertical drag par browser pointercancel bhejta hai aur page scroll karta hai (R8 intact). scroll-snap-type:x mandatory release par nearest card par snap karta hai. */ function bindRowDrag(row){ if (!row || row.dataset.dragBound) return; row.dataset.dragBound = "1"; let down = false, startX = 0, startLeft = 0, moved = false; row.addEventListener("pointerdown", e => { down = true; moved = false; startX = e.clientX; startLeft = row.scrollLeft; row.classList.add("dragging");}); row.addEventListener("pointermove", e => { if (!down) return; const dx = e.clientX - startX; if (Math.abs(dx) > 4){ if (!moved){ moved = true; try { row.setPointerCapture(e.pointerId);} catch (err) {}} row.scrollLeft = startLeft - dx;}}); const endDrag = () => { down = false; row.classList.remove("dragging"); }; row.addEventListener("pointerup", endDrag); row.addEventListener("pointercancel", endDrag); row.addEventListener("click", e => { if (moved){ e.preventDefault(); e.stopPropagation(); moved = false; } }, true); } /* V3.12 FIX B4: Spotted row is overflow-x:auto, so touch swipe works — but a mouse drag does nothing on a plain scroll container, and there are no arrows, so reels 2–4 are unreachable at desktop. Pointer-drag scrolling for mouse (touch pointers skip, keeping native touch scrolling). A drag swallows the click that follows it so a dragged reel does not navigate. */ /* V3.12 FIX B4 (ROUND 4 §15 — comment corrected): Spotted row overflow-x:auto hai, lekin R8 (§14) ne is par touch-action:pan-y lagaya — browser horizontal touch scroll NAHI karta, is liye "touch swipe works" wali baat ab ghalat hai. B4 ka mouse-only drag bhi touch skip karta tha. Ab unified bindRowDrag (touch + mouse) + setupTrackAutoSlide (4s auto, touch/hover par pause) — dono isi function se. */ function bindReelsDrag(){ const row = document.getElementById("reelsRow"); if (!row) return; bindRowDrag(row); setupTrackAutoSlide(row, null, null); } /* V3.11: Trending Products — Asim Jofa jaisa grid + toolbar (collection dropdown, pause, sort, filter). Sirf Luxury; baaqi themes carousel. */ let trendCat = "All", trendSort = "newest", trendOffset = 0, trendPaused = false, trendTimer = null; function trendPool(){ let pool = PRODUCTS.filter(p => p.active!== false); if (trendCat!== "All") pool = pool.filter(p => p.cat === trendCat); /* V3.12 FIX F4: Filters sheet state must apply to the Trending pool too — previously trendPool ignored every lux filter, so APPLY could never change the visible grid. Same conditions as currentList(). */ if (luxMinPrice!== null) pool = pool.filter(p => Number(p.price) >= luxMinPrice); if (luxMaxPrice!== null) pool = pool.filter(p => Number(p.price) <= luxMaxPrice); if (luxOnSale) pool = pool.filter(p => effectivePct(p) > 0); if (luxInStock) pool = pool.filter(p => p.stock!== "out"); if (luxSize) pool = pool.filter(p => (productOptions(p).sizes || []).includes(luxSize)); if (luxCat) pool = pool.filter(p => p.cat === luxCat); if (luxFabric) pool = pool.filter(p => String(p.fabric || "").trim() === luxFabric); if (luxPcs) pool = pool.filter(p => pcsOf(p) === luxPcs); if (trendSort === "newest") pool = [...pool].sort((a,b) => b.id - a.id); else if (trendSort === "price-low") pool = [...pool].sort((a,b) => a.price - b.price); else if (trendSort === "price-high") pool = [...pool].sort((a,b) => b.price - a.price); else if (trendSort === "rating") pool = [...pool].sort((a,b) => ratingOf(b) - ratingOf(a)); else pool = [...pool].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)); return pool;} function renderTrending(){ const el = document.getElementById("hotSection"); if (!el) return; if (!isLuxury()) return; const customHot = SETTINGS.sectionText && SETTINGS.sectionText.hot && String(SETTINGS.sectionText.hot.title || "").trim(); if (!customHot){ const ti = el.querySelector(".section-title"); if (ti) ti.textContent = "Trending Products"; } const tb = document.getElementById("trendToolbar"); if (tb) tb.hidden = false; const catBtn = document.getElementById("trendCatBtn"); if (catBtn) catBtn.textContent = (trendCat === "All" ? "All Collections" : trendCat) + " ⌄"; const catMenu = document.getElementById("trendCatMenu"); if (catMenu){ const cats = ["All", ...luxCats()]; catMenu.innerHTML = cats.map(c => `<button type="button" data-trendcat="${esc(c)}">${c === "All" ? "All Collections" : esc(c)}</button>`).join(""); catMenu.querySelectorAll("[data-trendcat]").forEach(b => b.onclick = () => { trendCat = b.dataset.trendcat; trendOffset = 0; catMenu.hidden = true; renderTrending(); }); } const sortBtn = document.getElementById("trendSortBtn"); if (sortBtn){ const labels = { newest: "Newest", "price-low": "Price: Low to High", "price-high": "Price: High to Low", popular: "Most Popular" }; sortBtn.textContent = "Sort: " + (labels[trendSort] || "Newest") + " ⌄"; } const pool = trendPool(); renderInto("hotTrack", secTotal("hot", 0) ? pool.slice(0, secTotal("hot", 0)) : pool); const pb = document.getElementById("trendPause"); if (pb) pb.textContent = trendPaused ? "▶" : "⏸"; if (trendTimer){ clearInterval(trendTimer); trendTimer = null; } } /* V3.12 FIX (collection pages): Luxury tile / VIEW ALL clicks open a dedicated collection page instead of filtering the hidden All Products grid. The page reads its title/subtitle from settings.collectionPages (admin Content tab), defaulting to the collection's name + product count. */ let collCat = "All", collLabel = "All Products", collMaxPrice = null, collSort = "newest", collCats = null; function collTitleOf(label){ const s = String(label || "").trim(); if (s && s === s.toUpperCase()) return s.toLowerCase().split(" ").map(w => w? w[0].toUpperCase() + w.slice(1): w).join(" "); return s;} function collPageText(cat, label){ const rows = (SETTINGS && Array.isArray(SETTINGS.collectionPages))? SETTINGS.collectionPages: []; const row = rows.find(x => String(x.cat || "").trim().toLowerCase() === String(cat || "").trim().toLowerCase()); const title = row && String(row.title || "").trim()? row.title.trim(): collTitleOf(label); return { title, subtitle: row && String(row.subtitle || "").trim()? row.subtitle.trim(): "", img: row && String(row.img || "").trim()? row.img.trim(): ""};} function collPool(){ let pool = PRODUCTS.filter(p => p.active!== false); if (collCats && collCats.length) pool = pool.filter(p => collCats.includes(p.cat)); else if (collCat!== "All") pool = pool.filter(p => p.cat === collCat); if (collMaxPrice!== null) pool = pool.filter(p => Number(p.price) <= collMaxPrice); /* Filters sheet state — same conditions as currentList()/trendPool(). */ if (luxMinPrice!== null) pool = pool.filter(p => Number(p.price) >= luxMinPrice); if (luxMaxPrice!== null) pool = pool.filter(p => Number(p.price) <= luxMaxPrice); if (luxOnSale) pool = pool.filter(p => effectivePct(p) > 0); if (luxInStock) pool = pool.filter(p => p.stock!== "out"); if (luxSize) pool = pool.filter(p => (productOptions(p).sizes || []).includes(luxSize)); if (luxCat) pool = pool.filter(p => p.cat === luxCat); if (luxFabric) pool = pool.filter(p => String(p.fabric || "").trim() === luxFabric); if (luxPcs) pool = pool.filter(p => pcsOf(p) === luxPcs); if (collSort === "price-low") pool = [...pool].sort((a,b) => a.price - b.price); else if (collSort === "price-high") pool = [...pool].sort((a,b) => b.price - a.price); else if (collSort === "popular") pool = [...pool].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)); else pool = [...pool].sort((a,b) => b.id - a.id); return pool;} function renderCollection(){ const pool = collPool(); const t = collPageText(collCat, collLabel); const ti = document.getElementById("collTitle"); if (ti) ti.textContent = t.title; const sub = document.getElementById("collSub"); if (sub) sub.textContent = t.subtitle || (pool.length + (pool.length === 1? " Product": " Products")); const im = document.getElementById("collImg"); if (im){ if (t.img){ im.src = safeUrl(t.img); im.hidden = false; } else { im.hidden = true; im.removeAttribute("src"); } } const sel = document.getElementById("collSort"); if (sel) sel.value = collSort; renderInto("collectionGrid", pool); if (!pool.length){ const g = document.getElementById("collectionGrid"); if (g) g.innerHTML = `<p class="hint" style="grid-column:1/-1;text-align:center;padding:24px 0">Is collection mein abhi koi product nahi.</p>`;}} function openCollection({ cat = "All", label = "All Products", maxPrice = null, sort, cats} = {}){ collCat = cat; collLabel = label; collMaxPrice = maxPrice; collCats = (cats && cats.length)? cats.slice(): null; /* R9 (§14): bottom-nav group pages — Unstitched = Unstitched tab collections (luxuryTabs: Luxury / Daily Wear / Embroidered), Stitched = RTW/Pret tab collections (luxuryRtwTabs: Luxury Pret / Daily Wear Pret / Embroidered Pret). openCollection ka `cats` array (collCats) ek se zyada categories ka pool banata hai; single-cat pages (tiles / VIEW ALL) pehle jaisi hi hain. */ if (sort && ["newest", "price-low", "price-high", "popular"].includes(sort)) collSort = sort; renderCollection(); showPage("collectionPage");}
+/* ---------- V3.10: Luxury Complete (Asim Jofa) ---------- */ function luxCats(){ const seen = []; PRODUCTS.filter(p => p.active !== false).forEach(p => { if (p.cat && !seen.includes(p.cat)) seen.push(p.cat); }); return seen; } function catFirstImg(cat){ const p = PRODUCTS.find(x => x.cat === cat && x.img); return p ? p.img : ""; } function luxuryTiles(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryTiles)) ? SETTINGS.luxuryTiles : []; if (saved.length) return saved; return [{ label: "Festive Wear", cat: "Festive Wear", img: "" }, { label: "Festive Luxe", cat: "Festive Luxe", img: "" }, { label: "Premium Festive Vol 1", cat: "Premium Festive Vol 1", img: "" }, { label: "Premium Festive Vol 2", cat: "Premium Festive Vol 2", img: "" }]; } function luxuryTabs(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryTabs)) ? SETTINGS.luxuryTabs : []; if (saved.length) return saved; return defaultLuxTabs(); } function renderFestive(){ const el = document.getElementById("festiveSection"); if (!el) return; if (!isLuxury()){ el.hidden = true; return; } const tiles = luxuryTiles(); if (!tiles.length){ el.hidden = true; return; } el.hidden = false; document.getElementById("festiveGrid").innerHTML = tiles.map(t => { const img = t.img || catFirstImg(t.cat); return "<button type=\"button\" class=\"festive-tile\" data-festive-cat=\"" + esc(t.cat) + "\" data-festive-label=\"" + esc(t.label) + "\">" + (img ? "<img src=\"" + safeUrl(img) + "\" alt=\"" + esc(t.label) + "\" loading=\"lazy\">" : "") + "<span>" + esc(t.label) + "</span></button>"; }).join(""); document.querySelectorAll("#festiveGrid [data-festive-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.festiveCat, label: b.dataset.festiveLabel, maxPrice: null })); } let luxTabState = { unstitched: 0, rtw: 0}; function renderTabSection(secId, tabsId, gridId, tabs, stateKey){ const el = document.getElementById(secId); if (!el) return; if (!isLuxury()){ el.hidden = true; return;} if (!tabs.length){ el.hidden = true; return;} el.hidden = false; if (luxTabState[stateKey] >= tabs.length) luxTabState[stateKey] = 0; document.getElementById(tabsId).innerHTML = tabs.map((t, i) => `<button type="button" class="lux-tab${i === luxTabState[stateKey]? " on": ""}" data-luxtab="${i}">${esc(t.label)}</button>`).join(""); const tab = tabs[luxTabState[stateKey]]; const list = PRODUCTS.filter(p => p.active!== false && (!tab.cat || p.cat === tab.cat)); renderInto(gridId, list); appendViewAll(gridId, tab.label.toUpperCase() + " - " + (stateKey === "rtw" ? "PRET" : "UNSTITCHED"), tab.cat); ensureSwipeWrap(document.getElementById(gridId)); $$("#" + tabsId + " [data-luxtab]").forEach(b => b.onclick = () => { luxTabState[stateKey] = +b.dataset.luxtab; renderTabSection(secId, tabsId, gridId, tabs, stateKey);});} function renderUnstitchedTabs(){ renderTabSection("unstitchedSection", "unstitchedTabs", "unstitchedGrid", luxuryTabs(), "unstitched");} function renderRtwTabs(){ renderTabSection("rtwSection", "rtwTabs", "rtwGrid", luxuryRtwTabs(), "rtw");} /* V3.11: VIEW ALL tile (Luxury) — row ke end par "VIEW ALL IN {GROUP}". */ function viewAllTile(label, cat){ const n = (!cat || cat === "All")? PRODUCTS.filter(p => p.active!== false).length: PRODUCTS.filter(p => p.active!== false && p.cat === cat).length; return `<button type="button" class="view-all-tile" data-viewall-cat="${esc(cat || "All")}" data-viewall-label="${esc(label)}"><span>VIEW ALL IN</span><strong>${esc(label)}</strong><small>${n} Products →</small></button>`;} function appendViewAll(gridId, label, cat){ const grid = document.getElementById(gridId); if (!grid) return; grid.insertAdjacentHTML("beforeend", viewAllTile(label, cat)); grid.querySelectorAll("[data-viewall-cat]").forEach(b => b.onclick = () => setFilter({ cat: b.dataset.viewallCat, label: b.dataset.viewallLabel, maxPrice: null}));} /* V3.11: Luxury tab defaults — pehle Luxury / Daily Wear / Embroidered naam wali categories, phir baaqi categories (tab label hamesha Asim Jofa jaisa). */ function defaultLuxTabs(){ const cats = luxCats(); const out = []; [["Luxury", /luxury/i], ["Daily Wear", /daily/i], ["Embroidered", /embroider/i]].forEach(([label, re]) => { const c = cats.find(x => re.test(x)); out.push({ label, cat: c || label }); }); return out.slice(0, 3); } function defaultLuxRtwTabs(){ const cats = luxCats(); const out = []; [["Luxury", /luxury/i], ["Daily Wear", /daily/i], ["Embroidered", /embroider/i]].forEach(([label, re]) => { const c = cats.find(x => /pret|stitched/i.test(x) && re.test(x)) || cats.find(x => /pret|stitched/i.test(x)); out.push({ label, cat: c || (label + " Pret") }); }); return out.slice(0, 3); } function luxuryRtwTabs(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryRtwTabs))? SETTINGS.luxuryRtwTabs: []; if (saved.length) return saved; return defaultLuxRtwTabs();} /* V3.11: Editorial slider (Asim Jofa fabric banners — Silk, Cambric...) — dots + 4s auto-rotate. Banners: admin list, warna purana single banner, warna hero slides. */ let editorialTimer = null, editorialIdx = 0; function luxuryBanners(){ const saved = (SETTINGS && Array.isArray(SETTINGS.luxuryBanners))? SETTINGS.luxuryBanners.filter(x => x && String(x.img || "").trim()): []; if (saved.length) return saved; const single = (SETTINGS && SETTINGS.luxuryBanner && typeof SETTINGS.luxuryBanner === "object")? SETTINGS.luxuryBanner: {}; if (String(single.img || "").trim()) return [{ img: single.img, eyebrow: single.eyebrow || "", title: single.title || "", button: single.button || "", cat: single.cat || ""}]; return []; } /* ROUND 4 (§15): editorial finger swipe. #editorialBanner single-img rotator hai — finger swipe ka koi handler nahi tha, sirf dots + 4s auto. touch-action:pan-y (CSS C-S1) se horizontal drag JS ko milta hai. Drag ke dauran timer pause (clearInterval). NOTE: pointerup par renderEditorial() SIRF tab call hota hai jab swipe hua ho (|dx|>50) — tap par re-render innerHTML badal dega aur dot/img ka click swallow ho jayega; tap par sirf timer restart hota hai, DOM nahi badalta. */ function bindEditorialSwipe(){ const ban = document.getElementById("editorialBanner"); if (!ban || ban.dataset.edSwipe) return; ban.dataset.edSwipe = "1"; let down = false, startX = 0, moved = false; const restartTimer = () => { const b = luxuryBanners(); if (b.length > 1 && !editorialTimer) editorialTimer = setInterval(() => { editorialIdx = (editorialIdx + 1) % b.length; renderEditorial(); }, 4000); }; ban.addEventListener("pointerdown", e => { down = true; moved = false; startX = e.clientX; if (editorialTimer){ clearInterval(editorialTimer); editorialTimer = null;}}); ban.addEventListener("pointermove", e => { if (!down) return; if (Math.abs(e.clientX - startX) > 4){ if (!moved){ moved = true; try { ban.setPointerCapture(e.pointerId);} catch (err) {}}}}); ban.addEventListener("pointerup", e => { if (!down) return; down = false; const dx = e.clientX - startX; if (Math.abs(dx) > 50){ const b = luxuryBanners(); if (b.length > 1) editorialIdx = (editorialIdx + (dx < 0 ? 1 : -1) + b.length) % b.length; renderEditorial(); } else restartTimer(); }); ban.addEventListener("pointercancel", () => { down = false; restartTimer(); }); ban.addEventListener("click", e => { if (moved){ e.preventDefault(); e.stopPropagation(); moved = false; } }, true); } function renderEditorial(){ const el = document.getElementById("editorialSection"); if (!el) return; if (editorialTimer){ clearInterval(editorialTimer); editorialTimer = null;} if (!isLuxury()){ el.hidden = true; return;} const banners = luxuryBanners(); if (!banners.length){ el.hidden = true; return;} el.hidden = false; if (editorialIdx >= banners.length) editorialIdx = 0; const b = banners[editorialIdx]; const cat = String(b.cat || "").trim() || "All"; const eb = String(b.eyebrow || "").trim(); const ti = String(b.title || "").trim(); const bt = String(b.button || "").trim(); document.getElementById("editorialBanner").innerHTML = `<img src="${safeUrl(b.img)}" alt="${esc(String(b.alt || b.title || ""))}" loading="lazy" data-ed-cat="${esc(cat)}">${(eb || ti || bt) ? `<div class="editorial-overlay">${eb ? `<p class="editorial-eyebrow">${esc(eb)}</p>` : ""}${ti ? `<h3>${esc(ti)}</h3>` : ""}${bt ? `<button type="button" class="ed-btn" data-ed-btn="${esc(cat)}">${esc(bt)}</button>` : ""}</div>` : ""}<div class="editorial-dots">${banners.map((_, i) => `<button type="button" data-ed-dot="${i}" class="${i === editorialIdx? "on": ""}" aria-label="Banner ${i + 1}"></button>`).join("")}</div>`; const imgEl = document.querySelector("#editorialBanner img"); if (imgEl) imgEl.onclick = () => setFilter({ cat: imgEl.dataset.edCat, label: imgEl.dataset.edCat === "All"? "All Products": imgEl.dataset.edCat, maxPrice: null}); const btnEl = document.querySelector("#editorialBanner [data-ed-btn]"); if (btnEl) btnEl.onclick = () => setFilter({ cat: btnEl.dataset.edBtn, label: btnEl.dataset.edBtn === "All"? "All Products": btnEl.dataset.edBtn, maxPrice: null}); $$("#editorialBanner [data-ed-dot]").forEach(d => d.onclick = () => { editorialIdx = +d.dataset.edDot; renderEditorial();}); bindEditorialSwipe(); if (banners.length > 1) editorialTimer = setInterval(() => { editorialIdx = (editorialIdx + 1) % banners.length; renderEditorial();}, 4000);} function luxSizeOptions(){ const set = new Set(); PRODUCTS.forEach(p => (productOptions(p).sizes || []).forEach(s => set.add(s))); return [...set]; } /* V3.11: Spotted — Instagram post jaisa card (avatar, @username, caption, video, like/share, Shop Now) + Visit Instagram button. Sirf Luxury. */ function renderReelsLuxury(list, handle){ const follow = document.getElementById("reelsFollow"); if (follow) follow.innerHTML = ""; const visit = document.getElementById("reelsVisit"); if (visit) visit.innerHTML = handle? `<a class="btn lux-visit-ig" href="https://instagram.com/${encodeURIComponent(handle)}" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/></svg> Visit Instagram</a>`: ""; document.getElementById("reelsRow").innerHTML = list.map(r => { const v = String(r.video || "").trim(); const user = String(r.user || "").trim() || handle || "instagram"; const ava = String(r.avatar || "").trim() ? `<img class="ig-ava" src="${safeUrl(r.avatar)}" alt="">` : `<span class="ig-ava-txt">${esc((user || "A")[0].toUpperCase())}</span>`; const media = /\.mp4(\?|$)/i.test(v) ? `<video src="${safeUrl(v)}" poster="${safeUrl(r.poster || "")}" muted loop playsinline preload="metadata"></video>` : `<a href="${safeUrl(v) || "#"}" target="_blank" rel="noopener"><img src="${imgSrc(r.poster || "")}" alt="${esc(r.title || "")}" loading="lazy" width="800" height="800"></a>`; return `<article class="reel-card ig"><div class="ig-head">${ava}<div><strong>@${esc(user)}</strong><span>${esc(r.title || "")}</span></div></div><div class="ig-media">${media}</div><div class="ig-foot"><button type="button" class="ig-like" data-ig-like aria-label="Like"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></button><a class="ig-act" href="${safeUrl(v) || "#"}" target="_blank" rel="noopener" aria-label="Comment"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></a><button type="button" class="ig-act" data-ig-share="${esc(v)}" aria-label="Share"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button><a class="ig-shop" href="${safeUrl(v) || "#"}" target="_blank" rel="noopener">Shop Now</a></div></article>`; }).join(""); document.querySelectorAll("#reelsRow video").forEach(v => { try { const pr = v.play(); if (pr) pr.catch(() => {});} catch (e) {}}); $$("#reelsRow [data-ig-like]").forEach(b => b.onclick = () => b.classList.toggle("liked")); $$("#reelsRow [data-ig-share]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.igShare); toast("Reel link copy ho gaya");} catch (e) { toast(b.dataset.igShare);}}); bindReelsDrag();} /* ROUND 4 (§15): unified pointer-drag for swipe rows — B4 generalised. R8 (§14) ne #newGrid/#unstitchedGrid/#rtwGrid/#reelsRow par touch-action:pan-y lagaya: browser horizontal touch scroll nahi karta, drag JS ko milta hai. B4 sirf mouse handle karta tha (touch skip) — is liye finger swipe dead thi. Ye binder SAB pointer types (touch + mouse + pen) handle karta hai; vertical drag par browser pointercancel bhejta hai aur page scroll karta hai (R8 intact). scroll-snap-type:x mandatory release par nearest card par snap karta hai. */ function bindRowDrag(row){ if (!row || row.dataset.dragBound) return; row.dataset.dragBound = "1"; let down = false, startX = 0, startLeft = 0, moved = false; row.addEventListener("pointerdown", e => { down = true; moved = false; startX = e.clientX; startLeft = row.scrollLeft; row.classList.add("dragging");}); row.addEventListener("pointermove", e => { if (!down) return; const dx = e.clientX - startX; if (Math.abs(dx) > 4){ if (!moved){ moved = true; try { row.setPointerCapture(e.pointerId);} catch (err) {}} row.scrollLeft = startLeft - dx;}}); const endDrag = () => { down = false; row.classList.remove("dragging"); }; row.addEventListener("pointerup", endDrag); row.addEventListener("pointercancel", endDrag); row.addEventListener("click", e => { if (moved){ e.preventDefault(); e.stopPropagation(); moved = false; } }, true); } /* V3.12 FIX B4: Spotted row is overflow-x:auto, so touch swipe works — but a mouse drag does nothing on a plain scroll container, and there are no arrows, so reels 2–4 are unreachable at desktop. Pointer-drag scrolling for mouse (touch pointers skip, keeping native touch scrolling). A drag swallows the click that follows it so a dragged reel does not navigate. */ /* V3.12 FIX B4 (ROUND 4 §15 — comment corrected): Spotted row overflow-x:auto hai, lekin R8 (§14) ne is par touch-action:pan-y lagaya — browser horizontal touch scroll NAHI karta, is liye "touch swipe works" wali baat ab ghalat hai. B4 ka mouse-only drag bhi touch skip karta tha. Ab unified bindRowDrag (touch + mouse) + setupTrackAutoSlide (4s auto, touch/hover par pause) — dono isi function se. */ function bindReelsDrag(){ const row = document.getElementById("reelsRow"); if (!row) return; bindRowDrag(row); setupTrackAutoSlide(row, null, null); } /* V3.11: Trending Products — Asim Jofa jaisa grid + toolbar (collection dropdown, pause, sort, filter). Sirf Luxury; baaqi themes carousel. */ let trendCat = "All", trendSort = "newest", trendOffset = 0, trendPaused = false, trendTimer = null; function trendPool(){ let pool = PRODUCTS.filter(p => p.active!== false); if (trendCat!== "All") pool = pool.filter(p => p.cat === trendCat); /* V3.12 FIX F4: Filters sheet state must apply to the Trending pool too — previously trendPool ignored every lux filter, so APPLY could never change the visible grid. Same conditions as currentList(). */ if (luxMinPrice!== null) pool = pool.filter(p => Number(p.price) >= luxMinPrice); if (luxMaxPrice!== null) pool = pool.filter(p => Number(p.price) <= luxMaxPrice); if (luxOnSale) pool = pool.filter(p => effectivePct(p) > 0); if (luxInStock) pool = pool.filter(p => p.stock!== "out"); if (luxSize) pool = pool.filter(p => (productOptions(p).sizes || []).includes(luxSize)); if (luxCat) pool = pool.filter(p => p.cat === luxCat); if (luxFabric) pool = pool.filter(p => String(p.fabric || "").trim() === luxFabric); if (luxPcs) pool = pool.filter(p => pcsOf(p) === luxPcs); if (trendSort === "newest") pool = [...pool].sort((a,b) => b.id - a.id); else if (trendSort === "price-low") pool = [...pool].sort((a,b) => a.price - b.price); else if (trendSort === "price-high") pool = [...pool].sort((a,b) => b.price - a.price); else if (trendSort === "rating") pool = [...pool].sort((a,b) => ratingOf(b) - ratingOf(a)); else pool = [...pool].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)); return pool;} function renderTrending(){ const el = document.getElementById("hotSection"); if (!el) return; if (!isLuxury()) return; const customHot = SETTINGS.sectionText && SETTINGS.sectionText.hot && String(SETTINGS.sectionText.hot.title || "").trim(); if (!customHot){ const ti = el.querySelector(".section-title"); if (ti) ti.textContent = "Trending Products"; } const tb = document.getElementById("trendToolbar"); if (tb) tb.hidden = false; const catBtn = document.getElementById("trendCatBtn"); if (catBtn) catBtn.textContent = (trendCat === "All" ? "All Collections" : trendCat) + " ⌄"; const catMenu = document.getElementById("trendCatMenu"); if (catMenu){ const cats = ["All", ...luxCats()]; catMenu.innerHTML = cats.map(c => `<button type="button" data-trendcat="${esc(c)}">${c === "All" ? "All Collections" : esc(c)}</button>`).join(""); catMenu.querySelectorAll("[data-trendcat]").forEach(b => b.onclick = () => { trendCat = b.dataset.trendcat; trendOffset = 0; catMenu.hidden = true; renderTrending(); }); } const sortBtn = document.getElementById("trendSortBtn"); if (sortBtn){ const labels = { newest: "Newest", "price-low": "Price: Low to High", "price-high": "Price: High to Low", popular: "Most Popular" }; sortBtn.textContent = "Sort: " + (labels[trendSort] || "Newest") + " ⌄"; } const pool = trendPool(); renderInto("hotTrack", secTotal("hot", 0) ? pool.slice(0, secTotal("hot", 0)) : pool); const pb = document.getElementById("trendPause"); if (pb) pb.textContent = trendPaused ? "▶" : "⏸"; if (trendTimer){ clearInterval(trendTimer); trendTimer = null; } } /* V3.12 FIX (collection pages): Luxury tile / VIEW ALL clicks open a dedicated collection page instead of filtering the hidden All Products grid. The page reads its title/subtitle from settings.collectionPages (admin Content tab), defaulting to the collection's name + product count. */ let collCat = "All", collLabel = "All Products", collMaxPrice = null, collSort = "newest", collCats = null; function collTitleOf(label){ const s = String(label || "").trim(); if (s && s === s.toUpperCase()) return s.toLowerCase().split(" ").map(w => w? w[0].toUpperCase() + w.slice(1): w).join(" "); return s;} function collPageText(cat, label){ const rows = (SETTINGS && Array.isArray(SETTINGS.collectionPages))? SETTINGS.collectionPages: []; const row = rows.find(x => String(x.cat || "").trim().toLowerCase() === String(cat || "").trim().toLowerCase()); const title = row && String(row.title || "").trim()? row.title.trim(): collTitleOf(label); return { title, subtitle: row && String(row.subtitle || "").trim()? row.subtitle.trim(): "", img: row && String(row.img || "").trim()? row.img.trim(): ""};} function collPool(){ let pool = PRODUCTS.filter(p => p.active!== false); if (collCats && collCats.length) pool = pool.filter(p => collCats.includes(p.cat)); else if (collCat!== "All") pool = pool.filter(p => p.cat === collCat); if (collMaxPrice!== null) pool = pool.filter(p => Number(p.price) <= collMaxPrice); /* Filters sheet state — same conditions as currentList()/trendPool(). */ if (luxMinPrice!== null) pool = pool.filter(p => Number(p.price) >= luxMinPrice); if (luxMaxPrice!== null) pool = pool.filter(p => Number(p.price) <= luxMaxPrice); if (luxOnSale) pool = pool.filter(p => effectivePct(p) > 0); if (luxInStock) pool = pool.filter(p => p.stock!== "out"); if (luxSize) pool = pool.filter(p => (productOptions(p).sizes || []).includes(luxSize)); if (luxCat) pool = pool.filter(p => p.cat === luxCat); if (luxFabric) pool = pool.filter(p => String(p.fabric || "").trim() === luxFabric); if (luxPcs) pool = pool.filter(p => pcsOf(p) === luxPcs); if (collSort === "price-low") pool = [...pool].sort((a,b) => a.price - b.price); else if (collSort === "price-high") pool = [...pool].sort((a,b) => b.price - a.price); else if (collSort === "popular") pool = [...pool].sort((a,b) => ratingOf(b) - ratingOf(a) || reviewsOf(b) - reviewsOf(a)); else pool = [...pool].sort((a,b) => b.id - a.id); return pool;} function renderCollection(){ const pool = collPool(); const t = collPageText(collCat, collLabel); const ti = document.getElementById("collTitle"); if (ti) ti.textContent = t.title; const sub = document.getElementById("collSub"); if (sub) sub.textContent = t.subtitle || (pool.length + (pool.length === 1? " Product": " Products")); const im = document.getElementById("collImg"); if (im){ if (t.img){ im.src = safeUrl(t.img); im.hidden = false; } else { im.hidden = true; im.removeAttribute("src"); } } const sel = document.getElementById("collSort"); if (sel) sel.value = collSort; renderInto("collectionGrid", pool); if (!pool.length){ const g = document.getElementById("collectionGrid"); if (g) g.innerHTML = `<p class="hint" style="grid-column:1/-1;text-align:center;padding:24px 0">Is collection mein abhi koi product nahi.</p>`;}} function openCollection({ cat = "All", label = "All Products", maxPrice = null, sort, cats} = {}){ collCat = cat; collLabel = label; collMaxPrice = maxPrice; collCats = (cats && cats.length)? cats.slice(): null; /* R9 (§14): bottom-nav group pages — Unstitched = Unstitched tab collections (luxuryTabs: Luxury / Daily Wear / Embroidered), Stitched = RTW/Pret tab collections (luxuryRtwTabs: Luxury Pret / Daily Wear Pret / Embroidered Pret). openCollection ka `cats` array (collCats) ek se zyada categories ka pool banata hai; single-cat pages (tiles / VIEW ALL) pehle jaisi hi hain. */ if (sort && ["newest", "price-low", "price-high", "popular"].includes(sort)) collSort = sort; renderCollection(); showPage("collectionPage");}
 /* ---------- V5 Phase 4: Custom Pages (SIMPLE) ----------
   Data: SETTINGS.customPages[] = { slug, title, body (safe HTML),
   seoTitle, showInHeader, showInFooter }. Har theme par chalta hai —
@@ -1377,12 +1423,15 @@ function dateText(days){
 function openProduct(id){
   const p = findP(id); if (!p) return;
   pdpId = id; pdpQty = 1;
-  $("#pdpImg").src = safeUrl(p.img || ""); $("#pdpImg").alt = p.name;
-  $("#pdpThumb").src = safeUrl(p.img || ""); $("#pdpThumb").alt = p.name;
-  /* V3.12: PDP thumbnails products.gallery se (pehli #pdpThumb rehti hai — lightbox binding barkarar). */
+  $("#pdpImg").src = imgSrc(p.img || ""); $("#pdpImg").alt = p.name;
+  $("#pdpThumb").src = imgSrc(p.img || ""); $("#pdpThumb").alt = p.name;
+  /* V3.12: PDP thumbnails products.gallery se. TAMAM thumbnails (pehli #pdpThumb bhi) click par MAIN image badalti hain — lightbox sirf main image (#pdpImg) ke click par khulta hai. */
   const galImgs = [String(p.img || "").trim(), ...galleryOf(p)].filter(Boolean);
   const thumbsBox = document.querySelector(".pdp-thumbs");
-  if (thumbsBox){ thumbsBox.querySelectorAll("[data-gal-thumb]").forEach(x => x.remove()); galImgs.slice(1).forEach(u => { const im = document.createElement("img"); im.src = safeUrl(u); im.alt = ""; im.dataset.galThumb = "1"; im.onclick = () => { $("#pdpImg").src = safeUrl(u); }; thumbsBox.appendChild(im); }); }
+  const setPdpMain = (u, el) => { const m = $("#pdpImg"); if (m) m.src = safeUrl(u); if (thumbsBox) thumbsBox.querySelectorAll("img").forEach(x => x.classList.toggle("on", x === el)); };
+  const firstThumb = $("#pdpThumb");
+  if (firstThumb){ firstThumb.classList.add("on"); firstThumb.onclick = () => setPdpMain(galImgs[0], firstThumb); }
+  if (thumbsBox){ thumbsBox.querySelectorAll("[data-gal-thumb]").forEach(x => x.remove()); galImgs.slice(1).forEach(u => { const im = document.createElement("img"); im.src = safeUrl(u); im.alt = ""; im.dataset.galThumb = "1"; im.onclick = () => setPdpMain(u, im); thumbsBox.appendChild(im); }); }
   $("#pdpCrumbCat").textContent = p.cat;
   $("#pdpCrumbName").textContent = p.name;
   $("#pdpTitle").textContent = p.name;
@@ -1397,7 +1446,7 @@ function openProduct(id){
   const pdpAddBtn = $("#pdpAdd"), pdpOrderBtn = $("#pdpOrder");
   pdpAddBtn.disabled = isOut; pdpAddBtn.textContent = isOut ? "OUT OF STOCK" : "ADD TO CART";
   pdpOrderBtn.disabled = isOut; pdpOrderBtn.innerHTML = isOut ? "OUT OF STOCK" : `${icon("lock", "ic-inline")} ORDER NOW`;
-  $("#pdpFee").innerHTML = `${delivText(p)} <span class="pdp-fee-days">• 2–4 working days</span>`;
+  $("#pdpFee").innerHTML = `${delivText(p)} <span class="pdp-fee-days">• 3–5 working days</span>`;
   /* Stock indicator (products.stock field se). */
   const stockEl = $("#pdpStock");
   if (stockEl){
@@ -1411,7 +1460,7 @@ function openProduct(id){
   const fbShare = $("#shareFb"); if (fbShare) fbShare.href = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(shareUrl);
   const copyBtn = $("#shareCopy");
   if (copyBtn) copyBtn.onclick = async () => {
-    try { await navigator.clipboard.writeText(shareUrl); toast("Product link copy ho gaya"); }
+    try { await navigator.clipboard.writeText(shareUrl); toast("Store link copy ho gaya"); }
     catch (e) { toast(shareUrl); }
   };
   /* product_fields: values sirf product.custom?.[id] se — na hon to khamoshi se skip. */
@@ -1422,11 +1471,11 @@ function openProduct(id){
   const stAdd = $("#pdpStickyAdd"), stOrder = $("#pdpStickyOrder");
   if (stAdd) stAdd.disabled = isOut;
   if (stOrder) stOrder.disabled = isOut;
-  $("#pdpQty").textContent = "1";
-  $("#pdpEtaText").textContent = `Get it by ${dateText(3)} – ${dateText(4)}`;
+  pdpQty = 1; syncPdpQty();
+  $("#pdpEtaText").textContent = `Get it by ${dateText(3)} – ${dateText(5)}`;
   $("#pdpD1").textContent = dateText(0);
   $("#pdpD2").textContent = dateText(1);
-  $("#pdpD3").textContent = `${dateText(3)} – ${dateText(4)}`;
+  $("#pdpD3").textContent = `${dateText(3)} – ${dateText(5)}`;
   $("#pdpDesc").innerHTML = descHtml(p.desc);
   const related = PRODUCTS.filter(x => x.cat === p.cat && x.id !== p.id).slice(0, 4);
   const wrap = $("#relatedWrap");
@@ -1473,8 +1522,7 @@ function renderPdpCustomFields(p){
     lb.hidden = false;
   };
   img.addEventListener("click", openLb);
-  const thumb = $("#pdpThumb");
-  if (thumb) thumb.addEventListener("click", openLb);
+  /* #pdpThumb lightbox NAHI kholta — tamam thumbnails sirf main image badalti hain (openProduct mein bandha hai); lightbox sirf main image (#pdpImg) ke click par khulta hai. */
   const closeLb = () => { const lb = $("#pdpLightbox"); if (lb) lb.hidden = true; };
   const lbEl = $("#pdpLightbox");
   if (lbEl) lbEl.addEventListener("click", closeLb);
@@ -1497,18 +1545,40 @@ window.addEventListener("scroll", updatePdpSticky, { passive: true });
 $("#pdpBack").onclick = showHome;
 $("#crumbHome").onclick = showHome;
 $("#pdpCrumbCat").onclick = () => { const p = findP(pdpId); if (p) setFilter({ cat: p.cat, maxPrice: null }); };
-$("#pdpMinus").onclick = () => { pdpQty = Math.max(1, pdpQty - 1); $("#pdpQty").textContent = pdpQty; };
-$("#pdpPlus").onclick = () => { pdpQty++; $("#pdpQty").textContent = pdpQty; };
+/* F-4: PDP qty 1–99 clamp (stepper buttons bhi usi hisaab se disable). */
+function syncPdpQty(){
+  pdpQty = Math.max(1, Math.min(99, Number(pdpQty) || 1));
+  $("#pdpQty").textContent = pdpQty;
+  const _mn = $("#pdpMinus"), _pl = $("#pdpPlus");
+  if (_mn) _mn.disabled = pdpQty <= 1;
+  if (_pl) _pl.disabled = pdpQty >= 99;
+}
+$("#pdpMinus").onclick = () => { pdpQty--; syncPdpQty(); };
+$("#pdpPlus").onclick = () => { pdpQty++; syncPdpQty(); };
 $("#pdpAdd").onclick = () => { if (pdpId !== null) addToCart(pdpId, pdpQty, pdpVariant); };
 $("#pdpOrder").onclick = () => { if (pdpId !== null) buyNow(pdpId, pdpQty, pdpVariant); };
 
-/* ---------- V3.9: per-product sizes/colors (products.options) ---------- options = { sizes: ["S","M","L","XL"], colors: [{name, hex}] }. Cart keys variant-aware hain: "id" (purani cart, bina variant) ya "id|size|color" — purani cart entries bina toote chalti rehti hain. */ let pdpVariant = { size: null, color: null }; function productOptions(p){ const o = (p && p.options && typeof p.options === "object") ? p.options : {}; const sizes = Array.isArray(o.sizes) ? o.sizes.map(s => String(s).trim()).filter(Boolean).slice(0, 12) : []; const colors = Array.isArray(o.colors) ? o.colors.filter(c => c && typeof c === "object" && String(c.name || "").trim()).map(c => ({ name: String(c.name).trim(), hex: /^#[0-9a-fA-F]{6}$/.test(String(c.hex || "")) ? String(c.hex) : "#8A8A8A" })).slice(0, 12) : []; return { sizes, colors }; } function cartKey(id, v){ const s = (v && v.size) ? String(v.size) : ""; const c = (v && v.color) ? String(v.color) : ""; return (s || c) ? (id + "|" + s + "|" + c) : String(id); } function parseCartKey(k){ const parts = String(k).split("|"); return { id: +parts[0], size: parts[1] || null, color: parts[2] || null }; } function variantText(v){ const parts = []; if (v && v.size) parts.push("Size: " + v.size); if (v && v.color) parts.push(v.color); return parts.join(" • "); } function renderPdpOptions(p){ let box = document.getElementById("pdpOptions"); if (!box){ box = document.createElement("div"); box.id = "pdpOptions"; const qtyRow = document.querySelector(".pdp-info .qty-row"); if (qtyRow && qtyRow.parentNode) qtyRow.parentNode.insertBefore(box, qtyRow); else return; } const { sizes, colors } = productOptions(p); const showSizes = SETTINGS.showSizes !== false && sizes.length > 0; const showColors = SETTINGS.showColors !== false && colors.length > 0; pdpVariant = { size: showSizes ? sizes[0] : null, color: showColors ? colors[0].name : null }; let h = ""; if (showSizes) h += `<div class="opt-block"><span class="opt-label">Size: <strong>${esc(pdpVariant.size)}</strong></span><div class="size-pills">${sizes.map(s => `<button type="button" class="size-pill${s === pdpVariant.size ? " on" : ""}" data-size="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>`; if (showColors) h += `<div class="opt-block"><span class="opt-label">Color: <strong>${esc(pdpVariant.color)}</strong></span><div class="color-swatches">${colors.map(c => `<button type="button" class="color-swatch${c.name === pdpVariant.color ? " on" : ""}" data-color="${esc(c.name)}" style="background:${c.hex}" title="${esc(c.name)}" aria-label="${esc(c.name)}"></button>`).join("")}</div></div>`; box.innerHTML = h; box.hidden = !h; box.querySelectorAll("[data-size]").forEach(b => b.onclick = () => { pdpVariant.size = b.dataset.size; b.closest(".opt-block").querySelectorAll("[data-size]").forEach(x => x.classList.toggle("on", x === b)); b.closest(".opt-block").querySelector(".opt-label strong").textContent = b.dataset.size; }); box.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { pdpVariant.color = b.dataset.color; b.closest(".opt-block").querySelectorAll("[data-color]").forEach(x => x.classList.toggle("on", x === b)); b.closest(".opt-block").querySelector(".opt-label strong").textContent = b.dataset.color; }); } /* ---------- Cart ---------- */
+/* ---------- V3.9: per-product sizes/colors (products.options) ---------- options = { sizes: ["S","M","L","XL"], colors: [{name, hex}] }. Cart keys variant-aware hain: "id" (purani cart, bina variant) ya "id|size|color" — purani cart entries bina toote chalti rehti hain. */ let pdpVariant = { size: null, color: null }; const COLOR_NAME_HEX = {"red":"#DC2626","blue":"#2563EB","green":"#16A34A","black":"#111111","white":"#F5F5F5","yellow":"#EAB308","pink":"#EC4899","purple":"#9333EA","orange":"#EA580C","brown":"#92400E","grey":"#6B7280","gray":"#6B7280","beige":"#D6CDBF","maroon":"#7F1D1D","navy":"#1E3A8A","teal":"#0D9488","gold":"#D4A017","silver":"#C0C0C0","lavender":"#E6E6FA","mustard":"#D9A404","olive":"#808000","cream":"#FFFDD0","sky blue":"#38BDF8","coral":"#FF7F50"}; function productOptions(p){ const o = (p && p.options && typeof p.options === "object") ? p.options : {}; const sizes = Array.isArray(o.sizes) ? o.sizes.map(s => String(s).trim()).filter(Boolean).slice(0, 12) : []; const colors = Array.isArray(o.colors) ? o.colors.map(c => (typeof c === "string" ? { name: c.trim(), hex: COLOR_NAME_HEX[c.trim().toLowerCase()] || "#8A8A8A" } : c)).filter(c => c && typeof c === "object" && String(c.name || "").trim()).map(c => ({ name: String(c.name).trim(), hex: /^#[0-9a-fA-F]{6}$/.test(String(c.hex || "")) ? String(c.hex) : (COLOR_NAME_HEX[String(c.name).trim().toLowerCase()] || "#8A8A8A") })).slice(0, 12) : []; return { sizes, colors }; } function cartKey(id, v){ const s = (v && v.size) ? String(v.size) : ""; const c = (v && v.color) ? String(v.color) : ""; return (s || c) ? (id + "|" + s + "|" + c) : String(id); } function parseCartKey(k){ const parts = String(k).split("|"); return { id: +parts[0], size: parts[1] || null, color: parts[2] || null }; } function variantText(v){ const parts = []; if (v && v.size) parts.push("Size: " + v.size); if (v && v.color) parts.push(v.color); return parts.join(" • "); } function renderPdpOptions(p){ let box = document.getElementById("pdpOptions"); if (!box){ box = document.createElement("div"); box.id = "pdpOptions"; const qtyRow = document.querySelector(".pdp-info .qty-row"); if (qtyRow && qtyRow.parentNode) qtyRow.parentNode.insertBefore(box, qtyRow); else return; } const { sizes, colors } = productOptions(p); const showSizes = SETTINGS.showSizes !== false && sizes.length > 0; const showColors = SETTINGS.showColors !== false && colors.length > 0; pdpVariant = { size: showSizes ? sizes[0] : null, color: showColors ? colors[0].name : null }; let h = ""; if (showSizes) h += `<div class="opt-block"><span class="opt-label">Size: <strong>${esc(pdpVariant.size)}</strong></span><div class="size-pills">${sizes.map(s => `<button type="button" class="size-pill${s === pdpVariant.size ? " on" : ""}" data-size="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>`; if (showColors) h += `<div class="opt-block"><span class="opt-label">Color: <strong>${esc(pdpVariant.color)}</strong></span><div class="color-swatches">${colors.map(c => `<button type="button" class="color-swatch${c.name === pdpVariant.color ? " on" : ""}" data-color="${esc(c.name)}" style="background:${c.hex}" title="${esc(c.name)}" aria-label="${esc(c.name)}"></button>`).join("")}</div></div>`; box.innerHTML = h; box.hidden = !h; box.querySelectorAll("[data-size]").forEach(b => b.onclick = () => { pdpVariant.size = b.dataset.size; b.closest(".opt-block").querySelectorAll("[data-size]").forEach(x => x.classList.toggle("on", x === b)); b.closest(".opt-block").querySelector(".opt-label strong").textContent = b.dataset.size; }); box.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { pdpVariant.color = b.dataset.color; b.closest(".opt-block").querySelectorAll("[data-color]").forEach(x => x.classList.toggle("on", x === b)); b.closest(".opt-block").querySelector(".opt-label strong").textContent = b.dataset.color; }); } /* ---------- Cart ---------- */
 function saveCart(){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
-function cartCount(){ return Object.values(cart).reduce((a,b) => a + Number(b || 0), 0); }
+/* F-1: cart entry tab "resolvable" hai jab us ka product maujood aur active ho.
+   get_public_storefront sirf active products deta hai, is liye missing =
+   deleted ya deactivated (ghost). */
+function isResolvableKey(k){ const p = findP(parseCartKey(k).id); return !!p && p.active !== false; }
+/* F-1: cartCount SIRF resolvable entries ginta hai — ghost lines badge aur
+   checkout button ko kabhi enable nahi karti. */
+function cartCount(){ return cartEntries().filter(([k]) => isResolvableKey(k)).reduce((a,[,q]) => a + Number(q || 0), 0); }
 function cartEntries(){ return Object.entries(cart).map(([k,q]) => [k, Number(q)]).filter(([,q]) => q > 0); }
+/* F-1 ghost-cart prune: unresolvable lines cart se hata dein; kuch hata ho to
+   toast dikhayein. Hataayi gayi lines ki tadad lotata hai. */
+function pruneCart(){
+  let removed = 0;
+  Object.keys(cart).forEach(k => { if (!isResolvableKey(k)){ delete cart[k]; removed++; } });
+  if (removed > 0){ saveCart(); renderCart(); toast("Kuch products ab available nahi hain, cart se hata diye gaye"); }
+  return removed;
+}
 function cartSubtotal(){ return cartEntries().reduce((sum,[k,q]) => { const p = findP(parseCartKey(k).id); return p ? sum + Number(p.price) * q : sum; }, 0); }
 function addToCart(id, qty, variant){
-   const k = cartKey(id, variant); cart[k] = (Number(cart[k]) || 0) + qty;
+   const k = cartKey(id, variant); cart[k] = Math.min(99, (Number(cart[k]) || 0) + qty); /* F-4: qty cap 1–99 */
   saveCart(); renderCart();
   const p = findP(id); if (p) toast(`Added: ${p.name}`);
    metaAddToCart(id, qty); /* V5 Phase 5: Meta AddToCart. */
@@ -1523,19 +1593,23 @@ function addToCart(id, qty, variant){
   }
 }
 function setQty(key, q){
-  if (q <= 0) delete cart[key]; else cart[key] = q;
+  if (q <= 0) delete cart[key]; else cart[key] = Math.min(99, q); /* F-4: qty cap 1–99 */
   saveCart(); renderCart();
 }
 function renderCart(){
   const n = cartCount();
   $("#cartCount").textContent = n;
   const entries = cartEntries();
-  $("#cartEmptyMsg").hidden = n !== 0;
-  $("#cartRows").innerHTML = entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k); const p = findP(id); if (!p) return ""; const vt = variantText({ size, color });
+  $("#cartEmptyMsg").hidden = entries.length !== 0;
+  $("#cartRows").innerHTML = entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k); const p = findP(id);
+    /* F-1 safety net: agar koi stale line phir bhi render ho to usay Remove
+       button ke saath dikhayein (checkout is par kabhi block nahi hota). */
+    if (!p || p.active === false) return `<div class="cart-row"><div><h3>Product ab available nahi hai</h3><p>Ye product store se hata diya gaya hai.</p><div class="cart-controls"><button class="remove-link" type="button" data-crem="${esc(k)}">Remove</button></div></div></div>`;
+    const vt = variantText({ size, color });
     return `<div class="cart-row">
-      <img src="${safeUrl(p.img || "")}" alt="${esc(p.name)}">
+      <img src="${imgSrc(p.img || "")}" alt="${esc(p.name)}" loading="lazy" width="800" height="800">
       <div><h3>${esc(p.name)}</h3><p>${fmt(p.price)} each • ${delivText(p)}</p>${vt ? `<p class="cart-variant">${esc(vt)}</p>` : ""}
-        <div class="cart-controls"><button class="qty-btn" type="button" data-cdec="${esc(k)}">−</button><strong>${q}</strong><button class="qty-btn" type="button" data-cinc="${esc(k)}">+</button><button class="remove-link" type="button" data-crem="${esc(k)}">Remove</button></div>
+        <div class="cart-controls"><button class="qty-btn" type="button" data-cdec="${esc(k)}">−</button><strong>${q}</strong><button class="qty-btn" type="button" data-cinc="${esc(k)}"${q >= 99 ? " disabled" : ""}>+</button><button class="remove-link" type="button" data-crem="${esc(k)}">Remove</button></div>
       </div><strong class="line-total">${fmt(Number(p.price) * q)}</strong>
     </div>`;
   }).join("");
@@ -1569,7 +1643,7 @@ function checkoutTotals(){
 function renderCheckoutSummary(){
   const entries = checkoutState ? checkoutState.entries : [];
   $("#coItems").innerHTML = entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k); const p = findP(id); if (!p) return ""; const vt = variantText({ size, color });
-    return `<div class="co-item"><img src="${safeUrl(p.img || "")}" alt=""><div class="co-item-info"><h4>${esc(p.name)}</h4><p>${fmt(p.price)} × ${q} • ${delivText(p)}</p>${vt ? `<p class="cart-variant">${esc(vt)}</p>` : ""}</div><strong>${fmt(Number(p.price) * q)}</strong></div>`;
+    return `<div class="co-item"><img src="${imgSrc(p.img || "")}" alt="${esc(p.name)}" loading="lazy" width="200" height="200"><div class="co-item-info"><h4>${esc(p.name)}</h4><p>${fmt(p.price)} × ${q} • ${delivText(p)}</p>${vt ? `<p class="cart-variant">${esc(vt)}</p>` : ""}</div><strong>${fmt(Number(p.price) * q)}</strong></div>`;
   }).join("");
   const { sub, fee, discount, total } = checkoutTotals();
   $("#coSubtotal").textContent = fmt(sub);
@@ -1582,6 +1656,7 @@ function renderCheckoutSummary(){
   }
   $("#coTotal").textContent = fmt(total);
   $("#checkoutError").textContent = "";
+  const _rb1 = $("#idemRetryBtn"); if (_rb1) _rb1.hidden = true;
 }
 /* ---------- Coupon (checkout) ---------- */
 function renderCouponUI(){
@@ -1638,7 +1713,12 @@ function renderCheckoutFields(){
     const name = "cf_" + esc(f.id);
     const label = esc(f.label) + (f.required ? ' <span class="req-star">*</span>' : "");
     if (f.type === "textarea") return `<label>${label}<textarea name="${name}" rows="2"${req}></textarea><small class="field-err" data-ferr="${esc(f.id)}" hidden>Ye field lazmi hai</small></label>`;
-    if (f.type === "select") return `<label>${label}<select name="${name}"${req}><option value="">— Select karein —</option>${(f.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select><small class="field-err" data-ferr="${esc(f.id)}" hidden>Ye field lazmi hai</small></label>`;
+    if (f.type === "select"){
+      /* F-21: required select jis ke zero options hon — checkout kabhi block na
+         kare: disabled render + note, validation mein bhi skip (neeche onsubmit). */
+      if (!f.options || !f.options.length) return `<label>${label}<select name="${name}" disabled><option value="">— Koi option nahi —</option></select><small>Is field mein abhi koi option nahi hai — order ke liye lazmi nahi.</small></label>`;
+      return `<label>${label}<select name="${name}"${req}><option value="">— Select karein —</option>${(f.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select><small class="field-err" data-ferr="${esc(f.id)}" hidden>Ye field lazmi hai</small></label>`;
+    }
     return `<label>${label}<input name="${name}" type="${f.type === "number" ? "number" : "text"}"${req}><small class="field-err" data-ferr="${esc(f.id)}" hidden>Ye field lazmi hai</small></label>`;
   }).join("");
   wrap.hidden = fields.length === 0;
@@ -1651,6 +1731,18 @@ function buyNow(id, qty, variant){
 }
 $("#backToShop").onclick = showHome;
 $("#continueBtn").onclick = showHome;
+/* F-22: Retry — stale idempotency key clear karke nayi key se dobara submit. */
+const _idemRetryBtn = $("#idemRetryBtn");
+if (_idemRetryBtn) _idemRetryBtn.onclick = () => {
+  idemClearKey();
+  _idemRetryBtn.hidden = true;
+  const _ce = $("#checkoutError"); if (_ce) _ce.textContent = "";
+  const _cf = $("#checkoutForm");
+  if (_cf){
+    if (typeof _cf.requestSubmit === "function") _cf.requestSubmit();
+    else _cf.dispatchEvent(new Event("submit", { cancelable: true }));
+  }
+};
 $("#couponApplyBtn").onclick = applyCoupon;
 $("#couponRemoveBtn").onclick = removeCoupon;
 $("#couponInput").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); applyCoupon(); } });
@@ -1707,6 +1799,8 @@ async function idemVerifyOrder(storeId, key, total, lines){
 function m6CheckoutErrorMessage(code){
      switch (String(code || "")){
         case "INVALID_COUPON": return "Coupon valid nahi hai — dobara check karein ya coupon hata dein.";
+        case "COUPON_EXPIRED": return "Coupon ki expiry ho gayi hai — coupon hata kar dobara try karein.";
+        case "COUPON_LIMIT_REACHED": return "Coupon ki limit poori ho gayi hai — coupon hata kar dobara try karein.";
         case "INVALID_PRODUCT":
         case "INVALID_VARIANT": return "Kuch products ab available nahi hain — cart refresh karein.";
         case "INVALID_QTY": return "Quantity theek nahi hai — dobara check karein.";
@@ -1735,6 +1829,48 @@ function m6OrderMatchesCart(serverOrder, rpcLines, couponCode){
      return storedCoupon === wantCoupon;
 }
 
+/* Module 6: create_order ki EK koshish — fetch + duplicate verify. F-1/F-22
+   retry ke liye alag function taa ke onsubmit dobara bhej sake. Server
+   authoritativeness waisi hi: browser sirf ids/qty/variant/coupon bhejta hai. */
+async function createOrderAttempt(rpcBody, rpcLines){
+  let error = null;
+  let serverOrder = null; /* the order row returned by create_order */
+  let idemDuplicate = false; /* true when the RPC returned an existing order */
+  try {
+    const idemCtrl = new AbortController();
+    const idemTimer = setTimeout(() => idemCtrl.abort(), 90000); /* 90s client timeout */
+    let orderRes;
+    try {
+      orderRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_order`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(rpcBody),
+        signal: idemCtrl.signal
+      });
+    } finally { clearTimeout(idemTimer); }
+    if (!orderRes.ok){
+      const errBody = await orderRes.json().catch(() => ({}));
+      error = { code: (errBody && errBody.message) || "", message: "Order save failed" };
+    } else {
+      const rows = await orderRes.json().catch(() => null);
+      serverOrder = Array.isArray(rows) ? rows[0] : null;
+      if (!serverOrder || typeof serverOrder.order_id !== "number"){ error = { message: "Order verify nahi ho saka — store se rabta karein." }; }
+      else {
+        idemDuplicate = !!serverOrder.is_duplicate;
+        if (idemDuplicate && !m6OrderMatchesCart(serverOrder, rpcLines, appliedCoupon ? appliedCoupon.code : null)){
+          /* F-22: mismatch — dead-end error nahi, caller Retry button dikhata hai. */
+          error = { code: "IDEM_MISMATCH", message: "Order verify nahi ho saka — store se rabta karein." };
+        }
+      }
+    }
+  } catch (e) { error = e; }
+  return { error, serverOrder, idemDuplicate };
+}
+
 $("#checkoutForm").onsubmit = async e => {
   e.preventDefault();
   if (!checkoutState || !checkoutState.entries.length) return;
@@ -1744,6 +1880,7 @@ $("#checkoutForm").onsubmit = async e => {
   if (String(new FormData(e.target).get("website") || "").trim() !== ""){ btn.disabled = false; btn.textContent = "ORDER PLACE KAREIN"; return; }
   const err = $("#checkoutError");
   err.textContent = "";
+  const _rb0 = $("#idemRetryBtn"); if (_rb0) _rb0.hidden = true;
   const f = new FormData(e.target);
   /* Custom fields: required wale khaali hon to inline error + submit rokein. */
   const coFields = Array.isArray(SETTINGS.checkout_fields) ? SETTINGS.checkout_fields : [];
@@ -1751,7 +1888,9 @@ $("#checkoutForm").onsubmit = async e => {
   coFields.forEach(cf => {
     const msg = document.querySelector(`[data-ferr="${CSS.escape(cf.id)}"]`);
     const val = String(f.get("cf_" + cf.id) || "").trim();
-    const bad = cf.required && !val;
+    /* F-21: required select jis ke zero options hon — kabhi block na kare. */
+    const noOptions = cf.type === "select" && (!cf.options || !cf.options.length);
+    const bad = cf.required && !val && !noOptions;
     if (msg) msg.hidden = !bad;
     if (bad && !firstMissing) firstMissing = cf;
   });
@@ -1761,71 +1900,74 @@ $("#checkoutForm").onsubmit = async e => {
     if (inp) inp.focus();
     return;
   }
+  /* F-1: submit se pehle stale lines prune karein — checkout kabhi stale
+     line par block na ho (pruneCart toast bhi dikhata hai agar kuch hata ho). */
+  pruneCart();
+  checkoutState.entries = checkoutState.entries.filter(([k]) => isResolvableKey(k));
+  if (!checkoutState.entries.length){
+    btn.disabled = false; btn.innerHTML = `${icon("check", "ic-inline")} ORDER PLACE KAREIN`;
+    err.textContent = "Cart mein koi available product nahi raha — dobara shopping karein.";
+    renderCheckoutSummary();
+    return;
+  }
   btn.disabled = true; btn.textContent = "Order save ho raha hai…";
      /* Module 6: server-authoritative checkout. The browser sends NO price, NO
           delivery fee, NO total — only product ids, quantities, variants and the
                coupon code. The create_order RPC validates every line against the
                     canonical catalogue and computes the total server-side. */
-  const rpcLines = checkoutState.entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k);
-    const line = { id, qty: q }; if (size) line.size = size; if (color) line.color = color; return line;
-  });
-    /* Custom checkout fields: [{label, value}] — not price-relevant, stored as-is. */
-  const rpcCustomFields = coFields.length
-    ? coFields.map(cf => ({ label: cf.label, value: String(f.get("cf_" + cf.id) || "").trim() })).filter(x => x.value !== "")
-    : null;
   /* Idempotency: reuse the stored key for a retry of this checkout, else a new key. */
   let idemKey = idemGetKey();
   if (!idemKey){ idemKey = idemNewKey(); idemSetKey(idemKey); }
-    const rpcBody = {
-           p_store_id: STORE_ID,
-           p_customer_name: String(f.get("name") || "").trim(),
-           p_phone: String(f.get("phone") || "").trim(),
-           p_city: String(f.get("city") || "").trim(),
-           p_address: String(f.get("address") || "").trim(),
-           p_lines: rpcLines,
-           p_coupon_code: appliedCoupon ? appliedCoupon.code : null,
-           p_idempotency_key: idemKey,
-           p_custom_fields: rpcCustomFields
+  const buildRpcBody = () => {
+    const lines = checkoutState.entries.map(([k,q]) => { const { id, size, color } = parseCartKey(k);
+      const line = { id, qty: q }; if (size) line.size = size; if (color) line.color = color; return line;
+    });
+    /* Custom checkout fields: [{label, value}] — not price-relevant, stored as-is. */
+    const customFields = coFields.length
+      ? coFields.map(cf => ({ label: cf.label, value: String(f.get("cf_" + cf.id) || "").trim() })).filter(x => x.value !== "")
+      : null;
+    return { body: {
+      p_store_id: STORE_ID,
+      p_customer_name: String(f.get("name") || "").trim(),
+      p_phone: String(f.get("phone") || "").trim(),
+      p_city: String(f.get("city") || "").trim(),
+      p_address: String(f.get("address") || "").trim(),
+      p_lines: lines,
+      p_coupon_code: appliedCoupon ? appliedCoupon.code : null,
+      p_idempotency_key: idemKey,
+      p_custom_fields: customFields
+    }, lines };
   };
-     let error = null;
-   let serverOrder = null; /* the order row returned by create_order */
-    let idemDuplicate = false; /* true when the RPC returned an existing order */   
-   try {
-      const idemCtrl = new AbortController();
-      const idemTimer = setTimeout(() => idemCtrl.abort(), 90000); /* 90s client timeout */
-      let orderRes;
-      try {
-        orderRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_order`, {
-           method: "POST",
-           headers: {
-            apikey: SUPABASE_ANON_KEY,
-              
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json"
-          },
-           body: JSON.stringify(rpcBody),
-           signal: idemCtrl.signal
-        });
-      } finally { clearTimeout(idemTimer); }
-            if (!orderRes.ok){
-                       const errBody = await orderRes.json().catch(() => ({}));
-                       error = { code: (errBody && errBody.message) || "", message: "Order save failed" };
-            } else {
-                       const rows = await orderRes.json().catch(() => null);
-                       serverOrder = Array.isArray(rows) ? rows[0] : null;
-                       if (!serverOrder || typeof serverOrder.order_id !== "number"){ error = { message: "Order verify nahi ho saka — store se rabta karein." }; }
-                       else {
-                                    idemDuplicate = !!serverOrder.is_duplicate;
-                                    if (idemDuplicate && !m6OrderMatchesCart(serverOrder, rpcLines, appliedCoupon ? appliedCoupon.code : null)){
-                                                   error = { message: "Order verify nahi ho saka — store se rabta karein." };
-                                    }
-                       }
-      }
-   } catch (e) { error = e; }
+  let _built = buildRpcBody();
+  let rpcBody = _built.body, rpcLines = _built.lines;
+  let result = await createOrderAttempt(rpcBody, rpcLines);
+  /* F-1: server ne INVALID_PRODUCT/INVALID_VARIANT diya to stale line hata kar
+     EK dafa dobara bhejein — baaqi lines ka order rukna nahi chahiye. Koi order
+     bana hi nahi tha, is liye wohi idempotency key dobara istemal safe hai. */
+  if (result.error && (result.error.code === "INVALID_PRODUCT" || result.error.code === "INVALID_VARIANT")){
+    pruneCart();
+    checkoutState.entries = checkoutState.entries.filter(([k]) => isResolvableKey(k));
+    if (checkoutState.entries.length){
+      toast("Kuch products ab available nahi hain — unhein hata kar order dobara bhej rahe hain.");
+      renderCheckoutSummary();
+      _built = buildRpcBody();
+      rpcBody = _built.body; rpcLines = _built.lines;
+      result = await createOrderAttempt(rpcBody, rpcLines);
+    }
+  }
+  const error = result.error;
+  const serverOrder = result.serverOrder;
   btn.disabled = false; btn.innerHTML = `${icon("check", "ic-inline")} ORDER PLACE KAREIN`;
   if (error){
     console.error(error);
-    err.textContent = m6CheckoutErrorMessage(error.code || "");
+    /* F-22: idempotency mismatch — dead-end nahi, Retry button: key clear karke
+       nayi key se dobara submit. Purana order waisa hi rehta hai. */
+    if (error.code === "IDEM_MISMATCH"){
+      err.textContent = "Pehla order save ho gaya tha, lekin cart tab se badal gaya hai. Dobara try karein — naya order banega, purana order waisa hi rahega.";
+      const _rb = $("#idemRetryBtn"); if (_rb) _rb.hidden = false;
+    } else {
+      err.textContent = m6CheckoutErrorMessage(error.code || "");
+    }
     return;
   }
   /* Server total wins (the RPC computed it from the canonical catalogue).
@@ -1889,7 +2031,7 @@ if (_trackForm) _trackForm.onsubmit = async e => {
     res.innerHTML = `<div class="track-card">
       <p><strong>Order #${oid}</strong> — <span class="pill">${escapeHtml(row.status)}</span></p>
       <p>Total: <strong>${fmt(row.total)}</strong> • Items: <strong>${row.item_count}</strong> • Date: ${escapeHtml(d)}</p>
-      ${row.tracking_note ? `<p class="track-note">📦 ${escapeHtml(row.tracking_note)}</p>` : ""}
+      ${row.tracking_note ? `<p class="track-note"><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> ${escapeHtml(row.tracking_note)}</p>` : ""}
     </div>`;
   } catch (err) {
     res.innerHTML = `<p class="form-error">Track nahi ho saka — thori der baad dobara try karein.</p>`;
@@ -1909,14 +2051,31 @@ $("#searchToggle").onclick = () => {
    lagayen (resize + settings apply par dobara). */
 function syncHeaderOffset(){
   const h = $("#siteHeader") || document.querySelector(".site-header");
-  if (!h) return; /* V3.6: Playful Pop ka header sticky NAHI hai (FunBug ki tarah upar scroll ho jata hai), is liye body par header jitni padding nahi chahiye. */ document.body.style.paddingTop = (document.body.classList.contains("theme-playful") || document.body.classList.contains("theme-luxury")) ? "0px" : h.offsetHeight + "px";
+  if (!h) return;
+  /* STAGING banner offset (2026-11-10): the staging banner is a static div at
+     the top of <body> (staging only; production mein banner hota hi nahi).
+     Header position:fixed (most themes) ya position:absolute (Luxury) hai,
+     dono top:0 par chipke hote hain, is liye banner se overlap ho jata tha.
+     Header ko banner ki measured height se neeche dhakelen (bh=0 ho to kuch
+     nahi badalta — production be-asar), aur body padding mein bhi banner ki
+     height shamil karein. Resize par dobara measure hota hai (banner wrap). */
+  const b = document.querySelector(".staging-banner");
+  const bh = b ? b.offsetHeight : 0;
+  h.style.top = bh ? bh + "px" : "";
+  /* V3.6: Playful Pop ka header sticky NAHI hai (FunBug ki tarah upar scroll ho jata hai), is liye body par header jitni padding nahi chahiye. */
+  document.body.style.paddingTop = (document.body.classList.contains("theme-playful") || document.body.classList.contains("theme-luxury")) ? "0px" : (h.offsetHeight + bh) + "px";
 }
 window.addEventListener("resize", syncHeaderOffset);
 $("#searchBtn").onclick = () => { showPage("homeView"); renderGrid(); requestAnimationFrame(() => scrollToId("shop")); };
-$("#searchInput").addEventListener("input", renderGrid);
+/* FE-Q1: search debounce (~200 ms) — har keystroke par grid re-render nahi. */
+let searchDebounce = null;
+$("#searchInput").addEventListener("input", () => { clearTimeout(searchDebounce); searchDebounce = setTimeout(renderGrid, 200); });
 $("#searchInput").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); $("#searchBtn").click(); } });
 $("#sortSelect").onchange = renderGrid;
 $("#viewAllBtn").onclick = () => resetFilters("All Products", "popular");
+/* FE-P1: Load More — mazeed 50 products dikhayein. */
+const _loadMoreBtn = $("#loadMoreBtn");
+if (_loadMoreBtn) _loadMoreBtn.onclick = () => { gridShown += 50; renderGrid(); };
 $("#viewNewBtn").onclick = () => resetFilters("New Arrivals", "newest");
 $("#shopDealsBtn").onclick = () => scrollToId("dealsSection");
 $("#hotPrev").onclick = () => $("#hotTrack").scrollBy({ left: -280, behavior: "smooth" });
@@ -2072,9 +2231,9 @@ function startSocialProof(){
      3) custom domain: hostname platform ke apne hosts se alag ho to
         storefront_stores mein custom_domain match
      4) default 'shopnest'
-   Stores lookup hi fail ho jaye (migration abhi nahi chali) to
-   SINGLE-TENANT FALLBACK: baghair store filter purana render — live
-   shop kabhi is wajah se band nahi hogi. */
+   Stores lookup hi fail ho jaye to FAIL-CLOSED (Module 4): kuch load nahi
+   hota, "Store load nahi ho saka" + Retry dikhta hai — kabhi baghair store
+   filter ke purana render nahi hota. */
 /* Module 1: public storefront data comes from the get_public_storefront RPC
    (server-side projection), NOT from direct table reads. Direct anon SELECT
    on settings/products/categories/storefront_stores is revoked; the RPC is
@@ -2097,6 +2256,7 @@ async function resolveStore(){
   const paramSlug = (new URLSearchParams(location.search).get("store") || "").trim().toLowerCase();
   let slug = null;
   let explicit = false;
+  let preRow = null; /* F-19: custom-domain RPC ka result — dobara fetch nahi hota. */
   if (paramSlug){
     slug = paramSlug; explicit = true;
     try { sessionStorage.setItem("sn_store_slug", slug); } catch (e) {}
@@ -2106,26 +2266,31 @@ async function resolveStore(){
       const host = (location.hostname || "").toLowerCase();
       if (host && !PLATFORM_HOSTS.includes(host)){
         /* Module 1: resolve a custom domain via the RPC (it tries the host
-           as a slug, then as a custom_domain). No direct view query. */
+           as a slug, then as a custom_domain). No direct view query.
+           F-19: is call ka result preRow mein rehta hai — neeche dobara
+           get_public_storefront call nahi hoti (boot = EK RPC). */
         try {
-          const row = await fetchPublicStorefront(host);
-          if (row && row.slug){
-            slug = row.slug;
+          preRow = await fetchPublicStorefront(host);
+          if (preRow && preRow.slug){
+            slug = preRow.slug;
             try { sessionStorage.setItem("sn_store_slug", slug); } catch (e) {}
-          }
-        } catch (e) { /* RPC fail — default/fallback neeche sambhal lega */ }
+          } else { preRow = null; }
+        } catch (e) { preRow = null; /* RPC fail — default/fallback neeche sambhal lega */ }
       }
     }
     if (!slug) slug = "shopnest";
   }
   STORE_SLUG = slug;
-  let row = null;
-  try {
-    row = await fetchStorefrontRow(slug);
-  } catch (e) {
-    console.warn("Store resolution fail — single-tenant fallback render.", e);
-    STORE = null; STORE_ID = null;
-    return "fallback";
+  /* F-19: custom-domain boot pehle hi resolve ho chuka ho to dobara RPC nahi. */
+  let row = preRow;
+  if (!row){
+    try {
+      row = await fetchStorefrontRow(slug);
+    } catch (e) {
+      console.warn("Store resolution fail — single-tenant fallback render.", e);
+      STORE = null; STORE_ID = null;
+      return "fallback";
+    }
   }
   if (!row){
     if (explicit) return "notfound";
@@ -2147,12 +2312,46 @@ async function resolveStore(){
   STORE_ID = row.id || null;
   return "ok";
 }
-function showStoreNotice(title, msg){
+/* Module 4: notice actions — Retry + Platform-home link. showStoreError
+   (lookup fail) aur suspended notice dono mein Retry ka matlab hai (store
+   dobara resolve hota hai); notfound par Retry bekaar hai (galat slug URL
+   mein phir se aayega), is liye wahan sirf Platform-home link hota hai. */
+function storeNoticeActions(withRetry){
+  const box = $("#storeNotice");
+  if (!box) return;
+  let actions = $("#storeNoticeActions");
+  if (!actions){
+    actions = document.createElement("div");
+    actions.id = "storeNoticeActions";
+    actions.className = "store-notice-actions";
+    actions.style.cssText = "display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap";
+    const card = box.querySelector(".store-notice-card");
+    if (card) card.appendChild(actions);
+  }
+  actions.innerHTML = "";
+  if (withRetry){
+    const retryBtn = document.createElement("button");
+    retryBtn.type = "button";
+    retryBtn.id = "storeRetryBtn";
+    retryBtn.className = "btn primary";
+    retryBtn.textContent = "Dobara try karein";
+    retryBtn.onclick = function(){ retryBoot(); };
+    actions.appendChild(retryBtn);
+  }
+  const homeLink = document.createElement("a");
+  homeLink.id = "storeHomeLink";
+  homeLink.className = "btn outline";
+  homeLink.href = "https://imalirazamansha.github.io/webalibabamarketingpro/shopnest.html";
+  homeLink.textContent = "Platform home";
+  actions.appendChild(homeLink);
+}
+function showStoreNotice(title, msg, withRetry){
   document.body.classList.add("store-closed");
   const box = $("#storeNotice");
   if (box){
     $("#noticeTitle").textContent = title;
     $("#noticeText").textContent = msg;
+    storeNoticeActions(!!withRetry);
     box.hidden = false;
   }
   document.title = title;
@@ -2164,29 +2363,7 @@ function showStoreError(){
   if (box){
     $("#noticeTitle").textContent = "Store load nahi ho saka";
     $("#noticeText").textContent = "Store load nahi ho saka — internet check karke dobara try karein.";
-    let actions = $("#storeNoticeActions");
-    if (!actions){
-      actions = document.createElement("div");
-      actions.id = "storeNoticeActions";
-      actions.className = "store-notice-actions";
-      actions.style.cssText = "display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap";
-      const card = box.querySelector(".store-notice-card");
-      if (card) card.appendChild(actions);
-    }
-    actions.innerHTML = "";
-    const retryBtn = document.createElement("button");
-    retryBtn.type = "button";
-    retryBtn.id = "storeRetryBtn";
-    retryBtn.className = "btn primary";
-    retryBtn.textContent = "Dobara try karein";
-    retryBtn.onclick = function(){ retryBoot(); };
-    const homeLink = document.createElement("a");
-    homeLink.id = "storeHomeLink";
-    homeLink.className = "btn outline";
-    homeLink.href = "https://imalirazamansha.github.io/webalibabamarketingpro/shopnest.html";
-    homeLink.textContent = "Platform home";
-    actions.appendChild(retryBtn);
-    actions.appendChild(homeLink);
+    storeNoticeActions(true);
     box.hidden = false;
   }
   document.title = "Store load nahi ho saka";
@@ -2196,6 +2373,8 @@ async function retryBoot(){
   const box = $("#storeNotice");
   if (box) box.hidden = true;
   document.body.classList.remove("store-closed");
+  /* Stale session slug saaf karein — warna retry wahi purani slug se fail hota hai. */
+  try { sessionStorage.removeItem("sn_store_slug"); } catch (e) {}
   PRODUCTS = [];
   CATEGORIES = [];
   STORE = null;
@@ -2205,11 +2384,11 @@ async function retryBoot(){
 async function boot(){
   const mode = await resolveStore();
   if (mode === "suspended"){
-    showStoreNotice("Store band hai", "Ye store filhal band hai — jald wapis aayega.");
+    showStoreNotice("Store band hai", "Ye store filhal band hai — jald wapis aayega.", true);
     return;
   }
   if (mode === "notfound"){
-    showStoreNotice("Store nahi mila", "Ye store nahi mila — link check karke dobara try karein.");
+    showStoreNotice("Store nahi mila", "Ye store nahi mila — link check karke dobara try karein.", false);
     return;
   }
   if (mode === "fallback"){
