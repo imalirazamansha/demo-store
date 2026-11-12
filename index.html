@@ -5,12 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ShopNest — Pakistan Ka Smart Store</title>
 <meta name="description" content="Smart gadgets and everyday essentials with Cash on Delivery across Pakistan.">
+<!-- M-3 / DEC-19: CSP meta (GitHub Pages custom headers nahi bhej sakta — meta hi ek rasta hai).
+     NOTE: decisions doc ki list mein connect-src/style-src/font-src/media-src nahi thay, lekin baghair un ke
+     page kaam hi nahi karta (Supabase RPCs, Google Fonts, reels video sab block ho jate) — is liye ye
+     minimal allowances zaroori hain. frame-ancestors meta mein kuch browsers ignore karte hain (DEC-19);
+     storefront ko embed hona bhi ho sakta hai, is liye yahan frame-buster nahi lagaya (sirf admin/HQ par hota hai). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://connect.facebook.net 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; media-src https: data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://connect.facebook.net https://*.facebook.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; upgrade-insecure-requests">
+<style>
+/* FE-A1: visible keyboard focus (storefront) — styles.css mein koi :focus-visible rule nahi hai. */
+:focus-visible{outline:3px solid var(--green,#1d7a3d);outline-offset:2px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{border-radius:6px}
+/* FE-P5: noscript + FE-P4: CDN-error banners. */
+.noscript-msg,.cdn-error{max-width:720px;margin:14px auto;padding:14px 18px;border-radius:12px;text-align:center;font-size:15px;line-height:1.6}
+.noscript-msg{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.cdn-error{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- FE-P5: JavaScript band ho to saaf message (khali page nahi). -->
+<noscript><div class="noscript-msg"><strong>JavaScript on karein</strong> — is store ko dekhne aur order karne ke liye browser mein JavaScript on karna zaroori hai.</div></noscript>
+<!-- FE-P4: supabase-js CDN + local copy dono fail hon to ye banner dikhta hai (script.js guard + fallback script se). -->
+<div class="cdn-error" id="cdnError" hidden><strong>Store load nahi ho saka.</strong> Internet check karke page refresh karein — agar masla rahe to store se rabta karein.</div>
 
 <!-- ===== SVG ICON SPRITE (UI stroke icons + brand icons) =====
      Stroke icons: <symbol id="i-*"> (feather-style, currentColor).
@@ -45,6 +64,7 @@
     <symbol id="i-share" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></g></symbol>
     <symbol id="i-tag" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></g></symbol> <symbol id="i-layers" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></g></symbol> <symbol id="i-shirt" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0.99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0.99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></g></symbol>
     <symbol id="i-package" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></g></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g></symbol>
     <symbol id="i-receipt" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></g></symbol>
     <symbol id="i-zap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></g></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></g></symbol>
@@ -60,7 +80,7 @@
 
 <!-- Multi-tenant notice: store suspended / na milne par sirf ye nazar aata hai
      (body.store-closed baaki saara page chhupa deta hai). -->
-<div class="store-notice" id="storeNotice" hidden>
+<div class="store-notice" id="storeNotice" aria-live="polite" hidden>
   <div class="store-notice-card">
     <div class="store-notice-icon"><svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg></div>
     <h1 id="noticeTitle">Store</h1>
@@ -149,7 +169,7 @@
       <p class="results" id="resultsText">Loading products…</p>
     </div>
     <div class="toolbar">
-      <button class="btn outline" id="luxFilterBtn" type="button" hidden>⚙ FILTERS <span class="lux-filter-count" id="luxFilterCount" hidden>0</span></button>
+      <button class="btn outline" id="luxFilterBtn" type="button" hidden><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> FILTERS <span class="lux-filter-count" id="luxFilterCount" hidden>0</span></button>
       <span class="filter-note" id="filterNote">Saari categories aur prices</span>
       <label class="sort">Sort:
         <select id="sortSelect">
@@ -161,6 +181,7 @@
       </label>
     </div>
     <div class="grid" id="grid"></div>
+    <div class="center-action"><button class="btn outline wide" id="loadMoreBtn" type="button" hidden>LOAD MORE</button></div>
     <p class="empty" id="emptyMsg" hidden>No products found. Search, category ya budget filter change karke dobara dekhein.</p>
     <p class="empty error" id="loadError" hidden><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Products load nahi ho sakay. Internet check karke page refresh karein.</p>
   </main>
@@ -196,7 +217,7 @@
         <div><p class="eyebrow">Trending Now</p><h2 class="section-title left">Trending Products</h2></div>
         <div class="carousel-arrows"><button class="arrow-btn" id="hotPrev" type="button" aria-label="Previous hot products">‹</button><button class="arrow-btn" id="hotNext" type="button" aria-label="Next hot products">›</button></div>
       </div>
-      <div class="trend-toolbar" id="trendToolbar" hidden> <div class="trend-drop"><button class="trend-btn" id="trendCatBtn" type="button" aria-haspopup="true" aria-expanded="false">All Collections ⌄</button><div class="trend-menu" id="trendCatMenu" hidden></div></div> <button class="icon-btn" id="trendPause" type="button" aria-label="Auto-slide rokain/chalayein">⏸</button> <div class="trend-drop"><button class="trend-btn" id="trendSortBtn" type="button" aria-haspopup="true" aria-expanded="false">Sort: Newest ⌄</button><div class="trend-menu" id="trendSortMenu" hidden><button type="button" data-trendsort="newest">Newest</button><button type="button" data-trendsort="price-low">Price: Low to High</button><button type="button" data-trendsort="price-high">Price: High to Low</button><button type="button" data-trendsort="popular">Most Popular</button></div></div> <button class="btn outline" id="trendFilterBtn" type="button">⚙ Filter</button> </div> <div class="h-track" id="hotTrack"></div>
+      <div class="trend-toolbar" id="trendToolbar" hidden> <div class="trend-drop"><button class="trend-btn" id="trendCatBtn" type="button" aria-haspopup="true" aria-expanded="false">All Collections ⌄</button><div class="trend-menu" id="trendCatMenu" hidden></div></div> <button class="icon-btn" id="trendPause" type="button" aria-label="Auto-slide rokain/chalayein">⏸</button> <div class="trend-drop"><button class="trend-btn" id="trendSortBtn" type="button" aria-haspopup="true" aria-expanded="false">Sort: Newest ⌄</button><div class="trend-menu" id="trendSortMenu" hidden><button type="button" data-trendsort="newest">Newest</button><button type="button" data-trendsort="price-low">Price: Low to High</button><button type="button" data-trendsort="price-high">Price: High to Low</button><button type="button" data-trendsort="popular">Most Popular</button></div></div> <button class="btn outline" id="trendFilterBtn" type="button"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Filter</button> </div> <div class="h-track" id="hotTrack"></div>
       <div class="center-action"><button class="btn primary wide" id="hotOrderBtn" type="button">ORDER NOW</button></div>
       <p class="trust-checklist"><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg> SMART PRODUCTS &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> QUALITY CHECKED &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-cash"/></svg> CASH ON DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> FAST DELIVERY &nbsp; <svg class="ic" aria-hidden="true"><use href="#i-returns"/></svg> EASY EXCHANGE</p>
     </div>
@@ -257,7 +278,7 @@
   </section>
 </div>
 
-<section id="collectionPage" class="page wrap" hidden> <button class="back-btn" id="collBack" type="button">← Back to Shop</button> <img id="collImg" class="coll-img" hidden alt=""> <h1 class="section-title" id="collTitle">Collection</h1> <p class="section-sub" id="collSub"></p> <div class="coll-toolbar" id="collToolbar"> <select id="collSort" aria-label="Sort products"> <option value="newest">Newest</option> <option value="price-low">Price: Low to High</option> <option value="price-high">Price: High to Low</option> <option value="popular">Most Popular</option> </select> <button class="btn outline" id="collFilterBtn" type="button">⚙ Filter</button> </div> <div class="grid" id="collectionGrid"></div> </section> <section id="customPage" class="page wrap" hidden> <button class="back-btn" id="customPageBack" type="button">← Back to Shop</button> <h1 class="section-title" id="customPageTitle">Page</h1> <div class="custom-page-body" id="customPageBody"></div> </section> <!-- PRODUCT PAGE -->
+<section id="collectionPage" class="page wrap" hidden> <button class="back-btn" id="collBack" type="button">← Back to Shop</button> <img id="collImg" class="coll-img" hidden alt=""> <h1 class="section-title" id="collTitle">Collection</h1> <p class="section-sub" id="collSub"></p> <div class="coll-toolbar" id="collToolbar"> <select id="collSort" aria-label="Sort products"> <option value="newest">Newest</option> <option value="price-low">Price: Low to High</option> <option value="price-high">Price: High to Low</option> <option value="popular">Most Popular</option> </select> <button class="btn outline" id="collFilterBtn" type="button"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Filter</button> </div> <div class="grid" id="collectionGrid"></div> </section> <section id="customPage" class="page wrap" hidden> <button class="back-btn" id="customPageBack" type="button">← Back to Shop</button> <h1 class="section-title" id="customPageTitle">Page</h1> <div class="custom-page-body" id="customPageBody"></div> </section> <!-- PRODUCT PAGE -->
 <section id="productPage" class="page wrap" hidden>
   <button class="back-btn" id="pdpBack" type="button">← Back to Shop</button>
   <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" id="crumbHome">Home</button><span>›</span><button type="button" id="pdpCrumbCat">Category</button><span>›</span><strong id="pdpCrumbName">Product</strong></nav>
@@ -346,6 +367,7 @@
       <input class="hp-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button class="btn primary big" type="submit" id="placeOrderBtn"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> ORDER PLACE KAREIN</button>
       <p class="form-error" id="checkoutError"></p>
+      <p class="center"><button class="btn outline" id="idemRetryBtn" type="button" hidden>Dobara try karein</button></p>
       <p class="muted center"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Aapki details sirf delivery ke liye istemal hongi.</p>
     </form>
     <aside class="co-box summary-panel">
@@ -376,7 +398,7 @@
     <p id="successText">Shukriya! Aapka order save ho gaya hai.</p>
     <p class="order-id" id="successOrderId"></p>
     <p>Hum jald aapko call karke order confirm karein ge. Payment Cash on Delivery hai — pehle product, phir payment.</p>
-    <button class="btn outline big" id="trackOrderBtn" type="button">📦 Track Order</button>
+    <button class="btn outline big" id="trackOrderBtn" type="button"><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> Track Order</button>
     <button class="btn primary big" id="continueBtn" type="button"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg> SHOPPING JAARI RAKHEIN</button>
   </div>
 </section>
@@ -392,7 +414,7 @@
       <button type="button" data-policy="refund">Refund Policy</button>
       <button type="button" data-policy="privacy">Privacy Policy</button>
       <button type="button" data-policy="terms">Terms of Service</button>
-      <button type="button" id="trackOrderLink">📦 Track Order</button>
+      <button type="button" id="trackOrderLink"><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> Track Order</button>
     </div></div>
     <div><h3>Let's Get In Touch</h3><div class="footer-contact" id="footerContact" hidden></div><p>New deals aur smart products ki updates sab se pehle paayein.</p><form class="subscribe" id="subForm"><input type="email" id="subEmail" placeholder="Your email address" required><button class="btn primary" type="submit">SUBSCRIBE</button></form><p class="sub-msg" id="subMsg"></p></div>
   </div>
@@ -404,9 +426,9 @@
   <button class="float-btn back-top" id="backTop" type="button" aria-label="Back to top"><svg class="ic" aria-hidden="true"><use href="#i-arrow-up"/></svg></button>
 </div>
 
-<div class="modal" id="trackModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" id="trackCloseBtn" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><h2>📦 Track Order</h2><p class="muted" style="margin-bottom:12px">Apna order ID aur wohi mobile number likhein jo order karte waqt diya tha.</p><form id="trackForm"><label>Order ID<input id="trackOrderId" type="number" min="1" placeholder="e.g. 12" required></label><label>Mobile number<input id="trackPhone" type="text" placeholder="03XX-XXXXXXX" required></label><button class="btn primary big" type="submit" style="margin-top:10px">TRACK KAREIN</button></form><div id="trackResult" style="margin-top:14px"></div></div></div>
+<div class="modal" id="trackModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" id="trackCloseBtn" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><h2><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> Track Order</h2><p class="muted" style="margin-bottom:12px">Apna order ID aur wohi mobile number likhein jo order karte waqt diya tha.</p><form id="trackForm"><label>Order ID<input id="trackOrderId" type="number" min="1" placeholder="e.g. 12" required></label><label>Mobile number<input id="trackPhone" type="text" placeholder="03XX-XXXXXXX" required></label><button class="btn primary big" type="submit" style="margin-top:10px">TRACK KAREIN</button></form><div id="trackResult" style="margin-top:14px"></div></div></div>
 <div class="modal" id="policyModal" aria-hidden="true"><div class="modal-card small"><button class="icon-btn modal-x" data-close type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><h2 id="policyTitle">Policy</h2><div class="policy-body" id="policyBody"></div></div></div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" aria-live="polite"></div>
 
 <!-- V3.10 Luxury bottom nav (mobile) — R9 (§14): nav script tags se PEHLE hai, warna bindLuxuryUI (script parse par chalta hai, koi DOMContentLoaded nahi) ko nav milta hi nahi aur buttons kabhi bind nahi hote. Nav position:fixed hai, DOM jagah se layout nahi badalta. -->
 <nav id="luxBottomNav" aria-label="Store navigation" hidden>
@@ -416,7 +438,11 @@
   <button type="button" data-luxnav="new"><svg class="ic" aria-hidden="true"><use href="#i-flame"/></svg><span>New In</span></button>
   <button type="button" data-luxnav="cart"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg><span>Cart</span><b class="lux-nav-badge" id="luxNavCartCount" hidden>0</b></button>
   </nav>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- M-3 / FE-P4: supabase-js PINNED 2.119.0 + SRI + crossorigin. CDN fail ho to
+       vendored local copy (js/supabase.min.js) — dono fail hon to #cdnError banner. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.min.js" integrity="sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb" crossorigin="anonymous"></script>
+  <script>if(!window.supabase){document.write('<script src="js/supabase.min.js"><\/script>')}</script>
+  <script>if(!window.supabase){var _ce=document.getElementById("cdnError");if(_ce)_ce.hidden=false;}</script>
 <script src="themes.js"></script>
      <script src="themes-v4.js"></script>
 
