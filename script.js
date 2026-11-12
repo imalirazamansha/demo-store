@@ -1806,6 +1806,7 @@ function m6CheckoutErrorMessage(code){
         case "INVALID_QTY": return "Quantity theek nahi hai — dobara check karein.";
         case "STORE_NOT_ACTIVE": return "Store load nahi ho saka — internet check karke dobara try karein.";
         case "RATE_LIMITED": return "Bohat zyada koshishein ho gayi hain — kuch der baad dobara try karein.";
+        case "INVALID_PHONE": return "Sahi phone number likhein — sirf digits, +, space ya -.";
         case "INVALID_CUSTOMER":
         case "INVALID_KEY":
         case "EMPTY_CART":
