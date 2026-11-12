@@ -65,17 +65,22 @@ const LEGACY_SEC = { best_sellers: "best", promos: "promos", hot: "hot", new_arr
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 /* V3 Part B security: escapeHtml = esc (storefront ke naam se match). */
 const escapeHtml = esc;
-/* V3 Part B security: safeUrl — sirf http(s)/relative image URLs. */
+/* V3 Part B security: safeUrl — sirf http(s)/relative image URLs.
+   X-1 fix (2026-11-10): scheme check ke baad ", ', <, >, backtick aur space
+   ko percent-encode karte hain, taa ke koi crafted URL quoted attribute
+   (src="...") se bahar na nikal sake (stored XSS). */
 function safeUrl(u){
   const t = String(u || "").trim();
   if (!t) return "";
-  if (/^https?:\/\//i.test(t)) return t;
-  if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) return t;
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;
+  const encAttr = s => s.replace(/["'<>` ]/g, c => ({ '"': "%22", "'": "%27", "<": "%3C", ">": "%3E", "`": "%60", " ": "%20" }[c]));
+  if (/^https?:\/\//i.test(t)) return encAttr(t);
+  if (t.startsWith("/") || t.startsWith("./") || t.startsWith("../")) return encAttr(t);
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return encAttr(t);
   return "";
 }
 
 let settingsLoaded = false;
+let settingsLoadFailed = false; /* HQ-A-03: load fail hua to save BLOCK hai. */
 let MY_EMAIL = null;
 let MY_ROLE = null;          // CURRENT store mein is user ki team role (platform-only ho to null)
 /* ---------- Multi-tenant store context ---------- */
@@ -88,11 +93,25 @@ let STORE_NAME = null;
 const effRole = () => MY_ROLE || (IS_PLATFORM ? "owner" : null);
 let ORDERS_CACHE = [];
 let PRODUCTS_CACHE = [];
+/* FE-P1: admin lists client-side 50/page (server abhi bhi poori list deta hai). */
+const ADMIN_PAGE_SIZE = 50;
+let ORDERS_PAGE = 1;
+let PRODUCTS_PAGE = 1;
+/* D-1 soft-delete: deleted_at wali rows list se chhupi rehti hain; server
+   deleted_at field na bheje to missing = "not deleted" (defensive). */
+let SHOW_DELETED_ORDERS = false;
+const isDeletedOrder = o => !!(o && o.deleted_at);
+/* L-4 COD payment: payment_status field server se na aaye to checkbox/stat
+   purane tareeqay par rehte hain (defensive — kuch nahi toot-ta). */
+const hasPaymentField = o => !!(o && Object.prototype.hasOwnProperty.call(o, "payment_status"));
+const isPaidOrder = o => !!(o && o.payment_status === "paid");
 let CATEGORIES_CACHE = [];
 let heroState = [];
 /* ---------- V2 state ---------- */
 let CURRENT_TAB = "dashboard";
+let tabRefreshArmed = false; /* switchTab refresh sirf boot ke baad (loadAll ke baad true hota hai). */
 let SETTINGS_STATE = null;   // loadSettings ke baad full merged settings (saare tabs isi se bharte/save hote hain)
+let metaDirty = false;   // Stale-save guard: Meta tab ke fields is session mein chhooe gaye ya nahi (persistAllSettings is se meta ko dirty-gate karta hai).
 let EDITING_PRODUCT_ID = null;
 let HP_ORDER = []; let HP_LUX_WARN = []; // Is theme par render na hone wali sections ki list (grey rows) — builder se koi key nahi hat-ti           // homepage builder: [{key, visible}] — custom entries key "custom:<id>"
 let HP_CUSTOM = {};          // custom sections content: id -> {heading, text, img, btn_label, btn_link}
@@ -480,7 +499,7 @@ function showStorePicker(){
   $("#storePickerView").classList.remove("hidden");
   $("#logoutBtn").classList.remove("hidden");
   $("#pickerEmail").textContent = MY_EMAIL || "";
-  $("#pickerList").innerHTML = MY_STORES.map(s => `<button class="btn ghost store-pick" data-pick="${esc(s.id)}"><span>🏪 <strong>${esc(s.name)}</strong> <small>/${esc(s.slug)}${s.status === "suspended" ? " • ⏸ suspended" : ""}</small></span><span class="pill ${s.role ? "green" : ""}">${s.role ? esc(s.role) : "👑 platform"}</span></button>`).join("");
+  $("#pickerList").innerHTML = MY_STORES.map(s => `<button class="btn ghost store-pick" data-pick="${esc(s.id)}"><span><svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> <strong>${esc(s.name)}</strong> <small>/${esc(s.slug)}${s.status === "suspended" ? " • ⏸ suspended" : ""}</small></span><span class="pill ${s.role ? "green" : ""}">${s.role ? esc(s.role) : "<svg class='ic' viewBox='0 0 24 24'><circle cx='12' cy='8' r='7'/><polyline points='8.21 13.89 7 23 12 20 17 23 15.79 13.88'/></svg> platform"}</span></button>`).join("");
   $("#pickerList").querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
     const store = MY_STORES.find(s => s.id === b.dataset.pick);
     if (store) enterStore(store);
@@ -499,6 +518,15 @@ function showNoAccess(email, storeName){
     if (p) p.innerHTML = `Aap <strong>${esc(email || "")}</strong> se login hain, lekin <strong>${esc(storeName)}</strong> store ki team mein shamil nahi hain. Us store ke <strong>owner se rabta karein</strong> — woh Team tab se aapka email add kar dein ge.`;
   }
 }
+/* HQ-A-14: domain section sirf owner/admin ko — staff ko note dikhao,
+   failing control kabhi nahi. */
+function applyDomainVisibility(){
+  const box = $("#domainBox");
+  const note = $("#domainStaffNote");
+  const allowed = isAdminPlus();
+  if (box) box.style.display = allowed ? "" : "none";
+  if (note) note.hidden = allowed;
+}
 function showDash(){
   $("#loginView").classList.add("hidden");
   $("#noAccessView").classList.add("hidden");
@@ -510,6 +538,7 @@ function showDash(){
   $("#tabTeam").classList.toggle("hidden", !(effRole() === "owner" || effRole() === "admin"));
   const adminOnlyTabs = ["tabMeta"]; /* V5 Phase 5: Meta tab sirf Owner/Admin — staff ko token fields kabhi nahi. */
   adminOnlyTabs.forEach(id => document.getElementById(id).classList.toggle("hidden", !isAdminPlus()));
+  applyDomainVisibility(); /* HQ-A-14 */
   switchTab("dashboard");
   loadAll();
   if (!settingsLoaded) loadSettings();
@@ -522,6 +551,7 @@ async function loadAll(){
   if (isAdminPlus()) loadDomain();
   loadCoupons();
   if (effRole() === "owner" || effRole() === "admin") loadTeam();
+  tabRefreshArmed = true; /* boot ho gaya — ab tab switch par refresh chalega. */
 }
 
 /* ---------- Image upload (Supabase Storage: product-images) ---------- */
@@ -584,6 +614,11 @@ async function uploadImage(file, folder){
   if (!String(file.type || "").startsWith("image/")) throw new Error("Sirf image file select karein.");
    const up = await compressImage(file);
      LAST_UPLOAD_INFO = { before: file.size, after: up.size };
+  /* DEC-20(c) / FE-P3: 2 MB max upload size — compression ke baad bhi
+     2 MB se bara ho to upload rok dein (storage + mobile load). Original
+     file par check nahi (compression aksar 5 MB photo ko bhi ~500 KB kar
+     deta hai) — check sirf asal upload payload par hai. */
+  if (up.size > 2 * 1024 * 1024) throw new Error("Ye photo 2 MB se bari hai (compression ke baad bhi " + fmtSize(up.size) + ") — chhoti photo use karein ya image ko resize karke dobara upload karein.");
   const match = String(up.name || "").match(/\.([a-zA-Z0-9]+)$/);
   const ext = match ? "." + match[1].toLowerCase() : "";
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
@@ -605,7 +640,7 @@ function showToast(msg, kind = "ok"){
   if (!wrap){ wrap = document.createElement("div"); wrap.id = "toastWrap"; document.body.appendChild(wrap); }
   const el = document.createElement("div");
   el.className = "toast " + (kind === "err" ? "err" : kind === "info" ? "info" : "ok");
-  const icon = kind === "err" ? "❌" : kind === "info" ? "ℹ️" : "✅";
+  const icon = kind === "err" ? '<svg class="ic" viewBox="0 0 24 24" style="width:18px;height:18px;vertical-align:-3px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' : kind === "info" ? '<svg class="ic" viewBox="0 0 24 24" style="width:18px;height:18px;vertical-align:-3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' : '<svg class="ic" viewBox="0 0 24 24" style="width:18px;height:18px;vertical-align:-3px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
   el.innerHTML = `<span>${icon}</span><span style="flex:1">${esc(String(msg))}</span><button type="button" aria-label="Band karein">✕</button>`;
   el.querySelector("button").onclick = () => el.remove();
   wrap.appendChild(el);
@@ -628,18 +663,31 @@ async function loadOrders(){
   const wrap = $("#ordersWrap");
   if (error){ wrap.innerHTML = `<p class="empty-note">Orders load nahi ho sakay: ${esc(error.message)}</p>`; ORDERS_CACHE = []; renderOrderStats(); return; }
   ORDERS_CACHE = data || [];
-  $("#statOrders").textContent = ORDERS_CACHE.length;
-  $("#statPending").textContent = ORDERS_CACHE.filter(o => o.status === "Pending").length;
-  $("#statRevenue").textContent = fmt(ORDERS_CACHE.filter(o => o.status === "Delivered").reduce((s,o) => s + Number(o.total || 0), 0));
+  /* D-1: stats mein deleted orders nahi ginte. */
+  const visibleOrders = ORDERS_CACHE.filter(o => !isDeletedOrder(o));
+  $("#statOrders").textContent = visibleOrders.length;
+  $("#statPending").textContent = visibleOrders.filter(o => o.status === "Pending").length;
+  /* L-4: revenue = Delivered AUR paid. payment_status field maujood na ho to
+     purana hisaab (sirf Delivered) — server migration ke baad hi paid-only. */
+  const deliveredOrders = visibleOrders.filter(o => o.status === "Delivered");
+  const paidDelivered = deliveredOrders.filter(o => !hasPaymentField(o) || isPaidOrder(o));
+  const unpaidDelivered = deliveredOrders.filter(o => hasPaymentField(o) && !isPaidOrder(o));
+  const revEl = $("#statRevenue");
+  revEl.textContent = fmt(paidDelivered.reduce((s,o) => s + Number(o.total || 0), 0));
+  revEl.title = unpaidDelivered.length
+    ? ("Delivered lekin cash nahi mila: " + fmt(unpaidDelivered.reduce((s,o) => s + Number(o.total || 0), 0)) + " (" + unpaidDelivered.length + " orders)")
+    : "";
   renderOrderStats();
   renderOrders();
 }
 /* Orders tab ke upar wali stats strip: 6 cards + status ki stacked bar.
    Counts CURRENT store ke loaded orders (ORDERS_CACHE) se bante hain. */
 function renderOrderStats(){
+  /* D-1: stats mein deleted orders nahi ginte. */
+  const rows = ORDERS_CACHE.filter(o => !isDeletedOrder(o));
   const counts = {};
-  STATUSES.forEach(s => { counts[s] = ORDERS_CACHE.filter(o => o.status === s).length; });
-  const total = ORDERS_CACHE.length;
+  STATUSES.forEach(s => { counts[s] = rows.filter(o => o.status === s).length; });
+  const total = rows.length;
   const statsEl = $("#orderStats");
   if (statsEl) statsEl.innerHTML = `<div class="ostat"><strong>${total}</strong><span>Kul Orders</span></div>`
     + STATUSES.map(s => `<div class="ostat"><strong style="color:${STATUS_COLORS[s]}">${counts[s]}</strong><span>${s}</span></div>`).join("");
@@ -652,18 +700,49 @@ function renderOrderStats(){
     ? STATUSES.map(s => `<span><i style="background:${STATUS_COLORS[s]}"></i>${s}: ${counts[s]} (${Math.round(counts[s] / total * 100)}%)</span>`).join("")
     : `<span>Abhi tak koi order nahi aaya.</span>`;
 }
+/* L-4: Delivered order par "cash collected" checkbox. Field server se na
+   aaye to ye function kabhi call nahi hota (column hi nahi banta). Paid ko
+   wapas unpaid sirf owner/admin kar sakta hai (staff ka checkbox disabled). */
+function paymentCellHtml(o){
+  if (!hasPaymentField(o)) return "—";
+  if (isDeletedOrder(o)) return "—"; /* soft-deleted order ka payment nahi badalte — RPC deleted_at check nahi karta */
+  if (o.status !== "Delivered") return isPaidOrder(o) ? "✅ Paid" : "—";
+  const paid = isPaidOrder(o);
+  const lock = paid && effRole() === "staff";
+  return `<label style="display:flex;gap:5px;align-items:center;cursor:pointer;font-size:13px;white-space:nowrap"><input type="checkbox" data-pay="${o.id}" ${paid ? "checked" : ""} ${lock ? "disabled" : ""} style="width:17px;height:17px"> ${paid ? "✅ Cash mila" : "Cash mila?"}</label>`;
+}
+/* FE-P1: orders pager (50/page) — #ordersPager div mein. */
+function renderOrdersPager(total){
+  const el = $("#ordersPager");
+  if (!el) return;
+  const pages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  if (ORDERS_PAGE > pages) ORDERS_PAGE = pages;
+  if (total <= ADMIN_PAGE_SIZE){ el.innerHTML = ""; return; }
+  el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn small ghost" id="ordersPrevBtn" type="button" ${ORDERS_PAGE <= 1 ? "disabled" : ""}>← Pichla</button><span style="font-size:13.5px;font-weight:600">Page ${ORDERS_PAGE} / ${pages} (${total} orders)</span><button class="btn small ghost" id="ordersNextBtn" type="button" ${ORDERS_PAGE >= pages ? "disabled" : ""}>Agla →</button></div>`;
+  const prev = $("#ordersPrevBtn"); if (prev) prev.onclick = () => { if (ORDERS_PAGE > 1){ ORDERS_PAGE--; renderOrders(); } };
+  const next = $("#ordersNextBtn"); if (next) next.onclick = () => { if (ORDERS_PAGE < pages){ ORDERS_PAGE++; renderOrders(); } };
+}
 function renderOrders(){
   const wrap = $("#ordersWrap");
   const q = ($("#orderSearch").value || "").trim().toLowerCase();
   const sf = $("#orderStatusFilter").value || "";
-  const list = ORDERS_CACHE.filter(o =>
+  /* D-1: aam view mein deleted orders chhupe hote hain; "Deleted orders"
+     view mein SIRF deleted dikhte hain (restore ke saath). */
+  const pool = ORDERS_CACHE.filter(o => SHOW_DELETED_ORDERS ? isDeletedOrder(o) : !isDeletedOrder(o));
+  const list = pool.filter(o =>
     (!sf || o.status === sf) &&
     (!q || String(o.customer_name || "").toLowerCase().includes(q) || String(o.phone || "").includes(q)));
-  if (!ORDERS_CACHE.length){ wrap.innerHTML = `<p class="empty-note">Abhi tak koi order nahi aaya.</p>`; return; }
-  if (!list.length){ wrap.innerHTML = `<p class="empty-note">Is search/filter par koi order nahi mila.</p>`; return; }
+  if (!ORDERS_CACHE.length){ wrap.innerHTML = `<p class="empty-note">Abhi tak koi order nahi aaya.</p>`; renderOrdersPager(0); return; }
+  if (!list.length){ wrap.innerHTML = `<p class="empty-note">${SHOW_DELETED_ORDERS ? "Koi deleted order nahi hai." : (!pool.length ? "Saare orders deleted hain — 'Deleted orders dikhayein' se dekhein." : "Is search/filter par koi order nahi mila.")}</p>`; renderOrdersPager(0); return; }
+  /* FE-P1: 50/page. */
+  const pages = Math.max(1, Math.ceil(list.length / ADMIN_PAGE_SIZE));
+  if (ORDERS_PAGE > pages) ORDERS_PAGE = pages;
+  const pageList = list.slice((ORDERS_PAGE - 1) * ADMIN_PAGE_SIZE, ORDERS_PAGE * ADMIN_PAGE_SIZE);
+  /* L-4: payment column sirf tab jab data mein payment_status field ho. */
+  const showPayCol = list.some(hasPaymentField);
   wrap.innerHTML = `<table>
-    <thead><tr><th>#</th><th>Customer</th><th>Phone / City</th><th>Address</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
-    <tbody>${list.map(o => { const lines = orderLines(o); const meta = orderMeta(o); return `<tr data-order="${o.id}">
+    <thead><tr><th>#</th><th>Customer</th><th>Phone / City</th><th>Address</th><th>Items</th><th>Total</th><th>Status</th>${showPayCol ? "<th>Payment</th>" : ""}<th></th></tr></thead>
+    <tbody>${pageList.map(o => { const lines = orderLines(o); const meta = orderMeta(o); return `<tr data-order="${o.id}">
       <td><strong>#${o.id}</strong><br><small style="color:var(--muted)">${new Date(o.created_at).toLocaleString("en-PK",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</small></td>
       <td><strong>${esc(o.customer_name)}</strong></td>
       <td>${esc(o.phone)}<br><small style="color:var(--muted)">${esc(o.city)}</small></td>
@@ -671,7 +750,10 @@ function renderOrders(){
       <td class="order-items">${lines.map(lineLabel).join("<br>")}${lines.some(i => i.delivery_fee !== undefined) ? `<br><small>Delivery: ${(() => { const d = lines.reduce((s,i) => s + (Number(i.delivery_fee)||0), 0); return d === 0 ? "FREE" : fmt(d); })()}</small>` : ""}${meta.coupon ? `<br><small>🎟️ Coupon ${esc(meta.coupon)}: −${fmt(meta.discount)}</small>` : ""}</td>
       <td><strong>${fmt(o.total)}</strong></td>
       <td><select class="status" data-status="${o.id}">${STATUSES.map(s => `<option ${s===o.status?"selected":""}>${s}</option>`).join("")}</select></td>
-      <td style="white-space:nowrap"><button class="btn small ghost" data-edit-order="${o.id}">✎ Edit</button>${effRole() === "owner" ? ` <button class="btn small danger" data-del-order="${o.id}">Delete</button>` : ""}</td>
+      ${showPayCol ? `<td>${paymentCellHtml(o)}</td>` : ""}
+      <td style="white-space:nowrap">${SHOW_DELETED_ORDERS
+        ? (effRole() === "owner" ? `<button class="btn small" data-restore-order="${o.id}">↩ Restore</button>` : "")
+        : `<button class="btn small ghost" data-edit-order="${o.id}">✎ Edit</button>${effRole() === "owner" ? ` <button class="btn small danger" data-del-order="${o.id}">Delete</button>` : ""}`}</td>
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-edit-order]").forEach(b => b.onclick = () => openOrderEdit(+b.dataset.editOrder));
   wrap.querySelectorAll("tbody tr[data-order]").forEach(tr => tr.onclick = e => {
@@ -683,7 +765,11 @@ function renderOrders(){
     if (error) showToast("Status update fail: " + error.message, "err"); else { await loadOrders(); loadDashboard(); showToast("✅ Order status update ho gaya.", "ok"); }
   });
   wrap.querySelectorAll("[data-del-order]").forEach(b => b.onclick = async () => {
-    if (!confirm("Yeh order delete kar dein?")) return;
+    /* D-1: soft-delete — order list se hat jayega lekin restore ho sakega
+       (Deleted orders view se). Server migration (deleted_at + restore_order)
+       apply hone ke baad hi ye soft-delete hai; us se pehle delete_order RPC
+       ka maujooda server behaviour chalta hai. */
+    if (!confirm("Yeh order delete kar dein? Order list se hat jayega lekin restore ho sakega — 'Deleted orders' view se wapas la sakte hain.")) return;
     const id = +b.dataset.delOrder;
     const msg = $("#ordersMsg");
     b.disabled = true; b.textContent = "Deleting…";
@@ -694,8 +780,8 @@ function renderOrders(){
       const { data: ok, error } = await sb.rpc("delete_order", { p_order_id: id });
       if (error) throw error;
       if (!ok) throw new Error("Order delete nahi hua — sirf Owner delete kar sakta hai.");
-      msg.textContent = `✅ Order #${id} delete ho gaya.`; msg.className = "msg ok";
-      showToast(`✅ Order #${id} delete ho gaya.`, "ok");
+      msg.textContent = `✅ Order #${id} delete ho gaya (soft-delete — Deleted orders se restore ho sakta hai).`; msg.className = "msg ok";
+      showToast(`✅ Order #${id} delete ho gaya (Deleted orders se restore ho sakta hai).`, "ok");
       await loadOrders(); loadDashboard();
     } catch (e) {
       msg.textContent = "Delete fail: " + e.message; msg.className = "msg err";
@@ -703,9 +789,41 @@ function renderOrders(){
       b.disabled = false; b.textContent = "Delete";
     }
   });
+  wrap.querySelectorAll("[data-pay]").forEach(cb => cb.onchange = async () => {
+    /* L-4 / DEC-15: payment_status — purpose-built RPC mark_payment_status (migration 07).
+       Server enforces: Delivered required to mark paid; staff may mark paid; only owner/admin
+       may reverse. Direct REST update is revoked (Module 3b) — never use it here. */
+    const id = +cb.dataset.pay;
+    const paid = cb.checked;
+    cb.disabled = true; /* double-click / duplicate request rokein */
+    const { data: ok, error } = await sb.rpc("mark_payment_status", { p_order_id: id, p_collected: paid });
+    if (error || ok !== true){
+      cb.checked = !paid; /* persisted state wapis (RPC ne kuch nahi badla) */
+      cb.disabled = false;
+      showToast("Payment status save nahi ho saka: " + (error ? error.message : "server ne confirm nahi kiya"), "err");
+      return;
+    }
+    const row = ORDERS_CACHE.find(x => x.id === id); if (row) row.payment_status = paid ? "paid" : "unpaid";
+    showToast(paid ? "✅ Cash mil gaya — payment paid mark ho gaya." : "Payment wapas unpaid kar diya gaya.", "ok");
+    cb.disabled = false;
+    await loadOrders(); loadDashboard();
+  });
+  wrap.querySelectorAll("[data-restore-order]").forEach(b => b.onclick = async () => {
+    /* D-1: restore — server par restore_order RPC migration ke saath aayega;
+       na ho to saaf error, kuch nahi toot-ta. */
+    const id = +b.dataset.restoreOrder;
+    if (!confirm(`Order #${id} restore kar dein? Ye dobara orders list mein aa jayega.`)) return;
+    const { error } = await sb.rpc("restore_order", { p_order_id: id });
+    if (error){ showToast("Restore nahi ho saka: " + error.message + " (server par restore abhi available nahi — migration apply nahi hui).", "err"); return; }
+    showToast(`✅ Order #${id} restore ho gaya.`, "ok");
+    await loadOrders(); loadDashboard();
+  });
+  renderOrdersPager(list.length);
 }
-$("#orderSearch").addEventListener("input", renderOrders);
-$("#orderStatusFilter").addEventListener("change", renderOrders);
+$("#orderSearch").addEventListener("input", () => { ORDERS_PAGE = 1; renderOrders(); });
+$("#orderStatusFilter").addEventListener("change", () => { ORDERS_PAGE = 1; renderOrders(); });
+const _showDeletedToggle = $("#showDeletedOrders");
+if (_showDeletedToggle) _showDeletedToggle.addEventListener("change", e => { SHOW_DELETED_ORDERS = e.target.checked; ORDERS_PAGE = 1; renderOrders(); });
 
 /* ---------- Order Edit (modal) ----------
    Orders table mein koi note/delivery_fee/discount COLUMN nahi hai:
@@ -715,10 +833,12 @@ $("#orderStatusFilter").addEventListener("change", renderOrders);
    (discount/coupon ho to object shape mein convert ho jata hai). */
 let OE_ID = null;
 let OE_COUPON = null;
+let OE_ORIG = null; /* HQ-A-10: load hua order — save sirf BADLE hue fields bhejta hai. */
 function openOrderEdit(id){
   const o = ORDERS_CACHE.find(x => x.id === id);
   if (!o) return;
   OE_ID = id;
+  OE_ORIG = JSON.parse(JSON.stringify(o)); /* HQ-A-10: diff isi se banta hai. */
   const meta = orderMeta(o);
   OE_COUPON = meta.coupon;
   $("#oeTitle").textContent = "#" + o.id;
@@ -741,6 +861,15 @@ function openOrderEdit(id){
      server items se total dobara hisaab karega). */
   $("#oeTotal").value = o.total ?? 0;
   $("#oeMsg").textContent = ""; $("#oeMsg").className = "msg";
+  /* M24 (§2.9, same release): staff sirf status badal sakta hai — PII/details
+     inputs staff ke liye disabled. Server bhi rokta hai (staff payload mein
+     sirf p_order_id + p_status hota hai); UI mein bhi dikhna chahiye, warna
+     staff ki edit silently drop ho jati ("Koi change nahi"). */
+  const staffNoPii = effRole() === "staff";
+  ["#oeName", "#oePhone", "#oeCity", "#oeAddress", "#oeTrackNote"].forEach(sel => {
+    const el = $(sel);
+    if (el) el.disabled = staffNoPii;
+  });
   $("#orderEditModal").classList.remove("hidden");
 }
 function addOeItemRow(l = {}){
@@ -788,6 +917,15 @@ function oeRecalc(){
 $("#oeDiscount").addEventListener("input", oeRecalc);
 $("#oeAddItem").onclick = () => { addOeItemRow({}); oeRecalc(); };
 $("#oeCancelBtn").onclick = () => $("#orderEditModal").classList.add("hidden");
+/* M24 fallback helper: PostgREST returns 404 / code PGRST202 ("Could not
+   find the function ...") when an RPC does not exist (e.g. update_order_all
+   after an M24 rollback). Any other RPC error is a real failure, not a
+   missing function — sirf is case mein fallback chalta hai. */
+function isRpcFunctionNotFound(err){
+  if (!err) return false;
+  if (err.code === "PGRST202") return true;
+  return /could not find the function/i.test(String(err.message || ""));
+}
 $("#orderEditModal").addEventListener("click", e => { if (e.target.id === "orderEditModal") e.currentTarget.classList.add("hidden"); });
 $("#oeSaveBtn").onclick = async () => {
   if (OE_ID == null) return;
@@ -803,15 +941,69 @@ $("#oeSaveBtn").onclick = async () => {
   if (!customer_name){ msg.textContent = "Customer name khaali nahi ho sakta."; msg.className = "msg err"; return; }
   btn.disabled = true; btn.textContent = "Saving…";
   try {
-    /* Module 3b: details + status + financials — teen alag RPCs. Financial
-       section sirf Owner ko nazar aata hai; server total khud hisaab karta hai. */
-    let r = await sb.rpc("update_order_details", { p_order_id: OE_ID, p_customer_name: customer_name, p_phone: $("#oePhone").value.trim(), p_city: $("#oeCity").value.trim(), p_address: $("#oeAddress").value.trim(), p_tracking_note: $("#oeTrackNote") ? $("#oeTrackNote").value.trim() : null });
-    if (r.error) throw r.error;
-    r = await sb.rpc("update_order_status", { p_order_id: OE_ID, p_status: $("#oeStatus").value });
-    if (r.error) throw r.error;
-    if (effRole() === "owner"){
-      r = await sb.rpc("update_order_financials", { p_order_id: OE_ID, p_items: items, p_discount: c.disc });
-      if (r.error) throw r.error;
+    /* HQ-A-10: sirf BADLE hue hisse save karte hain (loaded order se diff).
+       M24 (same release, findings §2.9 + D-19): staff save ek hi atomic
+       `update_order_all` RPC se hota hai — payload mein sirf p_order_id +
+       p_status (status badla ho to); details/financials/reason staff kabhi
+       nahi bhejta. Owner/admin teen alag RPCs se save karte hain (neeche).
+       Agar `update_order_all` na mile (PostgREST 404 — e.g. M24 rollback
+       ke baad), to staff bhi teen purane RPCs par wapas chala jata hai
+       (neeche fallback) — teeno RPCs is liye barkarar hain. */
+    const isStaff = effRole() === "staff";
+    const origMeta = OE_ORIG ? orderMeta(OE_ORIG) : { coupon: null, discount: 0 };
+    const newDetails = {
+      p_customer_name: customer_name,
+      p_phone: $("#oePhone").value.trim(),
+      p_city: $("#oeCity").value.trim(),
+      p_address: $("#oeAddress").value.trim(),
+      p_tracking_note: $("#oeTrackNote") ? $("#oeTrackNote").value.trim() : null
+    };
+    let detailsChanged = !OE_ORIG
+      || newDetails.p_customer_name !== (OE_ORIG.customer_name || "")
+      || newDetails.p_phone !== (OE_ORIG.phone || "")
+      || newDetails.p_city !== (OE_ORIG.city || "")
+      || newDetails.p_address !== (OE_ORIG.address || "")
+      || (newDetails.p_tracking_note || "") !== (OE_ORIG.tracking_note || "");
+    /* M24 switch (§2.9): staff ke liye detailsChanged force false — staff
+       PII edit nahi kar sakta, is liye details payload mein nahi aati. */
+    if (isStaff) detailsChanged = false;
+    const newStatus = $("#oeStatus").value;
+    const statusChanged = !OE_ORIG || newStatus !== OE_ORIG.status;
+    const finChanged = effRole() === "owner" && (!OE_ORIG
+      || JSON.stringify(items) !== JSON.stringify(OE_ORIG.items) || c.disc !== (origMeta.discount || 0));
+    if (!detailsChanged && !statusChanged && !finChanged){
+      msg.textContent = "Koi change nahi — kuch save nahi kiya gaya.";
+      msg.className = "msg";
+      btn.disabled = false; btn.innerHTML = `<svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg> Order Save karein`;
+      return;
+    }
+    /* M24 staff path: sirf status — atomic update_order_all. Agar function
+       nahi mila (PostgREST 404 / PGRST202 — M24 rollback ke baad), to
+       neeche teen purane RPCs par wapas chale jayen (FALLBACK, explicit). */
+    let savedViaAll = false;
+    if (isStaff && statusChanged){
+      const r = await sb.rpc("update_order_all", { p_order_id: OE_ID, p_status: newStatus });
+      if (r.error && isRpcFunctionNotFound(r.error)){
+        /* update_order_all absent — fall through to the three old RPCs. */
+      } else if (r.error){
+        throw r.error;
+      } else {
+        savedViaAll = true;
+      }
+    }
+    if (!savedViaAll){
+      if (detailsChanged){
+        let r = await sb.rpc("update_order_details", { p_order_id: OE_ID, ...newDetails });
+        if (r.error) throw r.error;
+      }
+      if (statusChanged){
+        let r = await sb.rpc("update_order_status", { p_order_id: OE_ID, p_status: newStatus });
+        if (r.error) throw r.error;
+      }
+      if (finChanged){
+        let r = await sb.rpc("update_order_financials", { p_order_id: OE_ID, p_items: items, p_discount: c.disc });
+        if (r.error) throw r.error;
+      }
     }
     $("#orderEditModal").classList.add("hidden");
     const om = $("#ordersMsg");
@@ -822,7 +1014,7 @@ $("#oeSaveBtn").onclick = async () => {
     msg.textContent = "Order save fail: " + e.message; msg.className = "msg err";
     showToast("Order save fail: " + e.message, "err");
   } finally {
-    btn.disabled = false; btn.textContent = "💾 Order Save karein";
+    btn.disabled = false; btn.innerHTML = `<svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg> Order Save karein`;
   }
 };
 
@@ -910,8 +1102,10 @@ async function loadProducts(){
 let BULK_SELECTED = new Set();
 /* Product row delete + us ki (ghair-shared) images Storage se delete.
    Storage fail ho to bhi product delete hi rehta hai — sirf us image ki
-   file reh jati hai (dobara delete par phir try hogi). Kisi doosre product
-   mein lagi image kabhi delete nahi hoti (shared-image guard). */
+   file reh jati hai (dobara delete par phir try hogi). Shared-image guard
+   replace path wala hi hai (removeUnsharedStorageUrls): kisi doosre
+   product, category ya settings mein lagi image kabhi delete nahi hoti;
+   doosre store / bahar ki URL / uncertain path bhi mehfooz rehte hain. */
 async function deleteProductAndImages(id){
   const p = PRODUCTS_CACHE.find(x => x.id === id);
   const { error } = await sb.from("products").delete().eq("id", id).eq("store_id", STORE_ID);
@@ -920,23 +1114,110 @@ async function deleteProductAndImages(id){
   const urls = [];
   if (p.img) urls.push(p.img);
   if (Array.isArray(p.gallery)) urls.push(...p.gallery);
-  const own = [];
-  for (const u of urls){
-    const i = String(u).indexOf("/product-images/");
-    if (i >= 0) own.push({ url: u, path: String(u).slice(i + "/product-images/".length).split("?")[0] });
-  }
-  if (!own.length) return { images: 0 };
-  let others = PRODUCTS_CACHE.filter(x => x.id !== id);
+  if (!urls.length) return { images: 0 };
+  /* D2-DELETE-GAP fix: delete path ab wahi shared-image guard istemal
+     karta hai jo replace path karta hai — removeUnsharedStorageUrls
+     (products + categories + settings, fail-closed, sirf apni-store
+     paths). Is se category ya settings (hero/logo) mein lagi image
+     delete nahi hoti, aur doosre store / bahar ki URL bhi mehfooz
+     rehti hai. Record pehle delete hota hai, Storage safai us ke
+     baad — delete fail ho to image barkarar rehti hai. */
+  const cl = await removeUnsharedStorageUrls(urls, []);
+  if (cl.failed) return { images: cl.removed, storageWarn: true };
+  return { images: cl.removed };
+}
+/* ---------- Replace-orphan cleanup (L-19) ---------- */
+/* Purani image URL(s) Storage se delete karein — SIRF jab wo kisi aur product
+   (img/gallery) ya category (image) mein lagi na hon (shared-image guard —
+   template copy D-6 shared references mehfooz rehti hain) aur nayi URL(s)
+   mein shaamil na hon. Sirf is store ki apni "<STORE_ID>/..." paths chhooti
+   hain (ownStoragePath); external URLs (Unsplash waghera), doosre store ki
+   paths aur legacy be-prefix paths kabhi delete nahi hoti. Guard sirf
+   products/categories nahi — settings (hero/luxury/blog/reels/logo) bhi
+   parhta hai, aur guard read ke fail hone par kuch delete nahi karta
+   (fail-closed — query error par data null aata hai, use ignore karna
+   fail-open hota).
+   Sirf successful DB save ke BAAD call karein — save fail ho to purani image
+   barkarar rehti hai. Storage fail non-fatal hai ({ removed: 0, failed: true })
+   — product/category save phir bhi kamyab rehta hai. deleteProductAndImages
+   ab yehi helper istemal karta hai (D2-DELETE-GAP fix) — ek hi guard,
+   dono raston par. */
+/* Storage path sirf is store ki apni (current-format) object ka hona chahiye:
+   "<STORE_ID>/..." se shuru ho, ".." ya backslash na ho, aur "?" / "#" ke baad
+   kuch na ho. Doosre store ka path, legacy be-ghair-prefix path
+   ("products/15/..." — Module 2 se pehle ke uploads) ya traversal jaisa path
+   kabhi delete nahi hota (legacy objects orphan hi rehte hain — un ki cleanup
+   alag owner-approved plan se hoti hai). */
+function ownStoragePath(url){
+  const s = String(url || "");
+  const i = s.indexOf("/product-images/");
+  if (i < 0) return null;
+  const p = s.slice(i + "/product-images/".length).split("?")[0].split("#")[0];
+  if (!p || !STORE_ID || !p.startsWith(STORE_ID + "/")) return null;
+  if (p.split("/").includes("..") || p.includes("\\")) return null;
+  return p;
+}
+/* Abhi-abhi upload hui (is liye kahin reference nahi ho sakti) URL(s) ko
+   best-effort delete karein — failed save par nayi upload orphan na rahe.
+   Kabhi throw nahi karta; sirf apni-store paths chhooti hain. */
+async function removeOwnStorageUrls(urls){
   try {
-    const { data, error: qErr } = await sb.from("products").select("id,img,gallery").neq("id", id);
-    if (!qErr && Array.isArray(data)) others = data;
-  } catch (e) {}
-  const drop = own.filter(o => !others.some(x => x.img === o.url || (Array.isArray(x.gallery) && x.gallery.includes(o.url))));
-  const paths = [...new Set(drop.map(o => o.path))];
-  if (!paths.length) return { images: 0 };
-  const { error: sErr } = await sb.storage.from("product-images").remove(paths);
-  if (sErr) return { images: 0, storageWarn: true };
-  return { images: paths.length };
+    const paths = [...new Set((urls || []).map(ownStoragePath).filter(Boolean))];
+    if (!paths.length) return 0;
+    const { error } = await sb.storage.from("product-images").remove(paths);
+    return error ? 0 : paths.length;
+  } catch (e) { return 0; }
+}
+async function removeUnsharedStorageUrls(urls, keepUrls){
+  const own = [];
+  for (const u of (urls || [])){
+    const s = String(u || "");
+    const path = ownStoragePath(s);
+    if (path) own.push({ url: s, path });
+  }
+  if (!own.length) return { removed: 0, failed: false };
+  const keep = new Set((keepUrls || []).map(String));
+  const drop = own.filter(o => !keep.has(o.url));
+  if (!drop.length) return { removed: 0, failed: false };
+  let refs = [];
+  try {
+    const { data: prods, error: pErr } = await sb.from("products").select("id,img,gallery");
+    const { data: cats, error: cErr } = await sb.from("categories").select("image");
+    const { data: settings, error: sErr } = await sb.from("settings").select("data");
+    /* supabase-js query fail par throw NAHI karta — { data: null, error } deta
+       hai. Error ko ignore karna fail-OPEN hota (refs khaali → sab delete);
+       is liye kisi bhi guard read ke fail hone par kuch delete na karein. */
+    if (pErr || cErr || sErr || !Array.isArray(prods) || !Array.isArray(cats) || !Array.isArray(settings)) return { removed: 0, failed: true };
+    refs = [...prods.flatMap(x => [x.img, ...(Array.isArray(x.gallery) ? x.gallery : [])]),
+            ...cats.map(c => c.image)];
+    /* Settings-held references bhi guard karein: hero slides, luxury tiles /
+       banners, collection pages, blog, reels poster/avatar aur logo — sab
+       isi bucket ki URLs hain, aur template copy (HQ) inhein doosri store ki
+       settings mein bhi copy kar deta hai. In mein lagi URL delete hui to
+       hero/banner khaali ho jata hai. */
+    const collect = (v) => {
+      if (typeof v === "string"){ if (v.indexOf("/product-images/") >= 0) refs.push(v); }
+      else if (Array.isArray(v)){ v.forEach(collect); }
+      else if (v && typeof v === "object"){ Object.values(v).forEach(collect); }
+    };
+    settings.forEach(row => collect(row && row.data));
+  } catch (e) { /* refs na milen to delete na karein — mehfooz rahein */ return { removed: 0, failed: true }; }
+  const paths = [...new Set(drop.filter(o => !refs.includes(o.url)).map(o => o.path))];
+  if (!paths.length) return { removed: 0, failed: false };
+  const { error } = await sb.storage.from("product-images").remove(paths);
+  if (error) return { removed: 0, failed: true };
+  return { removed: paths.length, failed: false };
+}
+/* FE-P1: products pager (50/page) — #productsPager div mein. */
+function renderProductsPager(total){
+  const el = $("#productsPager");
+  if (!el) return;
+  const pages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  if (PRODUCTS_PAGE > pages) PRODUCTS_PAGE = pages;
+  if (total <= ADMIN_PAGE_SIZE){ el.innerHTML = ""; return; }
+  el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn small ghost" id="productsPrevBtn" type="button" ${PRODUCTS_PAGE <= 1 ? "disabled" : ""}>← Pichla</button><span style="font-size:13.5px;font-weight:600">Page ${PRODUCTS_PAGE} / ${pages} (${total} products)</span><button class="btn small ghost" id="productsNextBtn" type="button" ${PRODUCTS_PAGE >= pages ? "disabled" : ""}>Agla →</button></div>`;
+  const prev = $("#productsPrevBtn"); if (prev) prev.onclick = () => { if (PRODUCTS_PAGE > 1){ PRODUCTS_PAGE--; renderProductsList(); } };
+  const next = $("#productsNextBtn"); if (next) next.onclick = () => { if (PRODUCTS_PAGE < pages){ PRODUCTS_PAGE++; renderProductsList(); } };
 }
 /* Products LIST (Shopify-style table) — Edit par upar wala card form khulta hai. */
 function renderProductsList(){
@@ -947,17 +1228,21 @@ function renderProductsList(){
     || String(p.name || "").toLowerCase().includes(q)
     || String(p.cat || "").toLowerCase().includes(q));
   $("#prodCount").textContent = PRODUCTS_CACHE.length ? `${list.length} / ${PRODUCTS_CACHE.length} products` : "";
-  if (!PRODUCTS_CACHE.length){ wrap.innerHTML = `<p class="empty-note">Abhi koi product nahi hai — upar "Add New Product" se pehla product banayein.</p>`; return; }
-  if (!list.length){ wrap.innerHTML = `<p class="empty-note">Is search par koi product nahi mila.</p>`; return; }
-  wrap.innerHTML = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:600;font-size:14px"><input type="checkbox" id="bulkCheckAll"> Sab select karein</label><span id="bulkCount" style="color:var(--muted);font-size:13.5px;font-weight:600"></span><button class="btn small danger" id="bulkDelBtn" type="button" disabled>🗑 Selected delete karein</button><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-left:1.5px solid var(--line);padding-left:10px"><select id="bulkEditField" style="border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px"><option value="">Bulk edit…</option><option value="stock-in">Stock → In Stock</option><option value="stock-out">Stock → Out of Stock</option><option value="live-on">Live → Show</option><option value="live-off">Live → Hide</option><option value="featured-on">Featured → On</option><option value="featured-off">Featured → Off</option><option value="price-up">Price → +% barhayein</option><option value="price-down">Price → -% kam karein</option></select><input id="bulkEditVal" type="number" min="1" max="90" placeholder="%" style="width:70px;border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;display:none"><button class="btn small" id="bulkEditBtn" type="button" disabled>Apply</button></span></div><table>
+  if (!PRODUCTS_CACHE.length){ wrap.innerHTML = `<p class="empty-note">Abhi koi product nahi hai — upar "Add New Product" se pehla product banayein.</p>`; renderProductsPager(0); return; }
+  if (!list.length){ wrap.innerHTML = `<p class="empty-note">Is search par koi product nahi mila.</p>`; renderProductsPager(0); return; }
+  /* FE-P1: 50/page (bulk select sirf is page ki rows par lagta hai). */
+  const pages = Math.max(1, Math.ceil(list.length / ADMIN_PAGE_SIZE));
+  if (PRODUCTS_PAGE > pages) PRODUCTS_PAGE = pages;
+  const pageList = list.slice((PRODUCTS_PAGE - 1) * ADMIN_PAGE_SIZE, PRODUCTS_PAGE * ADMIN_PAGE_SIZE);
+  wrap.innerHTML = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:600;font-size:14px"><input type="checkbox" id="bulkCheckAll"> Sab select karein</label><span id="bulkCount" style="color:var(--muted);font-size:13.5px;font-weight:600"></span><button class="btn small danger" id="bulkDelBtn" type="button" disabled><svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Selected delete karein</button><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-left:1.5px solid var(--line);padding-left:10px"><select id="bulkEditField" style="border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px"><option value="">Bulk edit…</option><option value="stock-in">Stock → In Stock</option><option value="stock-out">Stock → Out of Stock</option><option value="live-on">Live → Show</option><option value="live-off">Live → Hide</option><option value="featured-on">Featured → On</option><option value="featured-off">Featured → Off</option><option value="price-up">Price → +% barhayein</option><option value="price-down">Price → -% kam karein</option></select><input id="bulkEditVal" type="number" min="1" max="90" placeholder="%" style="width:70px;border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;display:none"><button class="btn small" id="bulkEditBtn" type="button" disabled>Apply</button></span></div><table>
     <thead><tr><th></th><th>Photo</th><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Live</th><th>Featured</th><th></th></tr></thead>
-    <tbody>${list.map(p => `<tr>
+    <tbody>${pageList.map(p => `<tr>
       <td><input type="checkbox" data-bulk-check="${p.id}" ${BULK_SELECTED.has(p.id) ? "checked" : ""}></td>
       <td><img class="prod-thumb" src="${safeUrl(p.img || PLACEHOLDER_IMG)}" alt=""></td>
       <td><strong>${esc(p.name || "")}</strong><br><small style="color:var(--muted)">#${p.id}</small></td>
       <td>${esc(p.cat || "General")}</td>
       <td><strong>${fmt(p.price)}</strong>${p.old ? `<br><small style="color:var(--muted);text-decoration:line-through">${fmt(p.old)}</small>` : ""}</td>
-      <td>${p.stock === "out" ? `<span class="pill grey">⛔ Out of Stock</span>` : `<span class="pill green">In Stock</span>`}</td>
+      <td>${p.stock === "out" ? `<span class="pill grey"><svg class="ic" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Out of Stock</span>` : `<span class="pill green">In Stock</span>`}</td>
       <td>${p.active ? `<span class="pill green">Live</span>` : `<span class="pill grey">Hidden</span>`}</td>
       <td>${p.featured ? `<span class="star-on" title="Featured">★</span>` : `<span class="star-off" title="Featured nahi">★</span>`}</td>
       <td style="white-space:nowrap"><button class="btn small" data-edit-prod="${p.id}">✎ Edit</button> <button class="btn small danger" data-del-prod="${p.id}">Delete</button></td>
@@ -981,7 +1266,7 @@ function renderProductsList(){
     const n = BULK_SELECTED.size;
     bulkCount.textContent = n ? `${n} selected` : "";
     bulkBtn.disabled = !n;
-    bulkBtn.textContent = n ? `🗑 ${n} selected delete karein` : "🗑 Selected delete karein";
+    bulkBtn.innerHTML = n ? `<svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> ${n} selected delete karein` : `<svg class="ic" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Selected delete karein`;
     const boxes = [...wrap.querySelectorAll("[data-bulk-check]")];
     checkAll.checked = boxes.length > 0 && boxes.every(b => BULK_SELECTED.has(+b.dataset.bulkCheck));
     checkAll.indeterminate = boxes.some(b => BULK_SELECTED.has(+b.dataset.bulkCheck)) && !checkAll.checked;
@@ -1028,28 +1313,30 @@ function renderProductsList(){
       const { error } = await sb.from("products").update(patch).eq("id", id).eq("store_id", STORE_ID);
       if (error) fail++; else ok++;
     }
-    loadProducts();
+    await loadProducts(); /* J2: bulk edit ke baad list fresh ho — await karein, warna toast pehle aur list baad mein update hoti hai. */
     if (fail) showToast(`${ok} products update huin, ${fail} fail huin.`, (fail && !ok) ? "err" : "info");
     else showToast(`✅ ${ok} products update ho gayin (${label}).`, "ok");
   };
   bulkBtn.onclick = async () => {
     const ids = [...BULK_SELECTED];
     if (!ids.length) return;
-    if (!confirm(`${ids.length} products delete kar dein? Ye wapas nahi aayega — un ki images bhi Storage se delete ho jayengi (jo kisi doosre product mein lagi hon wo mehfooz rahengi).`)) return;
+    if (!confirm(`${ids.length} products delete kar dein? Ye wapas nahi aayega — un ki images bhi Storage se delete ho jayengi (jo kisi doosre product, category ya settings mein lagi hon wo mehfooz rahengi).`)) return;
     bulkBtn.disabled = true; bulkBtn.textContent = "Deleting…";
-    let ok = 0, fail = 0, imgs = 0;
+    let ok = 0, fail = 0, imgs = 0, warn = false;
     for (const id of ids){
       try {
         const r = await deleteProductAndImages(id);
         ok++; imgs += r.images;
+        if (r.storageWarn) warn = true;
         PRODUCTS_CACHE = PRODUCTS_CACHE.filter(x => x.id !== id);
         if (EDITING_PRODUCT_ID === id) closeProductForm();
       } catch (e) { fail++; }
     }
     BULK_SELECTED.clear();
-    loadProducts();
-    if (fail) showToast(`${ok} products delete huin, ${fail} fail huin.` + (imgs ? ` ${imgs} images bhi Storage se delete huin (space wapas mili).` : ""), (fail && !ok) ? "err" : "info");
-    else showToast(`✅ ${ok} products delete ho gayin.` + (imgs ? ` ${imgs} images bhi Storage se delete huin — space wapas mil gayi.` : ""), "ok");
+    await loadProducts(); loadCategories(); /* category counts bhi fresh hon (delete se count badalta hai) — products PEHLE await karein, warna count purane cache se banta hai (J2) */
+    const warnNote = warn ? " Kuch images Storage se delete nahi ho sakin." : "";
+    if (fail) showToast(`${ok} products delete huin, ${fail} fail huin.` + (imgs ? ` ${imgs} images bhi Storage se delete huin (space wapas mili).` : "") + warnNote, (fail && !ok) ? "err" : "info");
+    else showToast(`✅ ${ok} products delete ho gayin.` + (imgs ? ` ${imgs} images bhi Storage se delete huin — space wapas mil gayi.` : "") + warnNote, "ok");
   };
   syncBulk();
   wrap.querySelectorAll("[data-del-prod]").forEach(b => b.onclick = async () => {
@@ -1058,12 +1345,13 @@ function renderProductsList(){
     try {
       const r = await deleteProductAndImages(id);
       if (EDITING_PRODUCT_ID === id) closeProductForm();
-      loadProducts();
-      showToast("✅ Product delete ho gaya." + (r.images ? ` ${r.images} image${r.images > 1 ? "s" : ""} bhi Storage se delete huin — space wapas mil gayi.` : ""), "ok");
+      await loadProducts(); loadCategories(); /* category counts bhi fresh hon — products PEHLE await karein (J2) */
+      showToast("✅ Product delete ho gaya." + (r.images ? ` ${r.images} image${r.images > 1 ? "s" : ""} bhi Storage se delete huin — space wapas mil gayi.` : "") + (r.storageWarn ? " Kuch images Storage se delete nahi ho sakin." : ""), "ok");
     } catch (e) { showToast("Delete fail: " + e.message, "err"); }
   });
+  renderProductsPager(list.length);
 }
-$("#prodSearch").addEventListener("input", renderProductsList);
+$("#prodSearch").addEventListener("input", () => { PRODUCTS_PAGE = 1; renderProductsList(); });
 function openProductForm(id){
   const p = PRODUCTS_CACHE.find(x => x.id === id);
   if (!p) return;
@@ -1090,7 +1378,7 @@ function refreshCatList(){
   const cats = [...new Set([...fromTable, ...fromProducts])];
   $("#catList").innerHTML = cats.map(c => `<option value="${esc(c)}">`).join("");
 }
-/* V3.9: product.options <-> form strings (sizes "S, M, L, XL"; colors "Maroon #7F1D1D, Green #0B3D2E"). */ function optionsOf(p){ const o = (p && p.options && typeof p.options === "object")? p.options: {}; return { sizes: Array.isArray(o.sizes)? o.sizes.map(s => String(s).trim()).filter(Boolean): [], colors: Array.isArray(o.colors)? o.colors.filter(c => c && typeof c === "object" && String(c.name || "").trim()).map(c => ({ name: String(c.name).trim(), hex: /^#[0-9a-fA-F]{6}$/.test(String(c.hex || ""))? String(c.hex): "#8A8A8A"})): []};} function sizesStr(p){ return optionsOf(p).sizes.join(", ");} function colorsStr(p){ return optionsOf(p).colors.map(c => c.name + " " + c.hex).join(", ");} function parseSizes(str){ return String(str || "").split(",").map(s => s.trim()).filter(Boolean).slice(0, 12);} function parseColors(str){ return String(str || "").split(",").map(s => s.trim()).filter(Boolean).map(part => { const m = part.match(/^(.*?)\s*(#[0-9a-fA-F]{6})\s*$/); if (m) return { name: m[1].trim(), hex: m[2]}; return { name: part, hex: "#8A8A8A"};}).filter(c => c.name).slice(0, 12);} /* Gallery URL inputs — product ki jitni gallery images hon, utne inputs
+/* V3.9: product.options <-> form strings (sizes "S, M, L, XL"; colors "Maroon #7F1D1D, Green #0B3D2E"). */ const COLOR_NAME_HEX = {"red":"#DC2626","blue":"#2563EB","green":"#16A34A","black":"#111111","white":"#F5F5F5","yellow":"#EAB308","pink":"#EC4899","purple":"#9333EA","orange":"#EA580C","brown":"#92400E","grey":"#6B7280","gray":"#6B7280","beige":"#D6CDBF","maroon":"#7F1D1D","navy":"#1E3A8A","teal":"#0D9488","gold":"#D4A017","silver":"#C0C0C0","lavender":"#E6E6FA","mustard":"#D9A404","olive":"#808000","cream":"#FFFDD0","sky blue":"#38BDF8","coral":"#FF7F50"}; function optionsOf(p){ const o = (p && p.options && typeof p.options === "object")? p.options: {}; return { sizes: Array.isArray(o.sizes)? o.sizes.map(s => String(s).trim()).filter(Boolean): [], colors: Array.isArray(o.colors)? o.colors.map(c => (typeof c === "string" ? { name: c.trim(), hex: COLOR_NAME_HEX[c.trim().toLowerCase()] || "#8A8A8A" } : c)).filter(c => c && typeof c === "object" && String(c.name || "").trim()).map(c => ({ name: String(c.name).trim(), hex: /^#[0-9a-fA-F]{6}$/.test(String(c.hex || ""))? String(c.hex): (COLOR_NAME_HEX[String(c.name).trim().toLowerCase()] || "#8A8A8A")})): []};} function sizesStr(p){ return optionsOf(p).sizes.join(", ");} function colorsStr(p){ return optionsOf(p).colors.map(c => c.name + " " + c.hex).join(", ");} function parseSizes(str){ return String(str || "").split(",").map(s => s.trim()).filter(Boolean).slice(0, 12);} function parseColors(str){ return String(str || "").split(",").map(s => s.trim()).filter(Boolean).map(part => { const m = part.match(/^(.*?)\s*(#[0-9a-fA-F]{6})\s*$/); if (m) return { name: m[1].trim(), hex: m[2]}; return { name: part, hex: "#8A8A8A"};}).filter(c => c.name).slice(0, 12);} /* Gallery URL inputs — product ki jitni gallery images hon, utne inputs
    (kam se kam 3). Multi-upload ya drag-reorder se zyada images banen to
    inputs khud barh jate hain, taa ke save par koi image gum na ho. */
 function galleryInputs(p){
@@ -1104,7 +1392,7 @@ function prodCard(p){
   const out = p.stock === "out";
   return `<div class="prod" data-id="${p.id}">
     <img class="img-preview" data-preview src="${safeUrl(p.img || PLACEHOLDER_IMG)}" alt="">
-    <div class="badges-row">${p.featured ? `<span class="pill green">⭐ Featured</span>` : ""}${out ? `<span class="pill grey">⛔ Out of Stock</span>` : `<span class="pill green">✅ In Stock</span>`}</div>
+    <div class="badges-row">${p.featured ? `<span class="pill green">⭐ Featured</span>` : ""}${out ? `<span class="pill grey"><svg class="ic" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Out of Stock</span>` : `<span class="pill green">✅ In Stock</span>`}</div>
     <label>Product name</label><input data-f="name" value="${esc(p.name||"")}">
     <div class="row2">
       <div><label>Price (Rs)</label><input data-f="price" type="number" value="${p.price||0}"></div>
@@ -1128,15 +1416,16 @@ function prodCard(p){
     </div>
     <p class="hint">Delivery fee: 0 = is product par <strong>FREE delivery</strong>; fee product par ek dafa lagti hai, quantity par nahi.</p>
     <p class="hint">Discount badge: khali/0 chor dein to badge price/old price se <strong>auto hisaab</strong> hoga; koi number likhein to card aur product page par <strong>wohi % badge</strong> nazar aayega.</p>
+    <p class="hint" data-discount-warn hidden style="color:#b45309">⚠️ Discount % likha hai lekin price kam nahi hua (old price nahi likha, ya price old price se kam nahi) — checkout par yehi price charge hoga, badge sirf % dikhayega.</p>
      <div class="row2"> <div><label>👗 Sizes (comma se alag — khaali = size nahi dikhega)</label><input data-f="sizes" value="${esc(sizesStr(p))}" placeholder="S, M, L, XL"></div> <div><label>🎨 Colors (naam + hex — khaali = color nahi dikhega)</label><input data-f="colors" value="${esc(colorsStr(p))}" placeholder="Maroon #7F1D1D, Green #0B3D2E"></div> </div> <p class="hint">Sizes/colors sirf is product ke liye hain — product page par pills/swatches banenge. Content tab se sizes ya colors poore store ke liye band bhi kiye ja sakte hain.</p> <div class="row2"> <div><label>🧵 Fabric (kapra — jaise Lawn, Chiffon)</label><input data-f="fabric" value="${esc(p.fabric || "")}" placeholder="Lawn"></div> </div> <label>📷 Product images upload (ek saath kai select karein)</label><input data-file="imgfile" type="file" accept="image/*" multiple>
     <p class="upload-msg" data-upload-msg>Files select karein to Save dabane par upload hongi. 1 file ho to sirf main image badlegi; 2 ya zyada hon to yehi poori image set ban jayegi (pehli main, baaki gallery). Koi file na ho to neeche wala URL use hoga.</p>
     <label>Ya image URL paste karein</label><input data-f="img" value="${esc(p.img||"")}" placeholder="https://…">
     <label>🖼️ Extra images (card par swipe hongi — V3.6 gallery)</label><div data-gallery-wrap>${galleryInputs(p)}</div><p class="hint">Extra image ho to product card par image swipe hogi (dots + auto-rotate) — FunBug ke bestseller cards ki tarah. Khaali chor dein to sirf main image dikhegi.</p>
     <label>↕️ Images ki tartib (pehli = main)</label><div class="img-order" data-img-order style="display:flex;gap:8px;flex-wrap:wrap"></div>
-    <p class="hint">Desktop par image ko drag karke aage-peeche karein, mobile par ▲▼ buttons dabayein, phir Save karein — pehli image main hogi, baaki gallery mein swipe hongi.</p><label>Description</label><textarea data-f="desc" rows="6">${esc(p.desc||"")}</textarea>
+    <p class="hint">Desktop par image ko drag karke aage-peeche karein, mobile par ▲▼ buttons dabayein; kisi image ko hatane ke liye us par ✕ dabayein — Save par pakki hogi (Storage se bhi delete ho jayegi). Pehli image main hogi, baaki gallery mein swipe hongi.</p><label>Description</label><textarea data-f="desc" rows="6">${esc(p.desc||"")}</textarea>
     <p class="hint">Ye text product page par 'Product Details' mein nazar aayega — khaali line chorne se naya paragraph banta hai.</p>
     <div class="actions">
-      <button class="btn small" data-save="${p.id}">💾 Save</button>
+      <button class="btn small" data-save="${p.id}"> <svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg> Save</button>
       <button class="btn small danger" data-del="${p.id}">Delete</button>
     </div>
   </div>`;
@@ -1178,7 +1467,7 @@ function renderImgOrder(card){
   const arr = imgOrderList(card);
   if (!arr.length){ strip.innerHTML = '<span class="hint">Koi image nahi — pehle image upload karein ya URL paste karein.</span>'; return; }
   let dragIdx = -1;
-  strip.innerHTML = arr.map((u, i) => `<div draggable="true" data-idx="${i}" style="position:relative;border:2px solid #ddd;border-radius:8px;overflow:hidden;width:64px;height:64px;cursor:grab;flex:0 0 auto" title="Image ${i+1}${i===0 ? " (main)" : ""}"><img src="${safeUrl(u)}" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block"><span style="position:absolute;top:0;left:0;background:#000a;color:#fff;font-size:11px;padding:1px 5px;border-radius:0 0 6px 0">${i+1}</span><span style="position:absolute;bottom:0;right:0;display:flex"><button type="button" data-move="-1" title="Ek pehle" style="background:#000a;color:#fff;border:0;padding:4px 7px;font-size:14px;line-height:1">▲</button><button type="button" data-move="1" title="Ek baad mein" style="background:#000a;color:#fff;border:0;padding:4px 7px;font-size:14px;line-height:1">▼</button></span></div>`).join("");
+  strip.innerHTML = arr.map((u, i) => `<div draggable="true" data-idx="${i}" style="position:relative;border:2px solid #ddd;border-radius:8px;overflow:hidden;width:64px;height:64px;cursor:grab;flex:0 0 auto" title="Image ${i+1}${i===0 ? " (main)" : ""}"><img src="${safeUrl(u)}" draggable="false" style="width:100%;height:100%;object-fit:cover;display:block"><span style="position:absolute;top:0;left:0;background:#000a;color:#fff;font-size:11px;padding:1px 5px;border-radius:0 0 6px 0">${i+1}</span><button type="button" data-remove="${i}" title="Ye image hatayein" style="position:absolute;top:0;right:0;background:#b91c1c;color:#fff;border:0;width:20px;height:20px;font-size:12px;line-height:1;border-radius:0 0 0 6px;cursor:pointer">✕</button><span style="position:absolute;bottom:0;right:0;display:flex"><button type="button" data-move="-1" title="Ek pehle" style="background:#000a;color:#fff;border:0;padding:4px 7px;font-size:14px;line-height:1">▲</button><button type="button" data-move="1" title="Ek baad mein" style="background:#000a;color:#fff;border:0;padding:4px 7px;font-size:14px;line-height:1">▼</button></span></div>`).join("");
   strip.querySelectorAll('[data-idx]').forEach(box => {
     box.addEventListener('dragstart', e => { dragIdx = +box.dataset.idx; try { e.dataTransfer.setData('text/plain', String(dragIdx)); } catch (err) {} });
     box.addEventListener('dragover', e => e.preventDefault());
@@ -1207,6 +1496,44 @@ function renderImgOrder(card){
       renderImgOrder(card);
     });
   });
+  /* Per-image remove: kisi bhi maujooda image par ✕ — poora product delete kiye baghair. Hatayi hui image Save par inputs se nikal jati hai; purani-image safai (D2) use Storage se bhi delete kar deti hai agar kahin aur use nahi ho rahi. Aakhri image block hai (product be-tasveer na rahe). */
+  strip.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const box = btn.closest('[data-idx]');
+      const i = +box.dataset.idx;
+      const a = imgOrderList(card);
+      if (a.length <= 1){ showToast("Aakhri image nahi hatayi ja sakti — pehle nayi image add karein.", "err"); return; }
+      if (!confirm("Ye image hatayein? Save karne par ye Storage se bhi delete ho jayegi (agar kahin aur use nahi ho rahi).")) return;
+      a.splice(i, 1);
+      writeImgOrder(card, a);
+      renderImgOrder(card);
+    });
+  });
+}
+/* HQ-A-13: product form client-side validation — naam, price, discount %, stock. */
+function validateProductForm(card, get){
+  const errs = [];
+  if (!get("name").trim()) errs.push("Product name khaali nahi ho sakta.");
+  const priceRaw = get("price").trim();
+  if (!/^\d+$/.test(priceRaw)) errs.push("Price poora number (0 ya zyada) hona chahiye.");
+  const discRaw = get("discount_pct").trim();
+  if (discRaw !== "" && !/^\d+$/.test(discRaw)) errs.push("Discount % poora number hona chahiye.");
+  else if (discRaw !== "" && (parseInt(discRaw) < 0 || parseInt(discRaw) > 100)) errs.push("Discount % 0–100 ke beech hona chahiye.");
+  const stock = get("stock");
+  if (stock !== "in" && stock !== "out") errs.push("Stock 'In Stock' ya 'Out of Stock' hona chahiye.");
+  return errs;
+}
+/* F-17: discount_pct likha ho lekin price us hisaab se kam na hua ho to
+   warning dikhao (badge % se banta hai, checkout price se charge hota hai).
+   Warning hai — save block nahi karti. */
+function updateDiscountWarn(card){
+  const warn = card.querySelector("[data-discount-warn]");
+  if (!warn) return;
+  const disc = parseInt(card.querySelector('[data-f="discount_pct"]').value) || 0;
+  const price = parseInt(card.querySelector('[data-f="price"]').value) || 0;
+  const oldRaw = card.querySelector('[data-f="old"]').value.trim();
+  const old = oldRaw === "" ? null : parseInt(oldRaw);
+  warn.hidden = !(disc > 0 && (old === null || isNaN(old) || old <= price));
 }
 function bindProdCards(wrap){
   wrap.querySelectorAll(".prod").forEach(card => {
@@ -1222,8 +1549,12 @@ function bindProdCards(wrap){
       setUploadMsg(msg, `${files.length} image${files.length > 1 ? "s" : ""} selected — Save dabane par upload hongi.` + (files.length === 1 ? " Sirf main image badlegi." : " Yehi poori image set ban jayegi (pehli main, baaki gallery).") + (files.length > 10 ? " Sirf pehli 10 li jayengi." : ""));
     });
     renderImgOrder(card);
+    /* D2 capture-timing fix (2026-11-11): purani image set FORM KHULTE WAQT capture karein (snapshot), save ke waqt nahi — save ke waqt inputs pehle se edited hotay hain (✕ remove / typed URL), is liye save-time capture hatayi hui image ko kabhi dekh hi nahi sakta tha (f2o5y3yd orphan reh gaya tha). */
+    card.dataset.oldImgs = JSON.stringify(imgOrderList(card));
+    updateDiscountWarn(card); /* F-17 warning live update. */
     card.addEventListener("input", e => {
       if (e.target.matches('[data-f="img"]') || e.target.closest('[data-gallery-wrap]')) renderImgOrder(card);
+      updateDiscountWarn(card);
     });
   });
   wrap.querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
@@ -1232,29 +1563,41 @@ function bindProdCards(wrap){
     const msg = card.querySelector("[data-upload-msg]");
     const fileInput = card.querySelector('[data-file="imgfile"]');
     const files = fileInput.files ? Array.from(fileInput.files) : [];
+    /* HQ-A-13: pehle validation — ghalat data par upload/save dono rukte hain. */
+    const formErrs = validateProductForm(card, get);
+    if (formErrs.length){
+      setUploadMsg(msg, "❌ " + formErrs.join(" "), "err");
+      showToast("Product save nahi hua: " + formErrs.join(" "), "err");
+      return;
+    }
+    updateDiscountWarn(card); /* F-17: warning hai, block nahi. */
     let imageUrl = get("img").trim();
+    /* L-19: purani image set form khulte waqt capture hui thi (bindProdCards — card.dataset.oldImgs). Save ke waqt inputs se capture karna ghalat tha: ✕ remove / typed URL ke baad inputs mein hatayi hui image hoti hi nahi, is liye safai use kabhi delete nahi karti thi. */
+    const oldImgUrls = JSON.parse(card.dataset.oldImgs || "[]");
     const oldLabel = b.textContent;
     b.disabled = true; b.textContent = files.length ? "Uploading…" : "Saving…";
+    /* Is save mein upload hui URLs — save fail ho to ye kahin reference nahi
+       hoti, is liye wapas delete kar ke orphan hone se bachate hain. */
+    let uploadedUrls = [];
     if (files.length){
       try {
         const take = files.slice(0, 10);
         setUploadMsg(msg, take.length + " image" + (take.length > 1 ? "s" : "") + " upload ho rahi " + (take.length > 1 ? "hain" : "hai") + "…");
         let totalBefore = 0, totalAfter = 0;
-        const urls = [];
         for (const f of take){
           totalBefore += f.size;
-          urls.push(await uploadImage(f, `products/${b.dataset.save}`));
+          uploadedUrls.push(await uploadImage(f, `products/${b.dataset.save}`));
           if (LAST_UPLOAD_INFO) totalAfter += LAST_UPLOAD_INFO.after;
         }
         if (take.length === 1){
-        imageUrl = urls[0];
+        imageUrl = uploadedUrls[0];
         card.querySelector('[data-f="img"]').value = imageUrl;
         card.querySelector("[data-preview]").src = imageUrl;
         } else {
-          writeImgOrder(card, urls);
-          imageUrl = urls[0];
+          writeImgOrder(card, uploadedUrls);
+          imageUrl = uploadedUrls[0];
         }
-        let doneNote = `✅ ${urls.length} image${urls.length > 1 ? "s" : ""} upload complete — ab product save ho raha hai.`;
+        let doneNote = `✅ ${uploadedUrls.length} image${uploadedUrls.length > 1 ? "s" : ""} upload complete — ab product save ho raha hai.`;
                  if (totalAfter > 0 && totalAfter < totalBefore){
                               const pct = Math.round((1 - totalAfter / totalBefore) * 100);
                               doneNote += ` Compress hui: ${fmtSize(totalBefore)} → ${fmtSize(totalAfter)} (${pct}% chhoti).`;
@@ -1263,6 +1606,10 @@ function bindProdCards(wrap){
         if (files.length > 10) doneNote += " Sirf pehli 10 li gayin.";
         setUploadMsg(msg, doneNote, "ok");
       } catch (e) {
+        /* Upload aadhi hui (pehli file(s) chadh gayi, baad wali fail) to
+           chadhi hui URLs orphan na rahen — wapas delete karein. Purani
+           image ko kuch nahi hota (save hua hi nahi). */
+        await removeOwnStorageUrls(uploadedUrls);
         setUploadMsg(msg, "Upload fail: " + e.message, "err");
         showToast("Image upload fail — product save nahi kiya gaya: " + e.message, "err");
         b.disabled = false; b.textContent = oldLabel;
@@ -1288,22 +1635,39 @@ function bindProdCards(wrap){
     };
     const { error } = await sb.from("products").update(payload).eq("id", +b.dataset.save).eq("store_id", STORE_ID);
     if (error) {
+      /* DB save fail: purani image barkarar hai (delete nahi hui), aur is
+         save mein upload hui nayi image(s) bhi orphan na rahen — wapas
+         delete karein (best-effort; save ka fail hona hi asal natija hai). */
+      const cleaned = await removeOwnStorageUrls(uploadedUrls);
       setUploadMsg(msg, "Product save fail: " + error.message, "err");
-      showToast("Save fail: " + error.message, "err");
+      showToast("Save fail: " + error.message + (cleaned ? " (Nayi upload hui image wapas delete kar di gayi.)" : ""), "err");
       b.disabled = false; b.textContent = oldLabel;
     } else {
       fileInput.value = "";
       b.textContent = "✅ Saved!";
-      loadProducts();
-      showToast("✅ Product save ho gaya — store par live hai.", "ok");
+      await loadProducts(); loadCategories(); /* category "Products" count bhi fresh ho — products PEHLE await karein, warna count purane cache se banta hai (J2) */
+      /* L-19 replace-orphan fix: purani image(s) delete karein — sirf jab un
+         ki jagah nayi URL aayi ho; shared/external wali chhoot jayengi. */
+      let replaceNote = "";
+      try {
+        const newUrls = [payload.img, ...(Array.isArray(payload.gallery) ? payload.gallery : [])].filter(Boolean);
+        if (oldImgUrls.some(u => u && !newUrls.includes(u))){
+          const cl = await removeUnsharedStorageUrls(oldImgUrls, newUrls);
+          if (cl.removed) replaceNote = ` Purani ${cl.removed} image${cl.removed > 1 ? "s" : ""} Storage se delete ho gayi.`;
+          else if (cl.failed) replaceNote = " Purani image Storage se delete nahi ho saki (product save ho gaya).";
+        }
+      } catch (e) { replaceNote = " Purani image Storage se delete nahi ho saki (product save ho gaya)."; }
+      /* Snapshot refresh: isi khule form par dobara save ho to purani set ab NAYI set hai — warna dobara save par pehle se delete hui image dobara delete karne ki koshish hoti. */
+      card.dataset.oldImgs = JSON.stringify([payload.img, ...(Array.isArray(payload.gallery) ? payload.gallery : [])].filter(Boolean));
+      showToast((payload.active ? "✅ Product save ho gaya — store par live hai." : "✅ Product save ho gaya — hidden hai (store par nazar nahi aayega).") + replaceNote, "ok");
     }
   });
   wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh product delete kar dein?")) return;
     try {
       const r = await deleteProductAndImages(+b.dataset.del);
-      loadProducts();
-      showToast("✅ Product delete ho gaya." + (r.images ? ` ${r.images} image${r.images > 1 ? "s" : ""} bhi Storage se delete huin — space wapas mil gayi.` : ""), "ok");
+      await loadProducts(); loadCategories(); /* category counts bhi fresh hon — products PEHLE await karein (J2) */
+      showToast("✅ Product delete ho gaya." + (r.images ? ` ${r.images} image${r.images > 1 ? "s" : ""} bhi Storage se delete huin — space wapas mil gayi.` : "") + (r.storageWarn ? " Kuch images Storage se delete nahi ho sakin." : ""), "ok");
     } catch (e) { showToast("Delete fail: " + e.message, "err"); }
   });
 }
@@ -1314,7 +1678,7 @@ $("#addProductBtn").onclick = async () => {
   }).select("id").single();
   if (error) showToast("Add fail: " + error.message, "err");
   else {
-    await loadProducts();
+    await loadProducts(); loadCategories(); /* naya product "General" mein hai — us ki count bhi fresh ho */
     if (data && data.id) openProductForm(data.id);
     showToast("Naya product ban gaya hai (abhi hidden hai) — form mein details aur image bhar kar, 'Show on store' = Yes karke Save karein.", "info");
   }
@@ -1344,31 +1708,100 @@ async function loadCategories(){
     const { error } = await sb.from("categories").update({ visible: cb.checked }).eq("id", id).eq("store_id", STORE_ID);
     const msg = $("#catMsg");
     if (error){ msg.textContent = "Visible update fail: " + error.message; msg.className = "msg err"; cb.checked = !cb.checked; showToast("Visible update fail: " + error.message, "err"); }
-    else { msg.textContent = cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi (products phir bhi All Products mein rahenge)."; msg.className = "msg ok"; showToast(cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi.", "ok"); loadCategories(); }
+    else { msg.textContent = cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi (products phir bhi All Products mein rahenge)."; msg.className = "msg ok"; showToast(cb.checked ? "✅ Category ab store par nazar aayegi." : "✅ Category store se hide ho gayi.", "ok"); await loadCategories(); }
   });
   wrap.querySelectorAll("[data-csave]").forEach(b => b.onclick = async () => {
     const tr = b.closest("tr");
     const id = +b.dataset.csave;
     const name = tr.querySelector("[data-cname]").value.trim();
     if (!name){ showToast("Category ka naam khaali nahi ho sakta.", "err"); return; }
+    /* HQ-A-02 (DEC-10): rename products.cat ko bhi cascade karta hai — atomic RPC
+       rename_category (migration 18) se. M27 se RPC khud 'General' ka rename
+       protect karta hai (server-side); UI bhi pehle se rokta hai (double safety). */
+    const oldCat = (CATEGORIES_CACHE.find(c => c.id === id) || {}).name || "";
+    const renamed = oldCat && oldCat !== name;
+    if (renamed && oldCat === "General"){ showToast("General category ka naam nahi badal sakte.", "err"); return; }
+    const affected = renamed ? PRODUCTS_CACHE.filter(p => p.cat === oldCat).length : 0;
+    if (renamed && affected > 0){
+      if (!confirm(`${affected} products is category mein hain — rename karne se un ka category bhi badal jayega?`)) return;
+    }
     let image = tr.querySelector("[data-cimg]").value.trim();
+    /* L-19: category replace se pehle purani image capture karein. */
+    const oldCatImage = (CATEGORIES_CACHE.find(c => c.id === id) || {}).image || "";
     const file = tr.querySelector("[data-cfile]").files[0];
+    /* Is save mein upload hui image — save fail ho to orphan na rahe. */
+    let uploadedCatImage = "";
     const old = b.textContent; b.disabled = true; b.textContent = "Saving…";
     try {
-      if (file) image = await uploadImage(file, "categories");
-      const { error } = await sb.from("categories").update({ name, image, sort: parseInt(tr.querySelector("[data-csort]").value) || 0 }).eq("id", id).eq("store_id", STORE_ID);
-      if (error) throw error;
-      $("#catMsg").textContent = "✅ Category save ho gayi."; $("#catMsg").className = "msg ok";
-      showToast("✅ Category save ho gayi.", "ok");
-      loadCategories(); loadProducts();
-    } catch (e) { showToast("Category save fail: " + e.message, "err"); }
+      if (file){ image = await uploadImage(file, "categories"); uploadedCatImage = image; }
+      /* Naam badla ho to pehle atomic rename RPC (cascade samet) — is ke baghair
+         image/sort save nahi karte, taa ke aadha save na ho. */
+      let moved = 0;
+      if (renamed){
+        const { data: movedCount, error: rErr } = await sb.rpc("rename_category", { p_store_id: STORE_ID, p_old_name: oldCat, p_new_name: name });
+        if (rErr){
+          const m = String(rErr.message || "");
+          if (/duplicate|unique/i.test(m)) throw new Error("Is naam ki category pehle se maujood hai.");
+          throw rErr;
+        }
+        moved = Number(movedCount) || 0;
+      }
+      /* Image/sort sirf is row ki hain — direct update mehfooz hai (koi cascade nahi). */
+      const { error } = await sb.from("categories").update({ image, sort: parseInt(tr.querySelector("[data-csort]").value) || 0 }).eq("id", id).eq("store_id", STORE_ID);
+      if (error){
+        if (renamed){
+          /* Rename ho gaya, image save fail: purani image mehfooz hai, aur
+             is save mein upload hui nayi image orphan na rahe — wapas delete. */
+          await removeOwnStorageUrls([uploadedCatImage]);
+          $("#catMsg").textContent = `Category rename ho gayi (${moved} products updated), lekin image/sort save nahi hui: ` + error.message;
+          $("#catMsg").className = "msg err";
+          showToast("Category rename ho gayi, lekin image/sort save nahi hui: " + error.message, "err");
+        } else throw error;
+      } else if (renamed){
+        $("#catMsg").textContent = `✅ Category save ho gayi — ${moved} products updated.`;
+        $("#catMsg").className = "msg ok";
+        showToast(`✅ Category save ho gayi — ${moved} products updated.`, "ok");
+      } else {
+        $("#catMsg").textContent = "✅ Category save ho gayi."; $("#catMsg").className = "msg ok";
+        showToast("✅ Category save ho gayi.", "ok");
+      }
+      /* L-19 replace-orphan fix (category image): sirf jab image save kamyab
+         hua ho (!error) aur purani URL ki jagah nayi aayi ho. Rename ho gaya
+         magar image save fail hua to purani image mehfooz rehti hai. */
+      if (!error && oldCatImage && oldCatImage !== image){
+        try {
+          const cl = await removeUnsharedStorageUrls([oldCatImage], [image]);
+          if (cl.removed) showToast("✅ Purani category image Storage se delete ho gayi.", "ok");
+          else if (cl.failed) showToast("Purani category image Storage se delete nahi ho saki (category save ho gayi).", "info");
+        } catch (e) {}
+      }
+      await loadProducts(); loadCategories(); /* rename ke baad products ka cat badla — pehle products fresh karein, phir categories (count usi cache se) (J2) */
+    } catch (e) {
+      /* Rename/upload/update fail: purani image barkarar hai; is save mein
+         upload hui nayi image orphan na rahe — wapas delete karein. */
+      await removeOwnStorageUrls([uploadedCatImage]);
+      showToast("Category save fail: " + e.message, "err");
+    }
     b.disabled = false; b.textContent = old;
   });
   wrap.querySelectorAll("[data-cdel]").forEach(b => b.onclick = async () => {
-    if (!confirm("Yeh category delete kar dein?\n\nNote: is category ke PRODUCTS delete NAHI honge — un par category ka text waisa hi rahega, sirf category nav/tiles/footer se gayab hogi.")) return;
-    const { error } = await sb.from("categories").delete().eq("id", +b.dataset.cdel).eq("store_id", STORE_ID);
-    if (error) showToast("Delete fail: " + error.message, "err");
-    else { $("#catMsg").textContent = "✅ Category delete ho gayi (products mehfooz hain)."; $("#catMsg").className = "msg ok"; showToast("✅ Category delete ho gayi.", "ok"); loadCategories(); }
+    const id = +b.dataset.cdel;
+    const catName = (CATEGORIES_CACHE.find(c => c.id === id) || {}).name || "";
+    if (catName === "General"){ showToast("General category delete nahi ho sakti.", "err"); return; }
+    const affected = catName ? PRODUCTS_CACHE.filter(p => p.cat === catName).length : 0;
+    if (!confirm(`Yeh category delete kar dein?\n\nNote: is category ke PRODUCTS delete NAHI honge — ${affected} product ki category "General" kar di jayegi, aur category nav/tiles/footer se gayab hogi.`)) return;
+    /* HQ-A-02 (DEC-10): atomic RPC delete_category_reassign (migration 18) — pehle
+       products General par, phir category delete, aik transaction mein. */
+    const { data: moved, error } = await sb.rpc("delete_category_reassign", { p_store_id: STORE_ID, p_name: catName });
+    if (error){
+      const msg = /General/i.test(error.message) ? "General category delete nahi ho sakti." : error.message;
+      showToast("Delete fail: " + msg, "err");
+      return;
+    }
+    const n = Number(moved) || 0;
+    $("#catMsg").textContent = `✅ Category delete ho gayi (${n} products General par move ho gaye).`; $("#catMsg").className = "msg ok";
+    showToast("✅ Category delete ho gayi.", "ok");
+    await loadProducts(); loadCategories(); /* delete ke baad products General par — pehle products fresh karein, phir categories (J2) */
   });
 }
 $("#addCategoryBtn").onclick = async () => {
@@ -1387,7 +1820,7 @@ $("#addCategoryBtn").onclick = async () => {
     $("#catNewName").value = ""; $("#catNewImage").value = ""; $("#catNewImageFile").value = "";
     msg.textContent = `✅ Category "${name}" add ho gayi.`; msg.className = "msg ok";
     showToast(`✅ Category "${name}" add ho gayi.`, "ok");
-    loadCategories();
+    await loadCategories();
   } catch (e) {
     msg.textContent = "Category add fail: " + e.message; msg.className = "msg err";
     showToast("Category add fail: " + e.message, "err");
@@ -1401,10 +1834,13 @@ async function loadCoupons(){
   if (error){ wrap.innerHTML = `<p class="empty-note">Coupons load nahi ho sakay (shopify migration run hai?): ${esc(error.message)}</p>`; return; }
   if (!data.length){ wrap.innerHTML = `<p class="empty-note">Abhi koi coupon nahi hai — upar wale form se pehla coupon banayein.</p>`; return; }
   wrap.innerHTML = `<table>
-    <thead><tr><th>Code</th><th>Discount</th><th>Active</th><th>Banaya gaya</th><th></th></tr></thead>
+    <thead><tr><th>Code</th><th>Discount</th><th>Expiry</th><th>Max uses</th><th>Uses</th><th>Active</th><th>Banaya gaya</th><th></th></tr></thead>
     <tbody>${data.map(c => `<tr>
       <td><strong>${esc(c.code)}</strong></td>
       <td>${c.pct}% OFF</td>
+      <td>${c.expires_at ? new Date(c.expires_at).toLocaleDateString("en-PK",{day:"numeric",month:"short",year:"numeric"}) : "—"}</td>
+      <td>${c.max_uses == null ? "∞" : c.max_uses}</td>
+      <td>${c.uses == null ? 0 : c.uses}</td>
       <td><input type="checkbox" data-cpn-active="${c.id}" ${c.active ? "checked" : ""} style="width:18px;height:18px"></td>
       <td><small style="color:var(--muted)">${new Date(c.created_at).toLocaleDateString("en-PK",{day:"numeric",month:"short",year:"numeric"})}</small></td>
       <td><button class="btn small danger" data-cpn-del="${c.id}">Delete</button></td>
@@ -1416,7 +1852,7 @@ async function loadCoupons(){
   wrap.querySelectorAll("[data-cpn-del]").forEach(b => b.onclick = async () => {
     if (!confirm("Yeh coupon delete kar dein?")) return;
     const { error } = await sb.from("coupons").delete().eq("id", +b.dataset.cpnDel).eq("store_id", STORE_ID);
-    if (error) showToast("Delete fail: " + error.message, "err"); else { loadCoupons(); showToast("✅ Coupon delete ho gaya.", "ok"); }
+    if (error) showToast("Delete fail: " + error.message, "err"); else { await loadCoupons(); showToast("✅ Coupon delete ho gaya.", "ok"); }
   });
 }
 $("#addCouponBtn").onclick = async () => {
@@ -1425,12 +1861,22 @@ $("#addCouponBtn").onclick = async () => {
   const msg = $("#couponsMsg");
   if (!code){ msg.textContent = "Coupon code likhein."; msg.className = "msg err"; return; }
   if (!pct){ msg.textContent = "Discount % 1–90 ke darmiyan likhein."; msg.className = "msg err"; return; }
-  const { error } = await sb.from("coupons").insert({ store_id: STORE_ID, code, pct, active: true });
+  /* M22: expiry + max-uses (columns exist only after the M22 ALTER TABLE).
+     Send them ONLY when set — PostgREST rejects unknown columns even when
+     null, so an unconditional insert would break coupon creation before M22
+     lands. Expiry is end-of-day (23:59:59) so the coupon stays valid through
+     its expiry date; empty = never expires / unlimited. */
+  const expRaw = $("#cpnExpiry").value;
+  const maxRaw = $("#cpnMaxUses").value.trim();
+  const payload = { store_id: STORE_ID, code, pct, active: true };
+  if (expRaw) payload.expires_at = new Date(expRaw + "T23:59:59").toISOString(); /* F-M22-2a: local end-of-day as UTC ISO — the DB is UTC, so an offset-less string would stay valid ~5h past the admin's local end-of-day. */
+  if (maxRaw !== "") payload.max_uses = Math.max(1, parseInt(maxRaw) || 0);
+  const { error } = await sb.from("coupons").insert(payload);
   if (error){ msg.textContent = "Coupon add fail: " + error.message; msg.className = "msg err"; showToast("Coupon add fail: " + error.message, "err"); return; }
-  $("#cpnCode").value = ""; $("#cpnPct").value = "";
+  $("#cpnCode").value = ""; $("#cpnPct").value = ""; $("#cpnExpiry").value = ""; $("#cpnMaxUses").value = "";
   msg.textContent = `✅ Coupon ${code} (${pct}% OFF) ban gaya.`; msg.className = "msg ok";
   showToast(`✅ Coupon ${code} (${pct}% OFF) ban gaya.`, "ok");
-  loadCoupons();
+  await loadCoupons();
 };
 
 /* ---------- Team (owner only) ---------- */
@@ -1452,13 +1898,13 @@ async function loadTeam(){
     </tr>`; }).join("")}</tbody></table>`;
   wrap.querySelectorAll("[data-trole]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("team").update({ role: sel.value }).eq("store_id", STORE_ID).eq("email", sel.dataset.trole);
-    if (error){ showToast("Role update fail: " + error.message, "err"); loadTeam(); }
+    if (error){ showToast("Role update fail: " + error.message, "err"); await loadTeam(); }
     else { $("#teamMsg").textContent = "✅ Role update ho gaya."; $("#teamMsg").className = "msg ok"; showToast("✅ Role update ho gaya.", "ok"); }
   });
   wrap.querySelectorAll("[data-tdel]").forEach(b => b.onclick = async () => {
     if (!confirm(`${b.dataset.tdel} ko team se remove kar dein? Unka dashboard access foran band ho jayega.`)) return;
     const { error } = await sb.from("team").delete().eq("store_id", STORE_ID).eq("email", b.dataset.tdel);
-    if (error) showToast("Remove fail: " + error.message, "err"); else { loadTeam(); showToast("✅ Member team se remove ho gaya.", "ok"); }
+    if (error) showToast("Remove fail: " + error.message, "err"); else { await loadTeam(); showToast("✅ Member team se remove ho gaya.", "ok"); }
   });
 }
 $("#addTeamBtn").onclick = async () => {
@@ -1471,7 +1917,7 @@ $("#addTeamBtn").onclick = async () => {
   $("#teamEmail").value = "";
   msg.textContent = `✅ ${email} team mein add ho gaya (${role}). Woh magic link se login kar sakte hain — agar link na aaye to pehle Supabase Auth mein unka user banana hoga.`; msg.className = "msg ok";
   showToast(`✅ ${email} team mein add ho gaya (${role}).`, "ok");
-  loadTeam();
+  await loadTeam();
 };
 
 /* ---------- Dashboard / Analytics ---------- */
@@ -1514,7 +1960,7 @@ async function loadDashboard(){
     msg.textContent = "Visits load nahi ho sakay (analytics migration run hai to thori dair mein data aana shuru hoga): " + e.message;
     msg.className = "msg err";
   }
-  const orders = ORDERS_CACHE.filter(o => o.status !== "Cancelled");
+  const orders = ORDERS_CACHE.filter(o => o.status !== "Cancelled" && !isDeletedOrder(o));
   const countByDay = rows => { const m = {}; rows.forEach(r => { const k = dayKeyOf(new Date(r.created_at)); m[k] = (m[k] || 0) + 1; }); return m; };
   const sumByDay = rows => { const m = {}; rows.forEach(r => { const k = dayKeyOf(new Date(r.created_at)); m[k] = (m[k] || 0) + Number(r.total || 0); }); return m; };
   const vBy = countByDay(visits), oCntBy = countByDay(orders), oSumBy = sumByDay(orders);
@@ -1568,8 +2014,8 @@ async function loadDashboard(){
     ? `<table><tbody>${topList.map(([name, a], i) => `<tr><td>${i + 1}. <strong>${esc(name)}</strong></td><td>${a.qty} sold</td><td><strong>${fmt(a.rev)}</strong></td></tr>`).join("")}</tbody></table>`
     : `<p class="empty-note">Abhi tak koi order record nahi.</p>`;
 
-  /* Recent orders */
-  const recent = ORDERS_CACHE.slice(0, 5);
+  /* Recent orders — deleted orders nahi dikhte (D-1). */
+  const recent = ORDERS_CACHE.filter(o => !isDeletedOrder(o)).slice(0, 5);
   $("#recentOrdersWrap").innerHTML = recent.length
     ? `<table><tbody>${recent.map(o => `<tr><td><strong>#${o.id}</strong></td><td>${esc(o.customer_name)}</td><td>${fmt(o.total)}</td><td><span class="pill">${esc(o.status)}</span></td><td><small style="color:var(--muted)">${new Date(o.created_at).toLocaleString("en-PK",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})}</small></td></tr>`).join("")}</tbody></table>`
     : `<p class="empty-note">Abhi tak koi order record nahi.</p>`;
@@ -2144,17 +2590,35 @@ function fillSettings(s){
   /* V4 Phase 2: active theme ke controls dikhayein/chhupayein. */
   applyThemeVisibility();
 }
+/* HQ-A-03: Save buttons ko load-fail par disable rakho; success par enable. */
+function setSettingsSaveDisabled(disabled){
+  document.querySelectorAll(".js-save, #globalSaveBtn").forEach(b => { b.disabled = disabled; });
+}
+function showSettingsLoadBanner(show){
+  const banner = $("#settingsLoadBanner");
+  if (banner) banner.hidden = !show;
+}
 async function loadSettings(){
-  settingsLoaded = true;
+  /* HQ-A-03: settingsLoaded sirf SUCCESSFUL load par true hota hai — load
+     shuru hote hi true karna defaults se poori settings wipe kar deta tha. */
   const msg = $("#settingsMsg");
   try {
     const { data, error } = await sb.rpc("get_store_settings", { p_store_id: STORE_ID });
     if (error) throw error;
     SETTINGS_STATE = mergeAdminSettings(data);
     fillSettings(SETTINGS_STATE);
+    settingsLoaded = true;
+    settingsLoadFailed = false;
+    setSettingsSaveDisabled(false);
+    showSettingsLoadBanner(false);
   } catch (e) {
+    settingsLoaded = false;
+    settingsLoadFailed = true;
     SETTINGS_STATE = mergeAdminSettings(null);
     fillSettings(SETTINGS_STATE);
+    setSettingsSaveDisabled(true);
+    showSettingsLoadBanner(true);
+    showToast("Settings load nahi hui — save mat karein. Page reload karein.", "err");
     msg.textContent = "Settings load nahi huye (migration run hai?); defaults dikhaye ja rahe hain: " + e.message;
     msg.className = "msg err";
   }
@@ -2231,8 +2695,8 @@ function renderHomepage(){
       return `<div class="sec-row" data-seckey="${esc(e.key)}">
         <div class="sec-line">
           <span class="drag-handle" title="Drag karke tartib badlein">⠿</span>
-          <span class="sec-name">🧩 Custom Section<small data-cusname>${esc(c.heading || "Bina heading ke")}</small></span>
-          <label class="checkline" style="border:0;padding:2px"><input type="checkbox" data-secvis ${e.visible ? "checked" : ""}> 👁 Show</label>
+          <span class="sec-name"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Custom Section<small data-cusname>${esc(c.heading || "Bina heading ke")}</small></span>
+          <label class="checkline" style="border:0;padding:2px"><input type="checkbox" data-secvis ${e.visible ? "checked" : ""}> <svg class="ic" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Show</label>
           <button class="btn small danger" type="button" data-secdel>Delete</button>
           <span class="sec-move"><button class="btn small" type="button" data-secmove="-1" title="Upar le jayein"${i === 0 ? " disabled" : ""}>↑</button><button class="btn small" type="button" data-secmove="1" title="Neeche le jayein"${i === HP_ORDER.length - 1 ? " disabled" : ""}>↓</button></span>
         </div>
@@ -2260,7 +2724,7 @@ function renderHomepage(){
       <div class="sec-line">
         <span class="drag-handle" title="Drag karke tartib badlein">⠿</span>
         <span class="sec-name">${esc(def.label)}<small>${esc(def.sub)}${off ? " — is theme par nahi dikhta" : ""}</small></span>
-        <label class="checkline" style="border:0;padding:2px"><input type="checkbox" data-secvis ${e.visible ? "checked" : ""}${off ? " disabled" : ""}> 👁 Show</label>
+        <label class="checkline" style="border:0;padding:2px"><input type="checkbox" data-secvis ${e.visible ? "checked" : ""}${off ? " disabled" : ""}> <svg class="ic" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Show</label>
         <span class="sec-move"><button class="btn small" type="button" data-secmove="-1" title="Upar le jayein"${i === 0 ? " disabled" : ""}>↑</button><button class="btn small" type="button" data-secmove="1" title="Neeche le jayein"${i === HP_ORDER.length - 1 ? " disabled" : ""}>↓</button></span>
       </div>
     </div>`;
@@ -2381,7 +2845,30 @@ function fieldRowHtml(f = {}){
 function bindFieldRows(wrap){
   if (!wrap) return;
   bindDragRows(wrap, ".fld-row");
-  wrap.querySelectorAll("[data-fdel]").forEach(b => b.onclick = () => b.closest(".fld-row").remove());
+  wrap.querySelectorAll("[data-fdel]").forEach(b => b.onclick = () => { b.closest(".fld-row").remove(); checkFieldRowsWarn(wrap); });
+  /* F-21: required select jis ke zero options hon — warning line (save
+     block nahi karti; checkout par aisi field customer ko rok degi). */
+  if (!wrap._fieldsWarn){
+    const warn = document.createElement("p");
+    warn.className = "hint";
+    warn.style.color = "#b45309";
+    warn.hidden = true;
+    wrap.after(warn);
+    wrap._fieldsWarn = warn;
+  }
+  if (!wrap._fieldsWarnBound){
+    wrap.addEventListener("input", () => checkFieldRowsWarn(wrap));
+    wrap.addEventListener("change", () => checkFieldRowsWarn(wrap));
+    wrap._fieldsWarnBound = true;
+  }
+  checkFieldRowsWarn(wrap);
+}
+function checkFieldRowsWarn(wrap){
+  const warn = wrap._fieldsWarn;
+  if (!warn) return;
+  const bad = readFieldRows(wrap).filter(f => f.type === "select" && f.required && (!f.options || !f.options.length));
+  warn.hidden = !bad.length;
+  if (bad.length) warn.textContent = "⚠️ " + bad.map(f => "“" + f.label + "”").join(", ") + " — required select field hai lekin is ke koi options nahi hain; yeh field checkout block kar dega. Pehle options likhein ya Required hatayein.";
 }
 function renderFieldRows(wrap, fields){
   if (!wrap) return;
@@ -2915,8 +3402,17 @@ function metaTestPixel(){
   const pid = String((($("#metaPixelId") || {}).value) || "").replace(/[^0-9]/g, "");
   const msg = $("#metaMsg");
   if (!pid){ if (msg){ msg.textContent = "Pehle Pixel ID likhein, phir test karein."; msg.className = "msg err"; } return; }
+  /* HQ-A-08: fbq admin page par kabhi load nahi hota (pixel script sirf
+     storefront par hai) — is liye pehle fbq check karein; na ho to jhooti
+     success NA dikhayein. */
+  if (typeof window.fbq !== "function"){
+    try { const arr = JSON.parse(localStorage.getItem("sn_meta_log_v1") || "[]"); arr.unshift({ t: new Date().toISOString(), kind: "test", name: "PageView", ok: false, detail: "fbq maujood nahi — test nahi bheja gaya" }); localStorage.setItem("sn_meta_log_v1", JSON.stringify(arr.slice(0, 20))); } catch (e){}
+    metaRenderLog();
+    if (msg){ msg.textContent = "Pixel load nahi hua — admin page par pixel script nahi hai; test nahi bheja gaya. Storefront khol kar wahan se test karein ya Events Manager check karein."; msg.className = "msg err"; }
+    return;
+  }
   try {
-    if (typeof window.fbq === "function"){ window.fbq("track", "PageView", {}, { eventID: "test_" + Date.now().toString(36) }); }
+    window.fbq("track", "PageView", {}, { eventID: "test_" + Date.now().toString(36) });
     try { const arr = JSON.parse(localStorage.getItem("sn_meta_log_v1") || "[]"); arr.unshift({ t: new Date().toISOString(), kind: "test", name: "PageView", ok: true, detail: "admin test — Events Manager → Test Events mein dekhein" }); localStorage.setItem("sn_meta_log_v1", JSON.stringify(arr.slice(0, 20))); } catch (e){}
     metaRenderLog();
     if (msg){ msg.textContent = "Test PageView bhej diya — Meta Events Manager → Test Events mein 1–2 minute mein nazar aana chahiye."; msg.className = "msg ok"; }
@@ -2926,8 +3422,33 @@ function bindMetaTab(){
   const tb = $("#metaTestPixelBtn"); if (tb) tb.onclick = metaTestPixel;
   const cl = $("#metaClearLogBtn"); if (cl) cl.onclick = () => { try { localStorage.removeItem("sn_meta_log_v1"); } catch (e){} metaRenderLog(); };
   const tg = $("#metaTokenToggle"); if (tg) tg.onclick = () => { const tok = $("#metaCapiToken"); if (!tok) return; tok.type = tok.type === "password" ? "text" : "password"; tg.textContent = tok.type === "password" ? "👁 dikhayein" : "🙈 chhupayein"; };
+  /* Stale-save guard: Meta tab ke fields chhooey jayein to hi metaDirty — warna
+     persistAllSettings meta/customCode payload se hata dega aur RPC ka top-level
+     merge stored meta ko mehfooz rakhega (capiEnabled overwrite nahi hota).
+     Programmatic fill (fillMeta) input/change events nahi chalata, is liye ye
+     sirf asal user edits par set hota hai. */
+  ["metaPixelId", "metaCapiEnabled", "metaTestEventCode", "metaCapiToken", "metaCapiDelete", "metaCodeHead", "metaCodeBody"].forEach(fid => {
+    const el = document.getElementById(fid);
+    if (!el) return;
+    el.addEventListener("input", () => { metaDirty = true; });
+    el.addEventListener("change", () => { metaDirty = true; });
+  });
 }
 async function persistAllSettings(){
+  /* HQ-A-03: load fail / load pending ho to save se inkaar — defaults se
+     asal settings overwrite nahi honi chahiye. */
+  if (settingsLoadFailed || !settingsLoaded){
+    const blockMsg = settingsLoadFailed
+      ? "Settings load nahi hui — save mat karein. Page reload karein, phir save karein."
+      : "Settings abhi load ho rahi hain — thori dair ruk kar dobara save karein.";
+    showSettingsLoadBanner(settingsLoadFailed);
+    setSettingsSaveDisabled(settingsLoadFailed);
+    const topMsg0 = $("#topSaveMsg");
+    if (topMsg0) topMsg0.textContent = blockMsg;
+    showToast(blockMsg, "err");
+    const m0 = $("#settingsMsg"); if (m0){ m0.textContent = blockMsg; m0.className = "msg err"; }
+    return;
+  }
   const saveBtns = [...document.querySelectorAll(".js-save, #globalSaveBtn")];
   const savedLabels = saveBtns.map(b => b.innerHTML);
   saveBtns.forEach(b => { b.disabled = true; b.textContent = "Saving…"; });
@@ -2935,6 +3456,8 @@ async function persistAllSettings(){
   Object.values(msgEls).forEach(m => { if (m){ m.textContent = ""; m.className = "msg"; } });
   const topMsg = $("#topSaveMsg");
   if (topMsg) topMsg.textContent = "";
+  let pendingToken = null;   /* HQ-A-09: token save settings ke BAAD, alag se. */
+  let tokenSaveError = null;
   try {
     const data = JSON.parse(JSON.stringify(SETTINGS_STATE || mergeAdminSettings(null)));
     /* Hero slides (pending file uploads samet) */
@@ -2991,11 +3514,34 @@ async function persistAllSettings(){
       updateLogoPreview(appLogo);
       setUploadMsg($("#appLogoMsg"), "✅ Logo upload complete.", "ok");
     }
-    data.logo_url = appLogo || profLogo;
-    if (data.logo_url){
-      data.profile.logo_url = data.logo_url;
-      if ($("#profLogo").value.trim() !== data.logo_url) $("#profLogo").value = data.logo_url;
+    /* Logo-clear fix: do fields (#appLogoUrl + #profLogo) aik hi logo hain —
+       purana `appLogo || profLogo` kisi aik field ko khaali karne par doosre
+       field ki purani value se logo wapas la deta tha, aur `if (data.logo_url)`
+       sync-back khaali karne par profile ko dobara bhar deta tha — is liye
+       logo kabhi clear nahi hota tha (Module 2 §2.1 #10: dono saves se ignore).
+       Ab: jis field ki value load-time value se badli ho, woh jeet-ti hai
+       (khaali karna bhi jeet-ta hai); dono na badlein to purana logo rehta
+       hai. Jeetne wali value dono keys mein aik saath likhte hain, kyunke
+       storefront `logo_url || profile.logo_url` parhta hai (script.js:519) —
+       sirf aik saaf karne se header logo rehta. Dono na badlein to dono keys
+       aur dono DOM fields stored values par hi rehte hain — warna aik
+       divergent stored pair (logo_url != profile.logo_url, legacy data mein
+       mumkin) har ghair-mutalliq save par chup-chap aik value mein collapse
+       ho jata. DOM fields bhi sync karte hain, warna agla save purani DOM
+       value se logo wapas la dega. */
+    const prevAppLogo = (SETTINGS_STATE && (SETTINGS_STATE.logo_url || (SETTINGS_STATE.profile && SETTINGS_STATE.profile.logo_url))) || "";
+    const prevProfLogo = (SETTINGS_STATE && SETTINGS_STATE.profile && SETTINGS_STATE.profile.logo_url) || "";
+    let newLogo = prevAppLogo;
+    let logoChanged = false;
+    if (appLogo !== prevAppLogo){ newLogo = appLogo; logoChanged = true; }
+    else if (profLogo !== prevProfLogo){ newLogo = profLogo; logoChanged = true; }
+    if (logoChanged){
+      data.logo_url = newLogo;
+      data.profile.logo_url = newLogo;
+      if ($("#appLogoUrl").value !== newLogo) $("#appLogoUrl").value = newLogo;
+      if ($("#profLogo").value !== newLogo) $("#profLogo").value = newLogo;
     }
+    updateLogoPreview(newLogo);
     data.font_family = fontObjFromName($("#appFont").value);
     /* V3 theme: sirf known key save ho, warna khaali (general fallback) */
     data.theme = (window.SHOPNEST_THEME_KNOWN && window.SHOPNEST_THEME_KNOWN(ADMIN_THEME_SELECTED)) ? ADMIN_THEME_SELECTED : "";
@@ -3039,20 +3585,12 @@ async function persistAllSettings(){
          chalta hai, UPDATE/DELETE nahi — test se prove). Is liye token save ab Edge
          Function se hota hai — function caller ka JWT verify karke (owner/admin/
          platform admin) aur service_role se upsert/delete karta hai (RLS bypass). */
+      /* HQ-A-09: token yahan sirf NOTE karte hain — save settings ke baad
+         alag se hoga, taa ke token fail ho to settings save na ruke. */
       const tokEl = $("#metaCapiToken");
       const delEl = $("#metaCapiDelete");
       const newTok = tokEl ? String(tokEl.value || "").trim() : "";
-      if ((delEl && delEl.checked) || newTok){
-        const { data: sessData } = await sb.auth.getSession();
-        const accessToken = sessData && sessData.session ? sessData.session.access_token : "";
-        if (!accessToken) throw new Error("CAPI token save nahi ho saka — admin session nahi mili, dobara sign in karein.");
-        const tokResp = await fetch(SUPABASE_URL + "/functions/v1/meta-token-save", { method: "POST", headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ store_id: STORE_ID, capi_token: newTok, delete: !!(delEl && delEl.checked) }) });
-        let tokJson = {};
-      try { tokJson = await tokResp.json(); } catch (e) {}
-          if (!tokResp.ok || !tokJson.ok) throw new Error("CAPI token save nahi ho saka — " + (tokJson.error || ("HTTP " + tokResp.status)));
-      }
-      if (tokEl) tokEl.value = "";
-      if (delEl) delEl.checked = false;
+      if ((delEl && delEl.checked) || newTok) pendingToken = { newTok, del: !!(delEl && delEl.checked) };
     }
     /* V3.3 Content — sirf jab Content tab bhara gaya ho; warna SETTINGS_STATE
        ki values (stored ya defaults) waisi ki waisi rehti hain. */
@@ -3072,22 +3610,51 @@ async function persistAllSettings(){
        Owner/Admin-only policy par band hai). */
     const savePayload = JSON.parse(JSON.stringify(data));
     if (effRole() === "staff"){ delete savePayload.meta; delete savePayload.customCode; }
+    /* Stale-save guard: Meta tab is session mein chhooa hi nahi gaya to meta/customCode
+       payload se hata dein — RPC ka top-level merge (v_stored || v_in) phir stored meta
+       ko bilkul waisa ka waisa rakhta hai, chahe page kitna bhi purana ho. */
+    if (!metaDirty){ delete savePayload.meta; delete savePayload.customCode; }
     const { data: saved, error } = await sb.rpc("update_store_settings", { p_store_id: STORE_ID, p_data: savePayload });
     if (error) throw error;
-    SETTINGS_STATE = saved || data; /* (A) Luxury auto-seed — theme save ho gaya, ab categories (agar khaali hon). Seed apni ghalti khud pakarta hai (toast) — save is se fail nahi hota. */ await seedLuxuryCategories(data);
+    /* HQ-A-09: settings save ho gayin — AB token save karein, apni try/catch
+       mein. Token fail ho to settings ka save wapas nahi hota; token ka
+       natija alag se bataya jata hai (neeche success message mein). */
+    if (pendingToken){
+      try {
+        const { data: sessData } = await sb.auth.getSession();
+        const accessToken = sessData && sessData.session ? sessData.session.access_token : "";
+        if (!accessToken) throw new Error("admin session nahi mili, dobara sign in karein.");
+        const tokResp = await fetch(SUPABASE_URL + "/functions/v1/meta-token-save", { method: "POST", headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ store_id: STORE_ID, capi_token: pendingToken.newTok, delete: pendingToken.del }) });
+        let tokJson = {};
+        try { tokJson = await tokResp.json(); } catch (e) {}
+        if (!tokResp.ok || !tokJson.ok) throw new Error(tokJson.error || ("HTTP " + tokResp.status));
+        const tokEl2 = $("#metaCapiToken"); if (tokEl2) tokEl2.value = "";
+        const delEl2 = $("#metaCapiDelete"); if (delEl2) delEl2.checked = false;
+      } catch (tokErr) {
+        tokenSaveError = tokErr;
+      }
+    }
+    SETTINGS_STATE = saved || data; metaDirty = false; /* save ke baad snapshot fresh hai — agla save dobara sirf chhooe gaye Meta par likhega. */ /* (A) Luxury auto-seed — theme save ho gaya, ab categories (agar khaali hon). Seed apni ghalti khud pakarta hai (toast) — save is se fail nahi hota. */ await seedLuxuryCategories(data);
     renderHeroEditor();
 /* V4 Phase 2: theme badla ho to Content/builder/Style dobara dikhayein. */
 applyThemeVisibility();
     const okText = "✅ Save ho gaya — store reload karke changes dekhein.";
     Object.values(msgEls).forEach(m => { if (m){ m.textContent = okText; m.className = "msg ok"; } });
     showToast("✅ Save ho gaya — store reload karke changes dekhein.", "ok");
+    /* HQ-A-09: token ka natija alag se — settings save ho chuki hain. */
+    if (tokenSaveError){
+      const tokMsg = "CAPI token save nahi ho saka: " + tokenSaveError.message + " — settings save ho gayin, token dobara save karein.";
+      if (msgEls.meta){ msgEls.meta.textContent = tokMsg; msgEls.meta.className = "msg err"; }
+      showToast(tokMsg, "err");
+    }
     if (topMsg){ topMsg.textContent = "✅ Save ho gaya"; setTimeout(() => { topMsg.textContent = ""; }, 3500); }
   } catch (e) {
     Object.values(msgEls).forEach(m => { if (m){ m.textContent = "Save fail: " + e.message; m.className = "msg err"; } });
     if (topMsg) topMsg.textContent = "";
     showToast("Save fail: " + e.message, "err");
   } finally {
-    saveBtns.forEach((b, i) => { b.disabled = false; b.innerHTML = savedLabels[i]; });
+    /* HQ-A-03: load fail hua to buttons dobara enable NA karein. */
+    if (!settingsLoadFailed) saveBtns.forEach((b, i) => { b.disabled = false; b.innerHTML = savedLabels[i]; });
   }
 }
 /* ---------- V3 Part B: CSV export + Low-stock alerts + Domain ---------- */
@@ -3217,7 +3784,7 @@ if (_impP) _impP.addEventListener("change", async () => {
     if (error){ setMsg("Import fail: " + error.message, "err"); showToast("Import fail: " + error.message, "err"); return; }
     setMsg(`✅ ${valid.length} products import ho gayin.${bad.length ? ` ${bad.length} rows chhoot gayin (rows: ${bad.slice(0, 10).join(", ")}).` : ""}`);
     showToast(`✅ ${valid.length} products import ho gayin (hidden — live karne se pehle check kar lein).`, "ok");
-    loadProducts();
+    await loadProducts(); loadCategories(); /* category counts bhi fresh hon — products PEHLE await karein (J2) */
   } catch (e) { setMsg("Import fail: " + e.message, "err"); showToast("Import fail: " + e.message, "err"); }
 });
 /* Low-stock: stock === 'out' wali products ki list — Products tab banner + Dashboard card. */
@@ -3259,6 +3826,12 @@ function validDomain(d){
 }
 async function saveDomain(clear){
   const msg = $("#domMsg");
+  /* HQ-A-14: staff yahan kabhi nahi aana chahiye (section hidden hai) — phir
+     bhi guard, taa ke koi direct call bhi server error na khaye. */
+  if (!isAdminPlus()){
+    msg.textContent = "Domain sirf owner/admin ke liye hai.";
+    msg.className = "msg err"; return;
+  }
   const inp = $("#domInput");
   const domain = clear ? "" : inp.value.trim().toLowerCase();
   if (!clear && !validDomain(domain)){
@@ -3317,7 +3890,22 @@ const SAVEABLE_TABS = ["settings", "homepage", "appearance", "style", "content",
 Object.entries(TAB_VIEWS).forEach(([view, [tabId]]) => {
   document.getElementById(tabId).onclick = () => switchTab(view);
 });
-function switchTab(view){
+/* Stale-counts fix (J2/J3): current tab ka data dobara load karein.
+   Await ka order ahem hai — products/orders PEHLE (cache fresh ho), phir
+   categories/dashboard (jo usi cache se count hoti hain). */
+async function refreshCurrentTab(){
+  if (!tabRefreshArmed) return;
+  /* Stale inline message saaf karein — dobara load hone wala data purane
+     message se match nahi karta (L10: "✅ Order #232 update ho gaya" tab
+     switch ke baad bhi dikhta rehta tha). Sirf tab-switch / tab-wapsi par,
+     save flow se NAHI (wahan message load ke BAAD set hota hai). */
+  if (CURRENT_TAB === "orders" || CURRENT_TAB === "dashboard"){ const m = $("#ordersMsg"); if (m){ m.textContent = ""; m.className = "msg"; } }
+  else if (CURRENT_TAB === "categories"){ const m = $("#catMsg"); if (m){ m.textContent = ""; m.className = "msg"; } }
+  if (CURRENT_TAB === "orders"){ await loadOrders(); loadDashboard(); }
+  else if (CURRENT_TAB === "categories"){ await loadProducts(); loadCategories(); }
+  else if (CURRENT_TAB === "dashboard"){ await loadOrders(); loadDashboard(); }
+}
+async function switchTab(view){
   CURRENT_TAB = view;
   Object.entries(TAB_VIEWS).forEach(([key, [tabId, panelId]]) => {
     document.getElementById(tabId).classList.toggle("active", key === view);
@@ -3326,4 +3914,14 @@ function switchTab(view){
   $("#globalSaveBtn").classList.toggle("hidden", !SAVEABLE_TABS.includes(view));
   /* V4 Phase 2: tab khulte hi active theme ke controls dobara lagayein. */
   applyThemeVisibility();
+  /* Stale-counts fix: tab khulte hi us ke data dobara load karein (storefront ya
+     doosri tab se badla hua data purana na dikhe). Boot ke waqt nahi (loadAll chal raha hota hai). */
+  await refreshCurrentTab();
 }
+/* Stale-counts fix (J3): browser tab wapas aane par bhi current tab ka data
+   dobara load karein — storefront tab par order karne ke baad admin tab par
+   aane se naya order forun nazar aaye. switchTab sirf admin ke andar ke tab
+   switch par chalta hai; browser tab switch par visibilitychange chalta hai. */
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshCurrentTab();
+});
