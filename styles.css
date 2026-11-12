@@ -38,7 +38,7 @@ img{display:block;max-width:100%} a{color:inherit}
 [hidden]{display:none!important}
 /* Multi-tenant notice (store suspended / nahi mila): body.store-closed par
    notice ke ilawa page ki har cheez chhup jati hai. */
-body.store-closed>*:not(.store-notice){display:none!important}
+body.store-closed>*:not(.store-notice):not(.staging-banner){display:none!important}
 .store-notice{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--soft)}
 .store-notice-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);max-width:480px;width:100%;text-align:center;padding:44px 30px}
 .store-notice-icon{font-size:46px;margin-bottom:12px}
@@ -134,7 +134,7 @@ body.store-closed>*:not(.store-notice){display:none!important}
 .page{padding-top:24px;padding-bottom:54px}.page[hidden],.modal[hidden]{display:none}.back-btn{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:9px 17px;font-weight:800;color:var(--navy);margin-bottom:18px}.back-btn:hover{border-color:var(--navy)}
 .page-title{color:var(--navy);font-size:clamp(31px,5vw,46px);text-transform:uppercase;margin-bottom:10px}.page-intro{color:var(--muted);line-height:1.6;margin-bottom:20px}
 .breadcrumbs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:13.5px;margin-bottom:18px}.breadcrumbs button{border:0;background:none;color:var(--navy);font-weight:800}.breadcrumbs strong{color:var(--ink)}
-.pdp-grid{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:start}.pdp-imgwrap{overflow:hidden;border-radius:22px;border:1px solid var(--line);background:#f8fafc}.pdp-imgwrap>img{width:100%;height:520px;object-fit:cover;cursor:zoom-in;transition:transform .35s ease}.pdp-imgwrap>img.zooming{transform:scale(1.8)}.pdp-thumbs{display:flex;gap:10px;margin-top:11px}.pdp-thumbs img{width:82px;height:82px;object-fit:cover;border-radius:13px;border:3px solid var(--green);cursor:zoom-in}
+.pdp-grid{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:start}.pdp-imgwrap{overflow:hidden;border-radius:22px;border:1px solid var(--line);background:#f8fafc}.pdp-imgwrap>img{width:100%;height:520px;object-fit:cover;cursor:zoom-in;transition:transform .35s ease}.pdp-imgwrap>img.zooming{transform:scale(1.8)}.pdp-thumbs{display:flex;gap:10px;margin-top:11px}.pdp-thumbs img{width:82px;height:82px;object-fit:cover;border-radius:13px;border:3px solid var(--green);cursor:pointer;opacity:.55;transition:opacity .2s ease}.pdp-thumbs img.on{opacity:1}
 .verified-line{color:var(--green-dark);font-weight:900;font-size:13.5px}.verified-line span{color:var(--line);margin:0 7px}.pdp-info h1{color:var(--navy);font-size:clamp(29px,4vw,44px);line-height:1.08;margin:10px 0}.pdp-rating{color:var(--gold);font-size:16px}.pdp-rating small{color:var(--muted)}
 .pdp-price{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin:17px 0 10px}.pdp-price strong{font-size:34px;color:var(--navy)}.pdp-price del{font-size:19px;color:#94a3b8}.save-pill{background:var(--red);color:#fff;border-radius:999px;padding:6px 11px;font-weight:900;font-size:13px}
 .live-line{color:#475569;font-size:14px}.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(34,197,94,.16);margin-right:5px}.pdp-fee{color:var(--green-dark);font-weight:900;margin-top:10px}
@@ -684,12 +684,16 @@ body.theme-playful .trust-grid div{min-width:240px;border:0;padding:6px 18px}
 body.theme-playful .trust-strip:hover .trust-grid, body.theme-playful .trust-strip:active .trust-grid{animation-play-state:paused}
 @keyframes trustScroll{to{transform:translateX(-50%)}}
 body.theme-playful .trust-grid{animation-duration:24s}
-body.theme-playful .card-gallery{position:relative;aspect-ratio:1/1;overflow:hidden;background:#f8fafc}
-body.theme-playful .card-imgwrap .card-gallery img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease}
-body.theme-playful .card-imgwrap .card-gallery img.on{opacity:1}
-body.theme-playful .cg-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;z-index:2}
-body.theme-playful .cg-dots button{width:7px;height:7px;border-radius:50%;border:0;background:rgba(255,255,255,.65);padding:0}
-body.theme-playful .cg-dots button.on{background:#FF7A1A;width:20px;border-radius:99px}
+/* V3.6 card gallery — theme-neutral. Pehle ye rules SIRF body.theme-playful tak mehdood thay, is liye Luxury/General par card ki saari images upar-neeche stack ho jati thin (dots/swipe/auto-rotate bhi be-asar thay). */
+.card-gallery{position:relative;aspect-ratio:1/1;overflow:hidden;background:#f8fafc}
+.card-imgwrap .card-gallery img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s ease}
+.card-imgwrap .card-gallery img.on{opacity:1}
+.cg-dots{position:absolute;left:0;right:0;bottom:9px;display:flex;justify-content:center;gap:5px;z-index:2}
+.cg-dots button{width:7px;height:7px;border-radius:50%;border:0;background:rgba(255,255,255,.65);padding:0}
+.cg-dots button.on{background:#FF7A1A;width:20px;border-radius:99px}
+body.theme-luxury .card-gallery{aspect-ratio:4/5}
+body.theme-luxury .cg-dots button.on{background:#B08D57}
+body.layout-card-large .card-gallery{aspect-ratio:4/5}
 body.theme-playful #featuredSection{background:#FFF8D6}
 body.theme-playful .fb-band{display:grid;grid-template-columns:1fr 1fr;gap:26px;background:#fff;border-radius:24px;padding:22px;box-shadow:0 14px 34px rgba(36,26,77,.12);align-items:center}
 body.theme-playful .fb-media img{width:100%;border-radius:18px;object-fit:cover;aspect-ratio:1/1}
@@ -933,3 +937,33 @@ body.theme-luxury.lux-no-disclaimer .pdp-disclaimer,body.theme-luxury.lux-no-dis
 
 
 #reelsRow{cursor:grab} #reelsRow.dragging{cursor:grabbing} body.theme-luxury #newGrid,body.theme-luxury #unstitchedGrid,body.theme-luxury #rtwGrid{cursor:grab} body.theme-luxury #newGrid.dragging,body.theme-luxury #unstitchedGrid.dragging,body.theme-luxury #rtwGrid.dragging{cursor:grabbing} body.theme-luxury #newGrid,body.theme-luxury #unstitchedGrid,body.theme-luxury #rtwGrid,body.theme-luxury #reelsRow{overscroll-behavior-x:contain} /* V3.12 FIX (collection pages, Item 5): dedicated listing page — title, toolbar, grid. .page gives the fixed-header top padding; .grid gives the responsive columns. */ body.theme-luxury #collectionPage .section-title{margin-bottom:6px} body.theme-luxury #collSub{display:block;text-align:center;color:#666;font-size:14px;margin:0 0 18px} body.theme-luxury .coll-toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap} body.theme-luxury .coll-toolbar select{flex:1 1 160px;min-width:0;border:1px solid #DDD;border-radius:8px;padding:9px 12px;font-size:14px;background:#fff;color:#111;font-weight:600} body.theme-luxury .coll-toolbar .btn{flex:0 0 auto} body.theme-luxury #collectionGrid{gap:14px} .coll-img{display:block;width:100%;height:clamp(160px,28vw,220px);object-fit:cover;border-radius:14px;margin:0 0 18px} /* V5 Phase 4: custom page body + Menu sheet pages list. */ .custom-page-body{max-width:760px;margin:0 auto;font-size:16px;line-height:1.75} .custom-page-body h2{font-size:22px;margin:22px 0 8px} .custom-page-body h3{font-size:18px;margin:18px 0 6px} .custom-page-body p{margin:0 0 12px} .custom-page-body ul,.custom-page-body ol{margin:0 0 12px;padding-left:22px} .custom-page-body li{margin-bottom:4px} .custom-page-body a{text-decoration:underline} #customPage .section-title{margin-bottom:14px} #luxMenuPages{margin-top:16px} #luxMenuPages h4{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 8px} #luxMenuPages button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 2px;font-size:15px;font-weight:600;color:inherit} #luxMenuPages button:hover{text-decoration:underline} /* V3.12 FIX B3: trendTimer is never started (declared + cleared in renderTrending, but the 4s start call is absent), so the Trending grid never rotates — the pause button pauses nothing. Kill it under Luxury; mobile-only controls get 3 buttons. */ body.theme-luxury #trendPause{display:none}
+
+/* ---- Staging batch 2026-11-10: Luxury muted-text contrast (4.5:1) ----
+   #8A8272 ivory (#FAF7F1) par ~3.9:1 tha — #5F594D par 6.5:1 hai. */
+body.theme-luxury .opt-label,
+body.theme-luxury .lux-tab,
+body.theme-luxury .view-all-tile span,
+body.theme-luxury .view-all-tile small,
+body.theme-luxury .card-fabric,
+body.theme-luxury .lux-sheet-row label{color:#5F594D}
+
+
+/* ---- Responsive fixes 2026-11-10 (owner phone video, ~360px) ----
+   Storefront product cards were slim strips: 2-col grid at 360px
+   (~158px/card), Luxury swipe cards at calc(50% - 6px), and the
+   VIEW ALL tile had no width so it shrank and its text crushed.
+   Mobile now: full-width product grid, wide swipe cards (~78% so
+   the next card peeks), VIEW ALL tile fixed to card width.
+   Appended LAST so these win the cascade on equal specificity. */
+@media(max-width:520px){
+  .grid{grid-template-columns:1fr;gap:14px}
+  body.theme-luxury #hotTrack{grid-template-columns:1fr}
+  .h-track{scroll-padding-inline:12px}
+  .h-track .card{min-width:250px;max-width:250px}
+}
+@media(max-width:900px){
+  body.theme-luxury #bestGrid .card,body.theme-luxury #newGrid .card,body.theme-luxury #unstitchedGrid .card,body.theme-luxury #rtwGrid .card{min-width:calc(78% - 9px);max-width:calc(78% - 9px)}
+  body.theme-luxury #bestGrid,body.theme-luxury #newGrid,body.theme-luxury #unstitchedGrid,body.theme-luxury #rtwGrid{scroll-padding-inline:12px}
+  body.theme-luxury .view-all-tile{flex:0 0 auto;min-width:calc(78% - 9px);max-width:calc(78% - 9px);scroll-snap-align:start}
+}
+.view-all-tile{flex:0 0 auto;min-width:220px;max-width:220px}
