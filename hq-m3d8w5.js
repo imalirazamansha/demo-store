@@ -5,6 +5,19 @@
    Sirf anon client use hota hai — koi service key yahan NAHI hai. */
 const SUPABASE_URL = "https://vyiwiqcbituttdjgsuwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aXdpcWNiaXR1dHRkamdzdXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MTQ0MTYsImV4cCI6MjEwODA5MDQxNn0.fQDW8_b27GzTpu5XBi_Nqw12mmJlJodE0yB3Ei1KLNo";
+/* FE-P4: agar CDN + local fallback dono fail hon to window.supabase nahi
+   hoga — khaali/toota page dikhane ke bajaye saaf error dikha kar ruk jayein.
+   (HTML mein bhi isi id ka banner banta hai — duplicate na bane is liye check.) */
+if (!window.supabase || typeof window.supabase.createClient !== "function") {
+  if (!document.getElementById("sbLoadError")) {
+    const _sbErr = document.createElement("div");
+    _sbErr.id = "sbLoadError";
+    _sbErr.style.cssText = "background:#fee2e2;color:#991b1b;border:2px solid #ef4444;border-radius:12px;padding:16px 18px;margin:20px;font:700 15px/1.6 system-ui,sans-serif";
+    _sbErr.textContent = "❌ Supabase library load nahi ho saki (CDN aur local copy dono fail). Internet check karke page reload karein — agar masla rahe to platform owner se rabta karein.";
+    document.body.prepend(_sbErr);
+  }
+  throw new Error("Supabase client library missing (CDN + local fallback failed)");
+}
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const $ = s => document.querySelector(s);
@@ -17,6 +30,7 @@ let MY_EMAIL = null;
 let STORES = [];
 let STORE_SETTINGS = {};   // store_id -> settings.data (theme/font dot + edit panel ke liye)
 let accessCheckedFor = null;
+let hqRefreshArmed = false; /* HQ stats refresh (L8): boot ke baad true — tab wapas aane par stats refresh chalega. */
 
 /* Appearance options — p-x7k94f.js ke FONTS/THEME_SWATCHES se match.
    font_family settings mein OBJECT hota hai: { name, stack, google }. */
@@ -348,20 +362,60 @@ function showDash(){
   loadAll();
 }
 $("#refreshBtn").onclick = loadAll;
+/* HQ stats refresh lag (L8): admin ko J3 fix (visibilitychange → refresh)
+   mila tha, HQ ko nahi — loadPlatformStats() sirf boot par chalta tha, is
+   liye tab par wapas aane par numbers purane dikhte thay. Sirf STATS refresh
+   karte hain (loadAll nahi): loadStores() → renderStores() khula hua store
+   edit panel (data-editpanel inputs) mita deta — stats sirf text nodes hain.
+   Store count (#psStores) STORES cache se aata hai; doosri session se store
+   badle to ↻ Refresh dabayein. */
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && hqRefreshArmed) loadPlatformStats();
+});
 
 async function loadAll(){
   await loadStores();
   loadPlatformStats();
+  hqRefreshArmed = true; /* boot ho gaya — ab tab wapas aane par stats refresh chalega. */
 }
 
-/* ---------- Platform stats ---------- */
+/* ---------- Platform stats (FE-P2) ----------
+   Purani load har store ka har order (total, status) bina limit ke parhti
+   thi — PostgREST ~1000 rows par khamoshi se kaat deta hai, to revenue
+   undercount hota. Ab: server-side aggregate RPC (platform_stats:
+   COUNT/SUM/GROUP BY — DEC-20) pehle; RPC na ho to bounded read
+   (1000 rows, newest first) + 1000-row note fallback. Revenue Cancelled
+   orders ko EXCLUDE karta hai (DEC-20) — purana sum bhi yahi karta tha. */
 async function loadPlatformStats(){
+  /* FE-P2 / DEC-20: server-side aggregate RPC (platform_stats) pehle —
+     exact counts, koi PostgREST 1000-row cap nahi. RPC na ho (abhi
+     production mein deploy nahi hua) to purana bounded-read fallback. */
   try {
-    const { data: orders } = await sb.from("orders").select("total, status");
-    const list = orders || [];
-    $("#psOrders").textContent = list.length;
-    $("#psRevenue").textContent = fmt(list.filter(o => o.status !== "Cancelled").reduce((s, o) => s + Number(o.total || 0), 0));
-  } catch (e) { /* stats khaali rahenge */ }
+    const { data, error } = await sb.rpc("platform_stats");
+    if (!error && data && data.length) {
+      const r = data[0];
+      $("#psOrders").textContent = r.order_count ?? "–";
+      /* revenue_total Cancelled orders ko EXCLUDE karta hai (DEC-20) —
+         purana client-side sum bhi yahi karta tha; number tab badlega
+         jab Cancelled orders hon (correction, regression nahi). */
+      $("#psRevenue").textContent = fmt(r.revenue_total ?? 0);
+      const note = $("#psLimitNote");
+      if (note) note.classList.add("hidden");
+    } else {
+      throw error || new Error("platform_stats unavailable");
+    }
+  } catch (e) {
+    /* Fallback: bounded client-side read (1000 rows, newest first) + note. */
+    try {
+      const { count: orderCount } = await sb.from("orders").select("id", { count: "exact", head: true });
+      $("#psOrders").textContent = orderCount ?? "–";
+      const { data: orders } = await sb.from("orders").select("total, status").order("created_at", { ascending: false }).limit(1000);
+      const list = orders || [];
+      $("#psRevenue").textContent = fmt(list.filter(o => o.status !== "Cancelled").reduce((s, o) => s + Number(o.total || 0), 0));
+      const note = $("#psLimitNote");
+      if (note) note.classList.toggle("hidden", !(orderCount != null && orderCount > 1000));
+    } catch (e2) { /* stats khaali rahenge */ }
+  }
   try {
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const { count } = await sb.from("visits").select("id", { count: "exact", head: true }).gte("created_at", since);
@@ -373,11 +427,17 @@ async function loadPlatformStats(){
 /* ---------- Stores ---------- */
 async function loadStores(){
   const wrap = $("#storesWrap");
-  const { data, error } = await sb.from("stores").select("*").order("created_at", { ascending: true });
+  /* FE-P2: select("*") ki jagah sirf zaroori columns (settings JSON aur
+     baaki columns ab nahi aate). */
+  const { data, error } = await sb.from("stores").select("id, name, slug, owner_email, plan, monthly_fee, fee_status, next_due, status, custom_domain, domain_status, theme, allowed_themes, created_at").order("created_at", { ascending: true });
   if (error){ wrap.innerHTML = `<p class="empty-note">Stores load nahi ho sakin: ${esc(error.message)}</p>`; STORES = []; return; }
   STORES = data || [];
   /* Saari stores ki settings EK query mein (theme color dot + edit panel
-     ke font/theme values ke liye) — settings par public read policy hai. */
+     ke font/theme values ke liye) — settings par public read policy hai.
+     FE-P2 NOTE: yeh abhi bhi har store ka POORA settings JSON load karta
+     hai (customCode/Meta samet). Sahi fix: sirf selected store ki settings
+     load karna + platform_stats RPC (DEC-20) — SQL agent ki prepared
+     migrations par munhasir hai; yahan tab tak yahi rehta hai. */
   try {
     const { data: srows } = await sb.from("settings").select("store_id, data");
     STORE_SETTINGS = {};
@@ -386,6 +446,7 @@ async function loadStores(){
   renderStores();
   renderBilling();
   fillTemplateSources();
+  fillAuditStoreFilter();
   loadPlatformStats();
 }
 function statusPill(s){
@@ -433,6 +494,8 @@ function renderStores(){
     <div class="store-edit hidden" data-editpanel="${esc(s.id)}">
       <div class="addform" style="margin-bottom:6px">
         <div><label>Store name</label><input data-e="name" value="${esc(s.name)}"></div>
+        <div><label>Owner email (login email)</label><input data-e="owner_email" type="email" value="${esc(s.owner_email || "")}"></div>
+        <p class="hint" style="grid-column:1 / -1">⚠️ <strong>Owner email badalne par:</strong> sirf store + team record update hoga — Supabase <strong>Auth user ka email Dashboard → Authentication → Users se ALAG se badalna hoga</strong>, warna owner naye email se login nahi kar sakega (purana Auth email hi kaam karega, magic link naye email par nahi aayega). Mismatch risk audit log mein darj hota hai. (HQ-A-05 / DEC-28a)</p>
         <div><label>Plan</label><select data-e="plan">${["Basic", "Pro", "Custom"].map(p => `<option ${p === s.plan ? "selected" : ""}>${p}</option>`).join("")}</select></div>
         <div><label>Monthly fee (Rs)</label><input data-e="monthly_fee" type="number" min="0" value="${s.monthly_fee || 0}"></div>
         <div><label>Next due date</label><input data-e="next_due" type="date" value="${esc(s.next_due || "")}"></div>
@@ -462,6 +525,7 @@ function renderStores(){
       </div>
     </div>
   </div>`; }).join("");
+  renderDeletedStores();
   reinjectThemeCopyResult(wrap);
  bindStoreActions(wrap);
 }
@@ -529,8 +593,32 @@ function bindStoreActions(wrap){
       theme: get("theme") || null
     };
     if (!payload.name){ msg.textContent = "Store name khaali nahi ho sakta."; msg.className = "msg err"; return; }
+    /* HQ-A-05 owner email (DEC-28a): stores.owner_email + team owner email
+       dono update honge. Auth user ka email frontend se NAHI badal sakta
+       (Auth Admin API ko service_role chahiye — anon key se nahi milti) —
+       is liye confirm + warning + audit; Dashboard step laazmi hai. */
+    const newOwnerEmail = get("owner_email").trim().toLowerCase();
+    const ownerEmailChanged = newOwnerEmail && newOwnerEmail !== ((_old.owner_email || "").toLowerCase());
+    if (newOwnerEmail && !newOwnerEmail.includes("@")){ msg.textContent = "Owner email durust nahi hai."; msg.className = "msg err"; return; }
+    if (ownerEmailChanged){
+      const okEmail = confirm(`Owner email "${_old.owner_email || "—"}" se "${newOwnerEmail}" kar rahe hain.\n\n⚠️ Yeh sirf store + team record badlega. Supabase Auth user ka email Dashboard → Authentication → Users se ALAG se badalna hoga — warna owner naye email se login nahi kar sakega (purana Auth email hi kaam karega, magic link naye email par nahi aayega).\n\nJaari rakhein?`);
+      if (!okEmail) return;
+      payload.owner_email = newOwnerEmail;
+    }
     const { error } = await sb.from("stores").update(payload).eq("id", id);
     if (error){ msg.textContent = "Save fail: " + error.message; msg.className = "msg err"; return; }
+    /* HQ-A-05: owner email badla ho to team owner row bhi update karein
+       (team store update policy platform admin ko allow karti hai). */
+    let ownerEmailNote = "";
+    if (ownerEmailChanged){
+      try {
+        const { error: te } = await sb.from("team").update({ email: newOwnerEmail }).eq("store_id", id).eq("role", "owner");
+        if (te) throw te;
+        audit("store_owner_email_changed", id, { slug: _old.slug, old_email: _old.owner_email || null, new_email: newOwnerEmail, auth_user_must_be_updated_in_dashboard: true });
+      } catch (te) {
+        ownerEmailNote = " (⚠️ Team owner email update fail: " + te.message + " — store email badal gaya, team email purana reh gaya. Auth user bhi Dashboard se badalna hai.)";
+      }
+    }
     /* V3 Part B: domain sirf set_store_domain RPC se (yehi waahid rasta) —
        platform admin 'live' bhi isi se karta hai. */
     let domainNote = "";
@@ -561,7 +649,7 @@ function bindStoreActions(wrap){
       const _oldAllowed = Array.isArray(_old.allowed_themes) ? _old.allowed_themes : [];
       if (JSON.stringify([..._newAllowed].sort()) !== JSON.stringify([..._oldAllowed].sort()) || (_old.theme || null) !== (get("theme") || null))
         audit("theme_allocation_changed", id, { slug: _old.slug, allowed_themes: _newAllowed, theme: get("theme") || null });
-      msg.textContent = "✅ Save ho gaya (Appearance samet)." + domainNote; msg.className = "msg ok";
+      msg.textContent = "✅ Save ho gaya (Appearance samet)." + domainNote + ownerEmailNote; msg.className = "msg ok";
     } catch (e) {
       msg.textContent = "Store save ho gaya, lekin Appearance save fail: " + e.message + " (platform3 migration run hai?)";
       msg.className = "msg err";
@@ -573,6 +661,157 @@ async function storeUpdate(id, payload){
   const { error } = await sb.from("stores").update(payload).eq("id", id);
   if (error) alert("Update fail: " + error.message);
   else loadStores();
+}
+
+/* ---------- HQ-A-05: Deleted stores — Restore (DEC-28a) ----------
+   Soft-deleted stores pehle HQ mein kahin nazar nahi aati thin (sirf
+   Dashboard/SQL se restore hoti thin). Yahan list + Restore (status wapas
+   "active") — hard delete kabhi nahi hota. */
+function renderDeletedStores(){
+  const wrap = $("#deletedStoresWrap");
+  if (!wrap) return;
+  const list = STORES.filter(s => s.status === "deleted");
+  if (!list.length){ wrap.innerHTML = `<p class="empty-note">Koi deleted store nahi hai.</p>`; return; }
+  wrap.innerHTML = list.map(s => `
+  <div class="store-card" data-deleted-store="${esc(s.id)}">
+    <h4>🗑 ${esc(s.name)}</h4>
+    <div class="store-meta">
+      🔗 Slug: <strong>${esc(s.slug)}</strong> • 👤 Owner: ${esc(s.owner_email || "—")}<br>
+      📦 Plan: <strong>${esc(s.plan)}</strong> • 💰 Fee: <strong>${fmt(s.monthly_fee)}</strong>/month • 🗓 Banayi gayi: ${fmtDate((s.created_at || "").slice(0, 10))}
+    </div>
+    <div class="store-actions">
+      <button class="btn small" data-restore="${esc(s.id)}">↩️ Restore karein (wapas Active)</button>
+    </div>
+  </div>`).join("");
+  wrap.querySelectorAll("[data-restore]").forEach(b => b.onclick = async () => {
+    const s = STORES.find(x => x.id === b.dataset.restore);
+    if (!s) return;
+    if (!confirm(`"${s.name}" ko wapas ACTIVE kar dein? Storefront dobara khul jayegi.`)) return;
+    await storeUpdate(s.id, { status: "active" });
+    audit("store_restored", s.id, { slug: s.slug });
+  });
+}
+
+/* ---------- HQ-A-04: Orphan cleanup (DEC-11 interim) ----------
+   Orphan = store jis ka team mein koi owner row nahi (adhoori creation ya
+   compensation se reh gaya). Cleanup = soft-delete (status "deleted") —
+   slug free ho jata hai (create handler deleted slug ko dobara istemal
+   karne deta hai) aur data DB mein rehta hai (hard delete nahi). */
+async function scanOrphans(){
+  const wrap = $("#orphanWrap"), msg = $("#orphanMsg");
+  if (!wrap) return;
+  wrap.innerHTML = "<p class='empty-note'>Scan ho raha hai…</p>";
+  if (msg){ msg.textContent = ""; msg.className = "msg"; }
+  try {
+    const { data: teams, error: te } = await sb.from("team").select("store_id, email, role").eq("role", "owner");
+    if (te) throw te;
+    const ownerStoreIds = new Set((teams || []).map(t => t.store_id));
+    const orphans = STORES.filter(s => !ownerStoreIds.has(s.id));
+    if (!orphans.length){
+      wrap.innerHTML = "<p class='empty-note'>✅ Koi orphan store nahi mili — har store ka owner team row maujood hai.</p>";
+      return;
+    }
+    wrap.innerHTML = orphans.map(s => {
+      const noSettings = !(STORE_SETTINGS[s.id]);
+      return `
+  <div class="store-card" data-orphan-store="${esc(s.id)}">
+    <h4>⚠️ ${esc(s.name)} <span class="pill red">Orphan</span></h4>
+    <div class="store-meta">
+      🔗 Slug: <strong>${esc(s.slug)}</strong> • 👤 Owner email: ${esc(s.owner_email || "—")} • Status: ${esc(s.status)}<br>
+      Team owner row: <strong>nahi hai</strong>${noSettings ? " • Settings row: <strong>nahi hai</strong>" : ""} — is store mein koi owner login nahi kar sakta.
+    </div>
+    <div class="store-actions">
+      <button class="btn small danger" data-orphan-cleanup="${esc(s.id)}">🧹 Cleanup (soft-delete + slug free)</button>
+    </div>
+  </div>`; }).join("") + `<p class="hint">Cleanup sirf soft-delete karta hai — store lists se gayab ho jayegi, slug dobara istemal ho sakega, data database mein mehfooz rahega aur "Deleted stores" se restore ho sakega.</p>`;
+    wrap.querySelectorAll("[data-orphan-cleanup]").forEach(b => b.onclick = async () => {
+      const s = STORES.find(x => x.id === b.dataset.orphanCleanup);
+      if (!s) return;
+      if (!confirm(`Orphan store "${s.name}" (${s.slug}) ko CLEANUP kar dein?\n\nYeh soft-delete hai: store har list se gayab ho jayegi, slug "${s.slug}" dobara istemal ho sakega, aur data DB mein rahega (Deleted stores se restore ho sakega).`)) return;
+      await storeUpdate(s.id, { status: "deleted" });
+      audit("store_orphan_cleaned", s.id, { slug: s.slug, owner_email: s.owner_email || null });
+      scanOrphans();
+    });
+  } catch (e) {
+    wrap.innerHTML = `<p class="empty-note">Scan fail: ${esc(e.message)}</p>`;
+  }
+}
+
+/* ---------- HQ-A-06: Audit log viewer — READ-ONLY (DEC-28b) ----------
+   platform_audit par platform-admin SELECT policy hai, is liye direct
+   select chalta hai (get_store_audit RPC per-store hota hai — cross-store
+   view ke liye yeh select sahi rasta hai). Details ke VALUES nahi dikhate
+   (audit mein kabhi customer PII aa sakta hai — DEC-14) — sirf keys.
+   Pagination 50/page (.range) — FE-P2. */
+let AUDIT_PAGE = 0;
+const AUDIT_PAGE_SIZE = 50;
+function fillAuditStoreFilter(){
+  const sel = $("#auditStoreFilter");
+  if (!sel) return;
+  const cur = sel.value || "";
+  sel.innerHTML = `<option value="">Saari stores</option>` + STORES.map(s => `<option value="${esc(s.id)}">${esc(s.name)} (${esc(s.slug)})${s.status === "deleted" ? " — deleted" : ""}</option>`).join("");
+  if (cur) sel.value = cur;
+}
+async function loadAuditLog(){
+  const wrap = $("#auditWrap"), info = $("#auditPageInfo");
+  const prevBtn = $("#auditPrevBtn"), nextBtn = $("#auditNextBtn");
+  if (!wrap) return;
+  wrap.innerHTML = "<p class='empty-note'>Audit log load ho raha hai…</p>";
+  if (info) info.textContent = "";
+  try {
+    const storeId = ($("#auditStoreFilter") && $("#auditStoreFilter").value) || "";
+    const action = ($("#auditActionFilter") && $("#auditActionFilter").value.trim()) || "";
+    let q = sb.from("platform_audit").select("id, created_at, actor_email, store_id, action, details", { count: "exact" }).order("created_at", { ascending: false }).range(AUDIT_PAGE * AUDIT_PAGE_SIZE, AUDIT_PAGE * AUDIT_PAGE_SIZE + AUDIT_PAGE_SIZE - 1);
+    if (storeId) q = q.eq("store_id", storeId);
+    if (action) q = q.ilike("action", "%" + action + "%");
+    const { data, error, count } = await q;
+    if (error) throw error;
+    const rows = data || [];
+    const total = count ?? rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE));
+    if (!rows.length){
+      wrap.innerHTML = `<p class="empty-note">Is filter par koi audit entry nahi mili.</p>`;
+    } else {
+      wrap.innerHTML = `<table>
+        <thead><tr><th>Waqt</th><th>Actor</th><th>Action</th><th>Store</th><th>Details (keys)</th></tr></thead>
+        <tbody>${rows.map(r => {
+          const st = STORES.find(s => s.id === r.store_id);
+          const keys = (r.details && typeof r.details === "object") ? Object.keys(r.details) : [];
+          const when = r.created_at ? new Date(r.created_at).toLocaleString("en-PK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+          return `<tr><td style="white-space:nowrap">${esc(when)}</td><td>${esc(r.actor_email || "—")}</td><td><strong>${esc(r.action)}</strong></td><td>${st ? esc(st.name) + " (" + esc(st.slug) + ")" : (r.store_id ? esc(String(r.store_id).slice(0, 8)) + "…" : "—")}</td><td><small style="color:var(--muted)">${keys.length ? esc(keys.join(", ")) : "—"}</small></td></tr>`;
+        }).join("")}</tbody></table>`;
+    }
+    if (info) info.textContent = `Page ${AUDIT_PAGE + 1} / ${totalPages} — kul ${total} entries (50/page)`;
+    if (prevBtn) prevBtn.disabled = AUDIT_PAGE === 0;
+    if (nextBtn) nextBtn.disabled = AUDIT_PAGE + 1 >= totalPages;
+  } catch (e) {
+    wrap.innerHTML = `<p class="empty-note">Audit log load nahi ho saka: ${esc(e.message)}</p>`;
+    if (info) info.textContent = "";
+  }
+}
+
+/* ---------- HQ-A-06: Platform Admins — READ-ONLY list (DEC-28b) ----------
+   platform_admins par platform-admin SELECT policy hai. Yeh sirf LIST hai —
+   add/remove yahan se NAHI hota (DEC-28b ka add/remove hissa is batch mein
+   implement nahi — naya admin Dashboard → Authentication mein user bana
+   kar + platform_admins row insert karke banta hai; last admin ko remove
+   karna mana hai). */
+async function loadPlatformAdmins(){
+  const wrap = $("#adminsWrap");
+  if (!wrap) return;
+  wrap.innerHTML = "<p class='empty-note'>Loading…</p>";
+  try {
+    const { data, error } = await sb.from("platform_admins").select("email").order("email");
+    if (error) throw error;
+    const rows = data || [];
+    if (!rows.length){ wrap.innerHTML = `<p class="empty-note">Koi platform admin nahi mila.</p>`; return; }
+    wrap.innerHTML = `<table>
+      <thead><tr><th>Email</th><th></th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td><strong>${esc(r.email)}</strong></td><td>${r.email === MY_EMAIL ? "<span class='pill green'>Aap</span>" : ""}</td></tr>`).join("")}</tbody></table>
+      <p class="hint" style="margin-top:8px">Read-only list hai — yahan se admin add/remove nahi hota. Naya platform admin: pehle Dashboard → Authentication → Users mein us ka Auth user banayein (MFA enrolment ke saath — B2: platform admin ke liye AAL2 zaroori hai), phir platform_admins mein us ki email wali row insert karein. Aakhri admin ko kabhi remove na karein.</p>`;
+  } catch (e) {
+    wrap.innerHTML = `<p class="empty-note">Platform admins load nahi ho sake: ${esc(e.message)}</p>`;
+  }
 }
 
 /* ---------- V4 Phase 3: theme copy — def-driven (runThemeCopy) ----------
@@ -638,7 +877,6 @@ function themeCopyResultHtml(r){
   lines.push(r.themeSet ? `Theme: ${esc(r.themeName || "Luxury")} set ho gaya.` : "Theme: nahi badla (checkbox OFF tha).");
   lines.push(r.copyProducts ? `Products: ${r.prodsCopied} copy hue, ${r.prodsSkipped} naam pehle se maujood the (skip).` : "Products: copy nahi hue (checkbox OFF — default).");
   r.notes.forEach(n => lines.push("ℹ️ " + esc(n)));
-  if (r.filled.indexOf("instaHandle") !== -1) lines.push(`⚠️ Instagram handle '${esc(r.copiedHandle || "")}' copy hua — apna handle store admin → Content tab se badal lein.`);
   if (r.orderAppended && r.orderAppended.length) lines.push(`✅ Homepage order: ${esc(r.themeName || "Luxury")} sections add kar diye gaye: ` + esc(r.orderAppended.join(", ")) + ".");
   if (!r.filled.length && !r.catsCreated && !r.themeSet && !r.copyProducts && !(r.orderAppended && r.orderAppended.length)) lines.push("Kuch nahi badla — sab kuch pehle se maujood/configured tha (dobara chalane par bhi yahi hoga).");
   return lines.join("<br>");
@@ -649,7 +887,6 @@ function themeCopyResultHtml(r){
    var profile = (def && def.copyProfile)? def.copyProfile: null;
    if (!profile) throw new Error("Is theme ke liye copy profile nahi hai — themes-v4.js load nahi hua ya def mein copyProfile nahi.");
    var displayName = profile.displayName || themeKey;
-   let copiedHandle = null;
   const target = STORES.find(s => s.id === targetId);
   const src = STORES.find(s => s.slug === profile.sourceSlug && s.status !== "deleted");
   if (!target) throw new Error("Target store nahi mili.");
@@ -690,6 +927,9 @@ function themeCopyResultHtml(r){
     let settingsDirty = false;
 
     profile.copyKeys.forEach(k => {
+      /* HQ-A-15 / DEC-30: source store ka Instagram handle kabhi copy nahi
+         hota — target ka apna handle (ya khaali) rehta hai. */
+      if (k === "instaHandle"){ notes.push("instaHandle: source ka handle copy nahi hua — target ka apna handle rahega."); return; }
       if (k === "instaReels"){
         const mp4Only = profile.reelsMp4Only!== false;
          const filtered = Array.isArray(srcData.instaReels) ? srcData.instaReels.filter(r => r && (!mp4Only || isMp4Url(r.video))) : [];
@@ -701,7 +941,7 @@ function themeCopyResultHtml(r){
       const sv = srcData[k];
       if (sv === undefined || sv === null){ notes.push(k + ": source pe khaali — copy nahi hua."); return; }
       if (isEmptyCopyVal(k, sv)){ notes.push(k + ": source pe khaali — copy nahi hua."); return; }
-      if (isEmptyCopyVal(k, merged[k])){ merged[k] = JSON.parse(JSON.stringify(sv)); filled.push(k); settingsDirty = true; if (k === "instaHandle") copiedHandle = sv; }
+      if (isEmptyCopyVal(k, merged[k])){ merged[k] = JSON.parse(JSON.stringify(sv)); filled.push(k); settingsDirty = true; }
       else skipped.push(k);
     });
 
@@ -749,7 +989,7 @@ function themeCopyResultHtml(r){
 
 
     audit(themeKey + "_setup_copied", targetId, { source: src.slug, categories_created: catsCreated, settings_filled: filled, theme_set: themeSet, products_copied: prodsCopied, order_appended: orderAppended });
-    return { target, src, catsCreated, catsSkipped, filled, skipped, notes, themeSet, copyProducts, prodsCopied, prodsSkipped, orderAppended, steps, themeName: displayName, copiedHandle };
+    return { target, src, catsCreated, catsSkipped, filled, skipped, notes, themeSet, copyProducts, prodsCopied, prodsSkipped, orderAppended, steps, themeName: displayName };
   } catch (e) {
     e.stepsDone = steps.slice();
     throw e;
@@ -819,6 +1059,53 @@ function reinjectThemeCopyResult(wrap){
   card.appendChild(box);
 }
 
+/* ---------- HQ-A-04: store creation compensation (DEC-11 interim) ----------
+   TARGET ek server-side transactional `create_store_with_setup` RPC hai
+   (store + team + settings + template ek transaction mein) — woh abhi
+   nahi hai. Jab tak woh na aaye, yeh compensation hi hai: ulta order mein
+   hard-delete (products → categories → settings → team → store row).
+   Store row ka hard delete fail ho to fallback soft-delete (status
+   "deleted") — slug phir bhi free ho jata hai (create handler deleted
+   slug ko dobara istemal karne deta hai).
+   MANUAL RUNBOOK (agar yeh compensation bhi fail ho):
+   1) HQ → neeche "Orphan stores" section → Scan karein → us store ki row
+      par "Cleanup" dabayein (soft-delete + slug free).
+   2) Agar woh bhi fail ho to Supabase Dashboard → Table Editor → stores
+      row ko status='deleted' karein, phir team/settings/categories/
+      products rows (store_id = <id>) delete karein.
+   3) Dobara banane se pehle slug check karein — deleted store ka slug
+      dobara istemal ho sakta hai. */
+async function compensatePartialStore(sid){
+  const cleaned = [], failed = [];
+  const del = async (label, query) => {
+    try {
+      const { error } = await query;
+      if (error) throw error;
+      cleaned.push(label);
+    } catch (e) { failed.push(label + " (" + e.message + ")"); }
+  };
+  await del("products", sb.from("products").delete().eq("store_id", sid));
+  await del("categories", sb.from("categories").delete().eq("store_id", sid));
+  await del("settings", sb.from("settings").delete().eq("store_id", sid));
+  await del("team", sb.from("team").delete().eq("store_id", sid));
+  try {
+    const { error } = await sb.from("stores").delete().eq("id", sid);
+    if (error) throw error;
+    cleaned.push("store row");
+  } catch (e) {
+    /* Fallback: soft-delete — slug free ho jata hai, store lists se gayab. */
+    try {
+      const { error: se } = await sb.from("stores").update({ status: "deleted" }).eq("id", sid);
+      if (se) throw se;
+      cleaned.push("store row (soft-delete fallback)");
+    } catch (e2) { failed.push("store row (" + e2.message + ")"); }
+  }
+  let note = "";
+  if (cleaned.length) note += ` — Cleanup: ${cleaned.join(", ")} saaf kar diye gaye; slug dobara istemal ho sakta hai.`;
+  if (failed.length) note += ` — ⚠️ Cleanup NA-MUKAMMAL: ${failed.join("; ")}. "Orphan stores" section se dobara cleanup karein ya manual runbook (oopar comment) dekhein.`;
+  return note;
+}
+
 /* ---------- Create store ---------- */
 function slugify(name){
   return String(name || "").toLowerCase().trim()
@@ -826,7 +1113,8 @@ function slugify(name){
 }
 let slugAuto = true;
 $("#csName").addEventListener("input", () => { if (slugAuto) $("#csSlug").value = slugify($("#csName").value); });
-$("#csSlug").addEventListener("input", () => { slugAuto = false; $("#csSlug").value = slugify($("#csSlug").value); });
+$("#csSlug").addEventListener("input", () => { slugAuto = false; });
+$("#csSlug").addEventListener("blur", () => { $("#csSlug").value = slugify($("#csSlug").value); });
 document.querySelectorAll('input[name="csMode"]').forEach(r => r.addEventListener("change", () => {
   const tpl = document.querySelector('input[name="csMode"]:checked').value === "template";
   $("#csTemplateOpts").classList.toggle("hidden", !tpl);
@@ -855,8 +1143,27 @@ $("#csCreateBtn").onclick = async () => {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)){ msg.textContent = "Slug durust nahi — sirf chhoti letters, numbers aur '-' (e.g. karachi-shoes)."; msg.className = "msg err"; return; }
   if (!ownerEmail || !ownerEmail.includes("@")){ msg.textContent = "Owner ka sahi email likhein."; msg.className = "msg err"; return; }
   if (STORES.some(s => s.slug === slug && s.status !== "deleted")){ msg.textContent = `Slug "${slug}" pehle se istemal mein hai — doosra slug chunein.`; msg.className = "msg err"; return; }
+  /* HQ-A-07 / DEC-12: server-side Auth-user check (auth_user_exists RPC)
+     pehle — agar RPC maujood hai to woh authoritative hai. RPC na ho
+     (abhi production mein deploy nahi hua) ya call fail ho to purana
+     checkbox gate (checklist-enforced runbook) lagta hai. */
+  let authChecked = false;
+  try {
+    const { data: userExists, error: authErr } = await sb.rpc("auth_user_exists", { p_email: ownerEmail });
+    if (!authErr && userExists === true) { authChecked = true; }
+    else if (!authErr && userExists === false) {
+      msg.textContent = "⛔ Is owner email ka Auth user nahi mila: pehle Supabase Dashboard → Authentication → Users → Add user → yahi owner email (" + ownerEmail + ") → phir dobara koshish karein. (Bina Auth user ke owner login hi nahi kar sakega — store banane se pehle yeh zaroori hai.)";
+      msg.className = "msg err"; return;
+    }
+    /* authErr → RPC maujood nahi / call fail → neeche checkbox gate. */
+  } catch (e) { /* RPC call fail → checkbox gate. */ }
+  if (!authChecked && (!$("#csAuthUserCheck") || !$("#csAuthUserCheck").checked)){
+    msg.textContent = "⛔ Pehle owner ka Auth user banayein: Supabase Dashboard → Authentication → Users → Add user → yahi owner email → phir neeche wala checkbox tick karein aur dobara koshish karein. (Bina Auth user ke owner login hi nahi kar sakega.)";
+    msg.className = "msg err"; return;
+  }
   btn.disabled = true; btn.textContent = "Store ban rahi hai…"; msg.textContent = ""; msg.className = "msg";
   const steps = [];
+  let sid = null; /* HQ-A-04: rollback ke liye store id try ke bahar */
   try {
     /* 1) Stores row */
     const { data: store, error: e1 } = await sb.from("stores").insert({
@@ -865,7 +1172,7 @@ $("#csCreateBtn").onclick = async () => {
       next_due: due, status: "active"
     }).select().single();
     if (e1) throw new Error("Store row: " + e1.message);
-    const sid = store.id;
+    sid = store.id;
     steps.push("✅ Store ban gayi");
     audit("store_created", sid, { slug, owner: ownerEmail });
 
@@ -908,7 +1215,10 @@ $("#csCreateBtn").onclick = async () => {
       /* Settings data copy — store_name nayi store ka */
       const { data: srcSettings } = await sb.from("settings").select("data").eq("store_id", srcId).maybeSingle();
       const newData = JSON.parse(JSON.stringify((srcSettings && srcSettings.data) || {}));
-              newData.store_name = name;         /* (C) Wart fix: template copy shopnest ki pehchan bhi copy kar deta tha —            nayi store ko shopnest ka WhatsApp / logo / socials / theme colour mil            jata tha. Inhein khaali kar dein (theme, sections_order, Luxury keys            copy hone dein — wahi maqsad hai). */         newData.whatsapp_number = "";         newData.logo_url = "";         newData.socials = { facebook: "", instagram: "", tiktok: "", youtube: "", x: "", whatsapp: ""};         newData.theme_color = "";         /* Profile fallback bhi reset: storefront logo profile.logo_url se aur            WhatsApp float profile.phone se bhi parhta hai — sirf top-level keys            khaali karne se shopnest ka number phir bhi leak hota. */         if (newData.profile) { newData.profile.logo_url = ""; newData.profile.phone = "";}
+              newData.store_name = name;         /* (C) Wart fix: template copy shopnest ki pehchan bhi copy kar deta tha —            nayi store ko shopnest ka WhatsApp / logo / socials / theme colour mil            jata tha. Inhein khaali kar dein (theme, sections_order, Luxury keys            copy hone dein — wahi maqsad hai). */         newData.whatsapp_number = "";         newData.logo_url = "";         newData.socials = { facebook: "", instagram: "", tiktok: "", youtube: "", x: "", whatsapp: ""};         newData.theme_color = "";         /* HQ-A-15 (theme copy wala hi usool): source ka Instagram handle bhi            nayi store par nahi jana chahiye — target ka apna handle (ya khaali)            rahega. */         newData.instaHandle = "";         /* Profile fallback bhi reset: storefront logo profile.logo_url se aur            WhatsApp float profile.phone se bhi parhta hai — sirf top-level keys            khaali karne se shopnest ka number phir bhi leak hota. */         if (newData.profile) { newData.profile.logo_url = ""; newData.profile.phone = "";}
+         /* Stale-save / leak fix: source store ki Meta config (Pixel/CAPI/test code) aur
+            custom code nayi store par nahi jani chahiye — nayi store ki apni Meta hogi. */
+         delete newData.meta; delete newData.customCode;
       const { error: e4 } = await sb.from("settings").upsert({ store_id: sid, data: newData }, { onConflict: "store_id" });
       if (e4) throw new Error("Settings copy: " + e4.message);
               steps.push("✅ Settings copy ho gayein (store name naya wala)");         steps.push("✅ ShopNest identity reset — WhatsApp/logo/socials/theme colour khaali (nayi store ki apni pehchan hogi)");
@@ -928,7 +1238,17 @@ $("#csCreateBtn").onclick = async () => {
     $("#csName").value = ""; $("#csSlug").value = ""; $("#csOwnerEmail").value = ""; slugAuto = true;
     loadStores();
   } catch (e) {
-    msg.textContent = "Store banane mein masla: " + e.message + (steps.length ? ` (Ho chuka tha: ${steps.join(", ")})` : "");
+    /* HQ-A-04 compensation (DEC-11 interim): store row banne ke baad koi
+       step fail ho to partial store saaf karein — warna store "active"
+       nazar aati hai jab ke us ka owner/settings nahi, aur slug bhi
+       taken rehta hai (retry fail). */
+    let cleanupNote = "";
+    if (sid) {
+      cleanupNote = await compensatePartialStore(sid);
+      audit("store_create_rolled_back", sid, { slug, error: e.message, steps_done: steps });
+      loadStores();
+    }
+    msg.textContent = "Store banane mein masla: " + e.message + (steps.length ? ` (Ho chuka tha: ${steps.join(", ")})` : "") + cleanupNote;
     msg.className = "msg err";
   } finally {
     btn.disabled = false; btn.textContent = "🏪 Store Banayein";
@@ -973,7 +1293,7 @@ function renderBilling(){
 }
 
 /* ---------- Tabs ---------- */
-const SUPER_TABS = { stores: ["tabStores", "storesPanel"], billing: ["tabBilling", "billingPanel"] };
+const SUPER_TABS = { stores: ["tabStores", "storesPanel"], billing: ["tabBilling", "billingPanel"], audit: ["tabAudit", "auditPanel"], admins: ["tabAdmins", "adminsPanel"] };
 Object.entries(SUPER_TABS).forEach(([view, [tabId]]) => {
   document.getElementById(tabId).onclick = () => switchSuperTab(view);
 });
@@ -982,4 +1302,12 @@ function switchSuperTab(view){
     document.getElementById(tabId).classList.toggle("active", key === view);
     document.getElementById(panelId).classList.toggle("hidden", key !== view);
   });
+  /* HQ-A-06: Audit/Admins tab khulte hi fresh load (lazy — har load par nahi). */
+  if (view === "audit"){ AUDIT_PAGE = 0; loadAuditLog(); }
+  if (view === "admins") loadPlatformAdmins();
 }
+/* HQ-A-04 orphan scan + HQ-A-06 audit controls (HTML mein hain). */
+$("#orphanScanBtn").onclick = scanOrphans;
+$("#auditLoadBtn").onclick = () => { AUDIT_PAGE = 0; loadAuditLog(); };
+$("#auditPrevBtn").onclick = () => { if (AUDIT_PAGE > 0){ AUDIT_PAGE--; loadAuditLog(); } };
+$("#auditNextBtn").onclick = () => { AUDIT_PAGE++; loadAuditLog(); };
