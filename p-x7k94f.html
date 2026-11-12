@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<!-- M-3 / DEC-19: CSP (meta — GitHub Pages headers nahi bhejta). Decisions doc ki
+     directives + zaroori additions: connect-src (Supabase API warna block),
+     style-src 'unsafe-inline' + Google Fonts (page mein 132 inline styles hain),
+     font-src (Google Fonts). Verbatim directives ye teeno ke baghair page torti. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://connect.facebook.net 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; media-src https: data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://connect.facebook.net https://*.facebook.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; upgrade-insecure-requests">
+<!-- DEC-19: frame-buster (admin/HQ only) — CSP meta mein frame-ancestors ignore hota hai. -->
+<script>if(window.top!==window.self){window.top.location=window.location;}</script>
 <title>ShopNest Admin — Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -11,11 +18,15 @@
   :root{--ink:#0A2B4E;--muted:#64748b;--bg:#f4faf7;--accent:#22C55E;--accent-dark:#15803d;--line:#dce8ee;--red:#EF4444}
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  /* No horizontal page scroll on phones — tables scroll inside their own
+     boxes; this is the safety net so no single wide element can push the
+     whole page sideways. overflow-x:clip keeps the sticky topbar working. */
+  html,body{overflow-x:hidden;overflow-x:clip}
   h1,h2,h3{font-family:'Plus Jakarta Sans',sans-serif}
   button{font-family:inherit;cursor:pointer}
   input,select,textarea{font-family:inherit;font-size:15px}
-  .topbar{background:var(--ink);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
-  .topbar .brand{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:19px}
+  .topbar{background:var(--ink);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;flex-wrap:wrap;gap:10px}
+  .topbar .brand{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:19px;white-space:nowrap;flex:none}
   .topbar .brand span{color:#34d399}
   .topbar a{color:#a7f3d0;font-size:14px;text-decoration:none;margin-right:16px}
   .btn{border:0;border-radius:10px;padding:10px 18px;font-weight:700;font-size:14px;background:var(--accent);color:#fff}
@@ -86,6 +97,9 @@
   .bar.sales{background:var(--ink)}
   .bar-lab{font-size:10.5px;color:var(--muted);white-space:nowrap}
   .tsrc-row{display:grid;grid-template-columns:104px 1fr 58px;gap:10px;align-items:center;margin:8px 0;font-size:13.5px}
+  /* Long referrer domains (no spaces) must truncate with "…" instead of
+     overflowing their 104px column and overlapping the bar. */
+  .tsrc-row span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tsrc-track{background:#e8f2ee;border-radius:99px;height:10px;overflow:hidden}
   .tsrc-fill{background:var(--accent);height:100%;border-radius:99px}
   .tsrc-num{text-align:right;font-weight:700;font-size:12.5px}
@@ -107,7 +121,7 @@
   /* --- Multi-tenant: store switcher + picker --- */
   .storebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
   .storebar .ctx-label{font-size:14px}
-  .storebar select{border:0;border-radius:8px;padding:7px 9px;font-weight:700;color:var(--ink);max-width:210px}
+  .storebar select{border:0;border-radius:8px;padding:7px 9px;font-weight:700;color:var(--ink);max-width:170px;min-width:0;flex:0 1 auto}
   .store-pick{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;margin-top:10px}
   .store-pick small{color:var(--muted);font-weight:600}
   .badges-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
@@ -147,14 +161,14 @@
 .od-sumrow.total{border-top:1px solid var(--line);font-weight:800;font-size:16px;margin-top:3px;padding-top:9px}
 #ordersWrap tbody tr{cursor:pointer}
   .sec-row{border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:#fff;margin-bottom:9px}
-  .sec-line{display:flex;align-items:center;gap:12px}
+  .sec-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .sec-row.dragging{opacity:.45}
   .sec-row.dragover{border-color:var(--accent);box-shadow:0 0 0 2px #bbf7d0}
   .sec-row.sec-off{opacity:.55;background:#f8fafc}
   .sec-move{display:flex;gap:4px}
   .sec-move.btn{padding:4px 8px;font-size:14px;line-height:1}
   .drag-handle{cursor:grab;font-size:18px;color:var(--muted);user-select:none;padding:2px 4px;line-height:1}
-  .sec-name{font-weight:700;flex:1}
+  .sec-name{font-weight:700;flex:1 1 170px;min-width:170px}
   .sec-name small{display:block;color:var(--muted);font-weight:500;font-size:12px}
   .custom-editor{border:1px dashed var(--line);border-radius:10px;padding:12px;margin:-3px 0 12px;background:#fbfdff}
   .custom-editor label{font-size:12px;font-weight:700;color:var(--muted);display:block;margin:8px 0 4px}
@@ -199,8 +213,8 @@
   .cnt-row input,.cnt-row textarea,.sp-row input{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;margin-bottom:6px;font-size:14px}
   .cnt-row-actions{display:flex;gap:6px;flex-wrap:wrap}
   input[type=range]{accent-color:var(--accent-dark)}
-  @media (max-width:700px){.ostats{grid-template-columns:repeat(3,1fr)} .oe-item,.oe-head{grid-template-columns:1fr 50px 76px 76px 30px}}
-  @media (max-width:700px){.stats,.acards{grid-template-columns:repeat(2,1fr)} .settings-grid,.dash-grid{grid-template-columns:1fr} table{font-size:13px} th:nth-child(4),td:nth-child(4){display:none}}
+  @media (max-width:700px){.ostats{grid-template-columns:repeat(2,1fr)} .oe-item,.oe-head{grid-template-columns:1fr 50px 76px 76px 30px}}
+  @media (max-width:700px){.stats,.acards{grid-template-columns:repeat(2,1fr)} .settings-grid,.dash-grid{grid-template-columns:1fr} table{font-size:13px}}
   /* --- Global toast (har kaam par khoobsurat success/fail popup) --- */
   #toastWrap{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:min(360px,calc(100vw - 32px))}
   .toast{background:#0f172a;color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:14px;line-height:1.45;display:flex;gap:10px;align-items:flex-start;animation:toastIn .25s ease}
@@ -211,19 +225,50 @@
   .btn:disabled{opacity:.55;cursor:not-allowed}
   tbody tr:hover{background:#f8fafc}
   input:focus,select:focus,textarea:focus{outline:2px solid #86efac;outline-offset:1px}
+  /* FE-A1: buttons/links ke liye bhi visible focus (pehle sirf form controls par tha). */
+  button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #86efac;outline-offset:2px}
+  /* ---- Responsive fixes 2026-11-10 (owner phone video, ~360px) ---- */
+  /* Tables: contained horizontal scroll — columns never crush or overlap.
+     The old 4th-column hide rule is removed (it deleted data); tables keep
+     all columns and scroll inside their card instead. */
+  #ordersWrap,#productsWrap,#categoriesWrap,#topProductsWrap,#recentOrdersWrap,#teamWrap,#couponsWrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #ordersWrap table,#productsWrap table,#categoriesWrap table{min-width:720px}
+  #topProductsWrap table,#recentOrdersWrap table{min-width:460px}
+  #teamWrap table{min-width:560px}
+  #couponsWrap table{min-width:520px}
+  /* Header + tabs on small phones: even 2-col tab grid; Refresh no longer
+     stranded on its own row by margin-left:auto. */
+  @media(max-width:640px){
+    .topbar{padding:10px 12px;gap:8px}
+    .topbar .brand{font-size:17px}
+    .storebar{gap:8px}
+    .storebar select{max-width:140px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .tabs button{justify-content:center;padding:10px 8px;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #refreshBtn{margin-left:0!important}
+  }
+  @media(max-width:520px){
+    .wrap{padding:16px 10px}
+    .card{padding:16px 12px}
+    .searchrow input{min-width:140px}
+    .addform{grid-template-columns:1fr 1fr}
+    .stat strong{font-size:20px}
+    .ostat strong{font-size:17px}
+  }
 </style>
 </head>
 <body>
+<noscript><p style="background:#fee2e2;color:#991b1b;font-weight:700;padding:14px;text-align:center">JavaScript on karein — Admin chalane ke liye JavaScript zaroori hai.</p></noscript>
 
 <div class="topbar">
   <div class="brand"><svg class="ic" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Shop<span>Nest</span> Admin</div>
   <div class="storebar">
     <span id="storeContext" class="hidden">
-      <span class="ctx-label">🏪 <strong id="curStoreName"></strong> <span class="pill green" id="curStoreRole"></span></span>
+      <span class="ctx-label"><svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> <strong id="curStoreName"></strong> <span class="pill green" id="curStoreRole"></span></span>
       <select id="storeSwitcher" title="Store badlein"></select>
       <a id="viewStoreLink" href="index.html" target="_blank">Storefront ↗</a>
     </span>
-    <span id="topSaveMsg"></span>
+    <span id="topSaveMsg" aria-live="polite"></span>
     <button class="btn small hidden" id="globalSaveBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>Save</button>
     <button class="btn small ghost hidden" id="logoutBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>Logout</button>
   </div>
@@ -232,7 +277,7 @@
 <!-- LOGIN -->
 <div class="wrap" id="loginView">
   <div class="card login-box">
-    <h2>Admin Login 🔐</h2>
+    <h2>Admin Login <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></h2>
     <p>Apna team email dein — aapko ek <strong>login link</strong> email par bheja jayega. Us link par click karte hi dashboard khul jayega. (Sirf team mein shamil email chalega.)</p>
     <input type="email" id="loginEmail" placeholder="team email">
     <button class="btn" id="sendLinkBtn" style="width:100%">Send Login Link</button>
@@ -243,7 +288,7 @@
 <!-- NO ACCESS -->
 <div class="wrap hidden" id="noAccessView">
   <div class="card login-box">
-    <h2>⛔ Access nahi hai</h2>
+    <h2><svg class="ic" viewBox="0 0 24 24"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Access nahi hai</h2>
     <p>Aap <strong id="noAccessEmail"></strong> se login hain, lekin yeh email store ki team mein shamil nahi hai. Dashboard dekhne ke liye <strong>owner se rabta karein</strong> — woh Team tab se aapka email add kar dein ge.</p>
     <button class="btn danger" id="noAccessLogout" style="width:100%">Logout</button>
   </div>
@@ -252,7 +297,7 @@
 <!-- STORE PICKER (kai stores ki team mein hon to) -->
 <div class="wrap hidden" id="storePickerView">
   <div class="card login-box" style="max-width:560px;text-align:left">
-    <h2 style="text-align:center">🏪 Apni store chunein</h2>
+    <h2 style="text-align:center"><svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Apni store chunein</h2>
     <p style="text-align:center">Aap (<strong id="pickerEmail"></strong>) in stores ki team mein hain — kis store ka dashboard kholna hai? Baad mein upar wale store switcher se kabhi bhi store badal sakte hain.</p>
     <div id="pickerList"></div>
   </div>
@@ -261,7 +306,7 @@
 <!-- MFA — Authenticator App (B2): platform admin ke liye zaroori -->
 <div class="wrap hidden" id="mfaView">
   <div class="card login-box">
-    <h2>🔐 MFA — Authenticator App</h2>
+    <h2><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> MFA — Authenticator App</h2>
     <p id="mfaIntro">Platform admin ke liye <strong>doosri pehchan (MFA)</strong> zaroori hai. Pehle apne authenticator app (Google Authenticator / Authy) se 6-digit code dein.</p>
     <!-- Challenge: pehle se enrolled factor hai -->
     <div id="mfaChallengeBox" class="hidden">
@@ -270,20 +315,20 @@
         <select id="mfaFactorSelect" style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:10px"></select>
       </div>
       <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" id="mfaChallengeCode" class="mfa-code" placeholder="••••••">
-      <button class="btn" id="mfaChallengeBtn" style="width:100%">✅ Verify karein</button>
+      <button class="btn" id="mfaChallengeBtn" style="width:100%"><svg class="ic" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Verify karein</button>
       <p class="msg" id="mfaChallengeMsg"></p>
     </div>
     <!-- Enrolment: abhi koi factor nahi -->
     <div id="mfaEnrollBox" class="hidden">
-      <button class="btn" id="mfaEnrollStartBtn" style="width:100%">📱 Authenticator app set up karein</button>
+      <button class="btn" id="mfaEnrollStartBtn" style="width:100%"><svg class="ic" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> Authenticator app set up karein</button>
       <div id="mfaQrWrap" class="hidden">
         <p style="font-size:14px">Authenticator app se yeh <strong>QR code scan</strong> karein. Agar scan na ho, to neeche wala secret haath se daal lein.</p>
         <img id="mfaQrImg" class="mfa-qr" alt="Authenticator QR code">
         <div class="mfa-secret" id="mfaSecretText"></div>
-        <button class="btn ghost small" id="mfaCopySecretBtn">📋 Secret copy karein</button>
+        <button class="btn ghost small" id="mfaCopySecretBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Secret copy karein</button>
         <p class="hint">Yeh secret sirf abhi dikh raha hai — dobara nahi dikhaya jayega. App mein add karne ke baad neeche 6-digit code likhein.</p>
         <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" id="mfaEnrollCode" class="mfa-code" placeholder="••••••" style="margin-top:10px">
-        <button class="btn" id="mfaEnrollVerifyBtn" style="width:100%">✅ Verify karke on karein</button>
+        <button class="btn" id="mfaEnrollVerifyBtn" style="width:100%"><svg class="ic" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Verify karke on karein</button>
       </div>
       <p class="msg" id="mfaEnrollMsg"></p>
     </div>
@@ -306,7 +351,7 @@
     <button id="tabStyle"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="#fff"/><circle cx="15" cy="12" r="2.2" fill="#fff"/><circle cx="7" cy="17" r="2.2" fill="#fff"/></svg>Style</button>
     <button id="tabContent"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/><circle cx="9" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="8" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg>Content</button>
     <button id="tabSettings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
-    <button id="tabMeta">📊 Meta</button>
+    <button id="tabMeta"><svg class="ic" viewBox="0 0 24 24"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>Meta</button>
     <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
   </div>
 
@@ -322,7 +367,7 @@
     <div class="card" id="dashLowStock" hidden></div>
 
     <div class="card">
-      <h3 style="margin-bottom:4px">👥 Visitors <small style="color:var(--muted);font-weight:400">(pageviews — har session mein har page ek dafa count hota hai)</small></h3>
+      <h3 style="margin-bottom:4px"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6"/><path d="M18.6 14.8c1.4.9 2.4 2.5 2.4 5.2"/></svg> Visitors <small style="color:var(--muted);font-weight:400">(pageviews — har session mein har page ek dafa count hota hai)</small></h3>
       <p class="msg" id="dashMsg"></p>
       <div class="acards">
         <div class="acard"><strong id="avToday">–</strong><span>Aaj ke visitors</span></div>
@@ -331,13 +376,13 @@
         <div class="acard"><strong id="avUnique7">–</strong><span>Unique sessions (7 din)</span></div>
       </div>
       <div class="dash-grid">
-        <div class="dash-box"><h4>📈 Visitors — pichle 7 din</h4><div id="chartVisitors"></div></div>
-        <div class="dash-box"><h4>🧭 Traffic Sources</h4><div id="trafficWrap"><p class="empty-note">Loading…</p></div></div>
+        <div class="dash-box"><h4><svg class="ic" viewBox="0 0 24 24"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg> Visitors — pichle 7 din</h4><div id="chartVisitors"></div></div>
+        <div class="dash-box"><h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Traffic Sources</h4><div id="trafficWrap"><p class="empty-note">Loading…</p></div></div>
       </div>
     </div>
 
     <div class="card">
-      <h3 style="margin-bottom:12px">💰 Sales <small style="color:var(--muted);font-weight:400">(Cancelled orders shamil nahi)</small></h3>
+      <h3 style="margin-bottom:12px"><svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Sales <small style="color:var(--muted);font-weight:400">(Cancelled orders shamil nahi)</small></h3>
       <div class="acards">
         <div class="acard"><strong id="asToday">–</strong><span>Aaj ki sales</span></div>
         <div class="acard"><strong id="asYesterday">–</strong><span>Kal ki sales</span></div>
@@ -351,10 +396,10 @@
         <div class="acard"><strong id="asOrders7">–</strong><span>Orders (7 din)</span></div>
       </div>
       <div class="dash-grid">
-        <div class="dash-box"><h4>💵 Sales (Rs) — pichle 7 din</h4><div id="chartSales"></div></div>
-        <div class="dash-box"><h4>🏆 Top Products</h4><div id="topProductsWrap"><p class="empty-note">Loading…</p></div></div>
+        <div class="dash-box"><h4><svg class="ic" viewBox="0 0 24 24"><path d="M4 20V12"/><path d="M10 20V4"/><path d="M16 20v-6"/><path d="M2 20h20"/></svg> Sales (Rs) — pichle 7 din</h4><div id="chartSales"></div></div>
+        <div class="dash-box"><h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg> Top Products</h4><div id="topProductsWrap"><p class="empty-note">Loading…</p></div></div>
       </div>
-      <div class="dash-box" style="margin-top:14px"><h4>🧾 Recent Orders</h4><div id="recentOrdersWrap"><p class="empty-note">Loading…</p></div></div>
+      <div class="dash-box" style="margin-top:14px"><h4><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Recent Orders</h4><div id="recentOrdersWrap"><p class="empty-note">Loading…</p></div></div>
     </div>
   </div>
 
@@ -365,37 +410,41 @@
     <div class="ostack" id="orderStack"></div>
     <div class="ostack-legend" id="orderStackLegend"></div>
     <div class="searchrow">
-      <input type="search" id="orderSearch" placeholder="🔍 Naam ya phone number se search karein…">
+      <input type="search" id="orderSearch" placeholder="Naam ya phone number se search karein…">
       <select id="orderStatusFilter">
         <option value="">Saare status</option>
         <option>Pending</option><option>Confirmed</option><option>Shipped</option><option>Delivered</option><option>Cancelled</option>
       </select>
+      <!-- D-1: deleted orders ka alag view (restore ke saath). -->
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:600;font-size:14px"><input type="checkbox" id="showDeletedOrders"> Deleted orders dikhayein</label>
     </div>
     <p class="msg" id="ordersMsg"></p>
-    <div style="margin-bottom:12px"><button class="btn small ghost" id="exportOrdersBtn" type="button">⬇ Orders CSV Export karein</button></div>
+    <div style="margin-bottom:12px"><button class="btn small ghost" id="exportOrdersBtn" type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>  Orders CSV Export karein</button></div>
     <div id="ordersWrap"><p class="empty-note">Loading…</p></div>
+    <div id="ordersPager"></div>
   </div>
 
   <!-- PRODUCTS -->
   <div class="card hidden" id="productsPanel">
     <h3 style="margin-bottom:6px">Products</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Neeche saari products ek <strong>list</strong> mein hain — kisi product ke <strong>Edit</strong> par click karein to us ka pura form (naam, price, <strong>category</strong>, <strong>stock</strong>, <strong>featured</strong>, <strong>rating + reviews</strong>, <strong>delivery fee</strong> — 0 = FREE delivery, <strong>🏷️ discount % badge</strong> — khali = price se auto, photo <strong>upload</strong> ya URL) upar khul jayega. Save karte hi store par live ho jayega.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Neeche saari products ek <strong>list</strong> mein hain — kisi product ke <strong>Edit</strong> par click karein to us ka pura form (naam, price, <strong>category</strong>, <strong>stock</strong>, <strong>featured</strong>, <strong>rating + reviews</strong>, <strong>delivery fee</strong> — 0 = FREE delivery, <strong><svg class="ic" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> discount % badge</strong> — khali = price se auto, photo <strong>upload</strong> ya URL) upar khul jayega. Save karte hi store par live ho jayega.</p>
     <button class="btn" id="addProductBtn" style="margin-bottom:16px">＋ Add New Product</button>
     <datalist id="catList"></datalist>
     <div id="productFormWrap" class="hidden" style="margin-bottom:18px"></div>
     <div id="lowStockBanner" hidden></div>
-    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small ghost" id="exportProductsBtn" type="button">⬇ Products CSV Export karein</button><label class="btn small ghost" style="cursor:pointer">⬆ CSV Import karein<input type="file" id="importProductsFile" accept=".csv,text/csv" hidden></label><span id="importMsg" style="color:var(--muted);font-size:13px"></span></div>
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small ghost" id="exportProductsBtn" type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>  Products CSV Export karein</button><label class="btn small ghost" style="cursor:pointer"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>  CSV Import karein<input type="file" id="importProductsFile" accept=".csv,text/csv" hidden></label><span id="importMsg" style="color:var(--muted);font-size:13px"></span></div>
     <div class="searchrow">
-      <input type="search" id="prodSearch" placeholder="🔍 Product naam ya category se search karein…">
+      <input type="search" id="prodSearch" placeholder="Product naam ya category se search karein…">
       <span id="prodCount" style="align-self:center;color:var(--muted);font-size:13.5px;font-weight:600"></span>
     </div>
     <div id="productsWrap"></div>
+    <div id="productsPager"></div>
   </div>
 
   <!-- CATEGORIES -->
   <div class="card hidden" id="categoriesPanel">
     <h3 style="margin-bottom:6px">Categories</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Categories store ke nav, tiles aur footer mein nazar aati hain. <strong>Visible off</strong> karne se category wahan se gayab ho jati hai, lekin us ke products All Products mein rehte hain. Category delete karne se <strong>products delete NAHI hote</strong> — un par category ka text waisa hi rehta hai.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Categories store ke nav, tiles aur footer mein nazar aati hain. <strong>Visible off</strong> karne se category wahan se gayab ho jati hai, lekin us ke products All Products mein rehte hain. Category delete karne se <strong>products delete NAHI hote</strong> — un ki category "General" ho jati hai. Category rename karne se us ke saare products ki category bhi badal jati hai.</p>
     <div class="addform">
       <div><label>Nayi category ka naam</label><input id="catNewName" placeholder="e.g. Kitchen"></div>
       <div><label>Image URL (optional)</label><input id="catNewImage" placeholder="https://…"></div>
@@ -413,6 +462,8 @@
     <div class="addform">
       <div><label>Coupon code</label><input id="cpnCode" placeholder="e.g. WELCOME10" style="text-transform:uppercase"></div>
       <div><label>Discount % (1–90)</label><input id="cpnPct" type="number" min="1" max="90" placeholder="10"></div>
+      <div><label>Expiry date (optional)</label><input id="cpnExpiry" type="date"></div>
+      <div><label>Max uses (optional)</label><input id="cpnMaxUses" type="number" min="1" placeholder="Unlimited"></div>
       <div><button class="btn" id="addCouponBtn" style="width:100%">＋ Add Coupon</button></div>
     </div>
     <p class="msg" id="couponsMsg"></p>
@@ -435,6 +486,8 @@
   <!-- STORE SETTINGS -->
   <div class="card hidden" id="settingsPanel">
     <h3 style="margin-bottom:6px">Store Settings</h3>
+    <!-- HQ-A-03: load fail par blocking banner — save mat karein. -->
+    <div id="settingsLoadBanner" hidden role="alert" aria-live="polite" style="background:#fee2e2;border:1.5px solid #ef4444;color:#991b1b;border-radius:10px;padding:12px 14px;font-weight:700;margin-bottom:14px"><svg class="ic" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>  Settings load nahi hui — save mat karein. Page reload karein; jab tak settings dobara load na hon, Save buttons band hain.</div>
     <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Storefront ka naam, logo, announcement bar, hero slides, section on/off, promo banners, policies, About text aur WhatsApp button yahin se change karein. <strong>Save Settings</strong> ke baad store page reload karne par changes live nazar aayenge.</p>
 
     <div class="settings-full" style="margin-top:0">
@@ -443,7 +496,7 @@
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <h4>🏪 Store Profile</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>  Store Profile</h4>
       <div class="settings-grid">
         <div>
           <label>Logo image URL (header mein text ki jagah logo)</label><input id="profLogo" placeholder="https://…">
@@ -461,7 +514,7 @@
 
     <div class="settings-grid" style="margin-top:14px">
       <div class="settings-box">
-        <h4>📢 Announcement Bar</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>  Announcement Bar</h4>
         <label>Message 1</label><input id="setAnn1">
         <label>Message 2</label><input id="setAnn2">
         <label>Message 3</label><input id="setAnn3">
@@ -469,19 +522,19 @@
         <p class="hint">Message 1 mein {STORE} likhne se store name auto aa jayega.</p>
       </div>
       <div class="settings-box">
-        <h4>ℹ️ About Section</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>  About Section</h4>
         <label>About heading</label><input id="setAboutHeading">
         <label>About text</label><textarea id="setAboutText" rows="7"></textarea>
       </div>
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <div class="hero-head"><h4>🖼️ Hero Slides <small style="color:var(--muted);font-weight:400">(1–4 slides; jo slide "Show" off hai woh store par nahi aayegi)</small></h4><button class="btn small" id="addSlideBtn" type="button">＋ Slide add karein</button></div>
+      <div class="hero-head"><h4><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>  Hero Slides <small style="color:var(--muted);font-weight:400">(1–4 slides; jo slide "Show" off hai woh store par nahi aayegi)</small></h4><button class="btn small" id="addSlideBtn" type="button">＋ Slide add karein</button></div>
       <div id="heroSlidesWrap"></div>
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <h4>🧩 Homepage Sections — on/off</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>  Homepage Sections — on/off</h4>
       <div class="toggle-grid">
         <label class="checkline"><input type="checkbox" data-sec="best"> Best Sellers</label>
         <label class="checkline"><input type="checkbox" data-sec="promos"> Promo Banners</label>
@@ -498,14 +551,14 @@
 
     <div class="settings-grid" style="margin-top:14px">
       <div class="settings-box">
-        <h4>🎁 Promo Banner 1</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>  Promo Banner 1</h4>
         <label>Small title</label><input id="setP1Kicker">
         <label>Heading</label><input id="setP1Heading">
         <label>Text</label><textarea id="setP1Text" rows="3"></textarea>
         <label>SHOP NOW category</label><input id="setP1Category" list="catList">
       </div>
       <div class="settings-box">
-        <h4>🎁 Promo Banner 2</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>  Promo Banner 2</h4>
         <label>Small title</label><input id="setP2Kicker">
         <label>Heading</label><input id="setP2Heading">
         <label>Text</label><textarea id="setP2Text" rows="3"></textarea>
@@ -514,7 +567,7 @@
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <h4>📜 Policies <small style="color:var(--muted);font-weight:400">(khaali chor dein to default text chalega; khaali line = naya paragraph)</small></h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>  Policies <small style="color:var(--muted);font-weight:400">(khaali chor dein to default text chalega; khaali line = naya paragraph)</small></h4>
       <div class="settings-grid">
         <div><label>Shipping Policy</label><textarea data-pol="shipping" rows="4"></textarea></div>
         <div><label>Refund Policy</label><textarea data-pol="refund" rows="4"></textarea></div>
@@ -525,16 +578,16 @@
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <h4>🔍 Store SEO (Google mein nazar aane ke liye)</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>  Store SEO (Google mein nazar aane ke liye)</h4>
       <label>SEO title (browser tab + Google result — khaali ho to store name chalega)</label><input id="setSeoTitle" placeholder="e.g. Sasta Bazaar — Pakistan Ka Smart Store">
       <label>SEO description (Google ke neeche wali line)</label><textarea id="setSeoDesc" rows="2" placeholder="e.g. Kapre, electronics aur grocery — Cash on Delivery, 3–5 din mein delivery."></textarea>
     </div>
 
-    <div class="settings-box" style="margin-top:14px">
-      <h4>🌐 Apna Domain Connect Karein</h4>
+    <div class="settings-box" id="domainBox" style="margin-top:14px">
+      <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>  Apna Domain Connect Karein</h4>
       <p class="hint" id="domCurrent">Domain load ho raha hai…</p>
       <label>Apna domain likhein (e.g. shop.meridukaan.com — https:// ya / nahi)</label><input id="domInput" placeholder="shop.example.com">
-      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:8px"><button class="btn small" id="domSaveBtn" type="button">💾 Domain Save karein</button><button class="btn small ghost" id="domClearBtn" type="button">Domain hatayein</button></div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:8px"><button class="btn small" id="domSaveBtn" type="button"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Domain Save karein</button><button class="btn small ghost" id="domClearBtn" type="button">Domain hatayein</button></div>
       <p class="msg" id="domMsg"></p>
       <div class="hint" style="margin-top:8px;line-height:1.7">
         <strong>DNS instructions:</strong><br>
@@ -546,14 +599,16 @@
         <strong>Abhi hosting GitHub Pages par hai — custom domain tab live hoga jab Phase 2 (Cloudflare) complete hoga; tab tak domain 'pending' rahega.</strong>
       </div>
     </div>
+    <!-- HQ-A-14: staff ko domain section ki jagah ye note dikhta hai. -->
+    <p id="domainStaffNote" hidden style="color:var(--muted);font-size:14px;margin-top:14px">Domain sirf owner/admin ke liye hai.</p>
 
-    <button class="btn js-save" id="saveSettingsBtn" style="margin-top:16px">💾 Save Settings</button>
+    <button class="btn js-save" id="saveSettingsBtn" style="margin-top:16px"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Save Settings</button>
         <p class="msg" id="settingsMsg"></p>
   </div>
 
   <!-- META (V5 Phase 5: Pixel + Conversions API + custom code) -->
   <div class="card hidden" id="metaPanel">
-    <h3 style="margin-bottom:6px">📊 Meta — Pixel + Conversions API + Custom Code</h3>
+    <h3 style="margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>  Meta — Pixel + Conversions API + Custom Code</h3>
     <div class="settings-box">
       <b>Pixel ID kahan se milega?</b>
       <ol style="margin:6px 0 0 18px;color:var(--muted);font-size:13px;line-height:1.7">
@@ -573,7 +628,7 @@
       <label>CAPI Access Token (Events Manager → Settings → Conversions API → Generate access token)</label>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="metaCapiToken" type="password" placeholder="Meta Events Manager se token paste karein" autocomplete="off" style="flex:1">
-        <button type="button" class="btn small ghost" id="metaTokenToggle">👁 dikhayein</button>
+        <button type="button" class="btn small ghost" id="metaTokenToggle"><svg class="ic" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>  dikhayein</button>
       </div>
       <p class="hint" id="metaTokenState">Koi CAPI token save nahi — Pixel akela bhi kaam karega.</p>
       <label><input id="metaCapiDelete" type="checkbox"> Save karte waqt purana token delete kar dein</label>
@@ -586,50 +641,50 @@
       <textarea id="metaCodeHead" rows="5" placeholder="&lt;!-- yahan head wala code paste karein --&gt;"></textarea>
       <label style="margin-top:8px">Custom code — &lt;/body&gt; se pehle (body ke end mein)</label>
       <textarea id="metaCodeBody" rows="5" placeholder="&lt;!-- yahan body-end wala code paste karein --&gt;"></textarea>
-      <p class="hint" style="color:#b3261e">⚠️ Ye code store ke HAR page par waise ka waise chalega — sirf pehchana hua code (jaise Google Analytics ya chat widget) paste karein. Ghalat code store ko kharab kar sakta hai. Pixel/Analytics ke liye upar wale ID fields use karein, raw code mein Pixel na daalein.</p>
+      <p class="hint" style="color:#b3261e"><svg class="ic" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>  Ye code store ke HAR page par waise ka waise chalega — sirf pehchana hua code (jaise Google Analytics ya chat widget) paste karein. Ghalat code store ko kharab kar sakta hai. Pixel/Analytics ke liye upar wale ID fields use karein, raw code mein Pixel na daalein.</p>
     </div>
     <div class="settings-box">
-      <button type="button" class="btn small" id="metaTestPixelBtn">🧪 Pixel test karein</button>
+      <button type="button" class="btn small" id="metaTestPixelBtn"><svg class="ic" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>  Pixel test karein</button>
       <button type="button" class="btn small ghost" id="metaClearLogBtn" style="margin-left:8px">Log saaf karein</button>
       <p class="hint">Test dabane ke baad Meta Events Manager → Test Events kholein — 1–2 minute mein PageView nazar aana chahiye.</p>
       <label style="margin-top:8px">Event log (is browser mein, aakhri 20 events)</label>
       <div id="metaEventLog" style="font-size:12px;color:var(--muted);max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">Abhi koi event log nahi.</div>
     </div>
-    <button class="btn js-save" id="saveMetaBtn">💾 Save Meta</button>
+    <button class="btn js-save" id="saveMetaBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Save Meta</button>
     <p class="msg" id="metaMsg"></p>
   </div>
 
   <!-- HOMEPAGE BUILDER -->
   <div class="card hidden" id="homepagePanel">
-    <h3 style="margin-bottom:6px">🧩 Homepage Sections</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Har section ko <strong>⠿ handle se drag</strong> karke upar/neeche karein — store ka homepage bilkul isi tartib mein bane ga. 👁 toggle off karne se section store se chhup jayega. Neeche <strong>Custom Section</strong> se apna heading/text/image wala naya section bhi jor sakte hain. <strong>Save</strong> ke baad store reload karke dekhein.</p>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">ℹ️ <strong>Farq samajh lein:</strong> yahan sirf sections ki <strong>tartib + show/hide + custom sections</strong> hote hain. Built-in sections ke <strong>andar ka content</strong> (FAQ ke sawal, reviews, How-to-Order steps, budget tiles, trust strip, About text) <strong>Content tab</strong> mein edit hota hai.</p>
+    <h3 style="margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>  Homepage Sections</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Har section ko <strong>⠿ handle se drag</strong> karke upar/neeche karein — store ka homepage bilkul isi tartib mein bane ga. <svg class="ic" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>  toggle off karne se section store se chhup jayega. Neeche <strong>Custom Section</strong> se apna heading/text/image wala naya section bhi jor sakte hain. <strong>Save</strong> ke baad store reload karke dekhein.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>  <strong>Farq samajh lein:</strong> yahan sirf sections ki <strong>tartib + show/hide + custom sections</strong> hote hain. Built-in sections ke <strong>andar ka content</strong> (FAQ ke sawal, reviews, How-to-Order steps, budget tiles, trust strip, About text) <strong>Content tab</strong> mein edit hota hai.</p>
     <div id="sectionsWrap"></div>
     <button class="btn ghost" id="addCustomSectionBtn" type="button" style="margin-top:4px">＋ Custom Section add karein</button>
     <div style="margin-top:18px">
-      <button class="btn js-save" id="saveHomepageBtn">💾 Save Homepage</button>
+      <button class="btn js-save" id="saveHomepageBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Save Homepage</button>
       <p class="msg" id="homepageMsg"></p>
     </div>
   </div>
 
   <!-- SECTIONS (V5 Phase 2a) — sab section editing aik jagah -->
   <div class="card hidden" id="sectionsPanel">
-    <h3 style="margin-bottom:6px">🎨 Sections — Style + Headings</h3>
+    <h3 style="margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.9 2-1.8 0-.8-.7-1.3-.7-2.1 0-.9.7-1.6 1.7-1.6h2A4.5 4.5 0 0 0 21.5 12C21.4 6.9 17.2 3 12 3z"/><circle cx="7.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/></svg>  Sections — Style + Headings</h3>
     <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Har section ki <strong>cards, height, width, alignment, rang, background, padding/margin</strong> aur <strong>heading</strong> yahan se badlein. Tartib (order) aur show/hide ab bhi <strong>Homepage tab</strong> se hote hain; hero slides, promos aur lists ab bhi apne purane tabs mein hain. Grey card is theme par storefront par nahi dikhta — us ki values mehfooz rehti hain.</p>
     <div id="secStyleWrap"></div>
     <div style="margin-top:18px">
-      <button class="btn js-save" id="saveSectionsBtn">💾 Save Sections</button>
+      <button class="btn js-save" id="saveSectionsBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Save Sections</button>
       <p class="msg" id="sectionsMsg"></p>
     </div>
   </div>
 
   <!-- APPEARANCE -->
   <div class="card hidden" id="appearancePanel">
-    <h3 style="margin-bottom:6px">🎨 Appearance</h3>
+    <h3 style="margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.9 2-1.8 0-.8-.7-1.3-.7-2.1 0-.9.7-1.6 1.7-1.6h2A4.5 4.5 0 0 0 21.5 12C21.4 6.9 17.2 3 12 3z"/><circle cx="7.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/></svg>  Appearance</h3>
     <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Store ka <strong>font</strong>, <strong>theme color</strong>, <strong>logo</strong>, <strong>social links</strong>, <strong>header menu</strong> aur <strong>footer</strong> yahan se change karein — aur neeche checkout/products ke liye <strong>custom fields</strong> bhi bana sakte hain. Save ke baad store par changes live honge.</p>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>🎨 Store Theme — sirf look badlega (products/sections wahi rahenge)</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.9 2-1.8 0-.8-.7-1.3-.7-2.1 0-.9.7-1.6 1.7-1.6h2A4.5 4.5 0 0 0 21.5 12C21.4 6.9 17.2 3 12 3z"/><circle cx="7.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/></svg>  Store Theme — sirf look badlega (products/sections wahi rahenge)</h4>
       <p class="hint">Apne business ke hisaab se theme chunein. Super Admin ne jo themes allow nahi ki hon, woh lock nazar aayengi.</p>
       <div class="theme-grid" id="themeGrid"></div>
       <p class="hint" id="themeNote"></p>
@@ -637,7 +692,7 @@
 
     <div class="settings-grid">
       <div class="settings-box">
-        <h4>🔤 Font &amp; Theme Color</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>  Font &amp; Theme Color</h4>
         <label>Font family</label>
         <select id="appFont" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff">
           <option value="">Default (system)</option>
@@ -654,7 +709,7 @@
         <p class="hint">Color store ke buttons, header aur highlights par lagega.</p>
       </div>
       <div class="settings-box">
-        <h4>🖼️ Store Logo</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>  Store Logo</h4>
         <img id="appLogoPreview" class="img-preview hidden" style="height:90px" alt="">
         <label>Logo image URL</label><input id="appLogoUrl" placeholder="https://…">
         <label>Ya logo upload karein</label>
@@ -665,7 +720,7 @@
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <h4>🔗 Social Media Links</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Social Media Links</h4>
       <div class="settings-grid">
         <div>
           <label>Facebook</label><input id="socFacebook" placeholder="https://facebook.com/…">
@@ -683,13 +738,13 @@
 
     <div class="settings-grid" style="margin-top:14px">
       <div class="settings-box">
-        <h4>🧭 Header Menu Links</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>  Header Menu Links</h4>
         <p class="hint">Khaali chor dein to default menu chalega (categories wala).</p>
         <div id="menuLinksWrap" style="margin-top:10px"></div>
         <button class="btn small ghost" id="addMenuLinkBtn" type="button">＋ Link add karein</button>
       </div>
       <div class="settings-box">
-        <h4>🦶 Footer Links</h4>
+        <h4><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>  Footer Links</h4>
         <p class="hint">Khaali chor dein to default footer links chalenge.</p>
         <div id="footerLinksWrap" style="margin-top:10px"></div>
         <button class="btn small ghost" id="addFooterLinkBtn" type="button">＋ Link add karein</button>
@@ -699,26 +754,26 @@
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <h4>🧾 Custom Fields — Checkout Form</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>  Custom Fields — Checkout Form</h4>
       <p class="hint">Checkout par customer se extra maloomat (e.g. "Note", "City Area", "Size") mangwane ke liye fields banayein. Rows ko ⠿ se drag karke tartib badlein.</p>
       <div id="checkoutFieldsWrap" style="margin-top:10px"></div>
       <button class="btn small ghost" id="addCheckoutFieldBtn" type="button">＋ Field add karein</button>
     </div>
 
     <div class="settings-box" style="margin-top:14px">
-      <h4>📦 Custom Fields — Products</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>  Custom Fields — Products</h4>
       <p class="hint">Products ke liye extra fields (e.g. "Warranty", "Color options") — yeh definitions save hoti hain taa ke store inhein istemal kar sake.</p>
       <div id="productFieldsWrap" style="margin-top:10px"></div>
       <button class="btn small ghost" id="addProductFieldBtn" type="button">＋ Field add karein</button>
     </div>
 
-    <button class="btn js-save" id="saveAppearanceBtn" style="margin-top:16px">💾 Save Appearance</button>
+    <button class="btn js-save" id="saveAppearanceBtn" style="margin-top:16px"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Save Appearance</button>
     <p class="msg" id="appearanceMsg"></p>
   </div>
 
   <!-- STYLE EDITOR (V3.2) — theme ke upar custom style; khaali = theme default -->
   <div class="card hidden" id="stylePanel">
-    <h3 style="margin-bottom:6px">🎨 Style Editor</h3>
+    <h3 style="margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.9 2-1.8 0-.8-.7-1.3-.7-2.1 0-.9.7-1.6 1.7-1.6h2A4.5 4.5 0 0 0 21.5 12C21.4 6.9 17.2 3 12 3z"/><circle cx="7.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/></svg>  Style Editor</h3>
     <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Store ke <strong>cards, sections, buttons aur page rang</strong> yahan se badlein — ye settings <strong>theme ke upar</strong> lagti hain. Koi rang <strong>khaali</strong> chor dein to us jagah theme ka default look chalega. Save ke baad store reload karke dekhein.</p>
 
     <div class="settings-box" style="margin-bottom:14px">
@@ -749,7 +804,7 @@
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>🧩 Homepage Sections — background + heading rang</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>  Homepage Sections — background + heading rang</h4>
       <p class="hint">Har section ka background aur heading rang — khaali = theme default.</p>
       <div style="overflow-x:auto;margin-top:10px">
         <table class="style-table">
@@ -760,7 +815,7 @@
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>🔘 Buttons</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>  Buttons</h4>
       <div class="settings-grid">
         <div>
           <label>Primary button background (khaali = theme default)</label>
@@ -785,7 +840,7 @@
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>📄 Page Rang</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>  Page Rang</h4>
       <div class="settings-grid">
         <div>
           <label>Header background (khaali = theme default)</label>
@@ -805,7 +860,7 @@
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>👥 Social Proof Popups <small style="color:var(--muted);font-weight:400">(neeche-left corner mein "X ne Y order kiya" wali chhoti card)</small></h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6"/><path d="M18.6 14.8c1.4.9 2.4 2.5 2.4 5.2"/></svg>  Social Proof Popups <small style="color:var(--muted);font-weight:400">(neeche-left corner mein "X ne Y order kiya" wali chhoti card)</small></h4>
       <label class="checkline"><input type="checkbox" id="stySpEnabled" checked> Social-proof popups on karein</label>
       <div class="settings-grid" style="margin-top:10px">
         <div>
@@ -818,61 +873,61 @@
         </div>
       </div>
       <div style="margin-top:14px">
-        <h4 style="margin-bottom:6px">📝 Popup entries — aap khud likhein</h4>
+        <h4 style="margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>  Popup entries — aap khud likhein</h4>
         <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Yehi entries popup mein dikhengi — <strong>koi auto order fetch nahi, koi demo nahi</strong>. Waqt <strong>exact waisa likhein jaisa dikhana hai</strong> (masalan "2 min pehle"). Amount khaali bhi chalega. Poori khaali row save nahi hogi. Entries khaali hon to koi popup nahi dikhega.</p>
         <div id="spEntriesWrap"></div>
         <button class="btn ghost" id="addSpEntryBtn" type="button" style="margin-top:6px">＋ Entry add karein</button>
       </div>
     </div>
 
-    <button class="btn js-save" id="saveStyleBtn" style="margin-top:2px">💾 Save Style</button>
+    <button class="btn js-save" id="saveStyleBtn" style="margin-top:2px"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Save Style</button>
     <p class="msg" id="styleMsg"></p>
   </div>
 
   <!-- CONTENT (V3.3) — built-in sections ke andar ka content -->
   <div class="card hidden" id="contentPanel">
-    <h3 style="margin-bottom:6px">📝 Content — Homepage Sections ka Andaruni Content</h3>
+    <h3 style="margin-bottom:6px"><svg class="ic" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>  Content — Homepage Sections ka Andaruni Content</h3>
     <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Yahan built-in sections ka <strong>text</strong> badalta hai. Sections ki <strong>tartib/show-hide</strong> Homepage tab mein hoti hai, rang Style tab mein. Khaali row save nahi hogi. <strong>Save</strong> ke baad store reload karke dekhein.</p>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>ℹ️ About + Footer Text</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>  About + Footer Text</h4>
       <label>About heading</label>
       <input id="cntAboutHeading" placeholder="PAKISTAN KA SMART STORE">
       <label style="margin-top:10px;display:block">About text</label>
       <textarea id="cntAboutText" rows="3" placeholder="Store ke baare mein..."></textarea>
       <label style="margin-top:10px;display:block">Footer about text (khaali ho to About text hi dikhega)</label>
       <textarea id="cntFooterText" rows="2" placeholder="Footer mein store ke baare mein..."></textarea>
-    </div> <div class="settings-box" style="margin-bottom:14px"> <h4>👗 Fashion Options — Sizes &amp; Colors (product page)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Sizes/colors har product mein Product form se likhe jate hain. Yahan se poore store ke liye band kiye ja sakte hain — off ho to product page par nahi dikhenge.</p> <label class="checkline"><input type="checkbox" id="cntShowSizes" checked> Sizes dikhayein (S / M / L / XL pills)</label> <label class="checkline" style="margin-top:8px"><input type="checkbox" id="cntShowColors" checked> Colors dikhayein (rang ke swatches)</label> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>🔤 Section Titles — Homepage sections ke headings</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Khaali chor dein to asal heading rehti hai. Sirf wohi badlein jo badalna ho.</p> <label>Shop by Category — chhota upar wala text</label> <input id="cntSec_categories_eyebrow" placeholder="Apni Pasand Chunein"> <label style="margin-top:8px;display:block">Shop by Category — bara heading</label> <input id="cntSec_categories_title" placeholder="SHOP BY CATEGORY"> <label style="margin-top:10px;display:block">Best Sellers — chhota upar wala text</label> <input id="cntSec_best_eyebrow" placeholder="SAB SE ZYADA ORDER HONE WALE PRODUCTS"> <label style="margin-top:8px;display:block">Best Sellers — bara heading</label> <input id="cntSec_best_title" placeholder="BEST SELLERS"> <label style="margin-top:10px;display:block">Hot Selling — chhota upar wala text</label> <input id="cntSec_hot_eyebrow" placeholder="Trending Now"> <label style="margin-top:8px;display:block">Hot Selling — bara heading</label> <input id="cntSec_hot_title" placeholder="Trending Products"> <label style="margin-top:10px;display:block">New Arrivals — chhota upar wala text</label> <input id="cntSec_arrivals_eyebrow" placeholder="JUST LAUNCHED"> <label style="margin-top:8px;display:block">New Arrivals — bara heading</label> <input id="cntSec_arrivals_title" placeholder="New Arrivals"> <label style="margin-top:10px;display:block">Mega Deals — chhota upar wala text</label> <input id="cntSec_deals_eyebrow" placeholder="LIMITED TIME"> <label style="margin-top:8px;display:block">Mega Deals — bara heading</label> <input id="cntSec_deals_title" placeholder="MEGA DEALS — HAR GHAR KI ZAROORAT"> <label style="margin-top:10px;display:block">Shop by Budget — chhota upar wala text</label> <input id="cntSec_budget_eyebrow" placeholder="Har Budget Ke Liye"> <label style="margin-top:8px;display:block">Shop by Budget — bara heading</label> <input id="cntSec_budget_title" placeholder="SHOP BY BUDGET"> <label style="margin-top:10px;display:block">How to Order — chhota upar wala text</label> <input id="cntSec_howto_eyebrow" placeholder="Asaan Tareeqa"> <label style="margin-top:8px;display:block">How to Order — bara heading</label> <input id="cntSec_howto_title" placeholder="HOW TO ORDER"> <label style="margin-top:10px;display:block">FAQ — chhota upar wala text</label> <input id="cntSec_faq_eyebrow" placeholder="Aksar Sawalat"> <label style="margin-top:8px;display:block">FAQ — bara heading</label> <input id="cntSec_faq_title" placeholder="FAQ"> <label style="margin-top:10px;display:block">Happy Customers — chhota upar wala text</label> <input id="cntSec_reviews_eyebrow" placeholder="Customer Love"> <label style="margin-top:8px;display:block">Happy Customers — bara heading</label> <input id="cntSec_reviews_title" placeholder="HAPPY CUSTOMERS"> <label style="margin-top:10px;display:block">Festive Edit — chhota upar wala text (Luxury)</label> <input id="cntSec_festive_eyebrow" placeholder="THE FESTIVE EDIT"> <label style="margin-top:8px;display:block">Festive Edit — bara heading (Luxury)</label> <input id="cntSec_festive_title" placeholder="Festive Collection"> <label style="margin-top:10px;display:block">Unstitched — chhota upar wala text (Luxury)</label> <input id="cntSec_unstitched_tabs_eyebrow" placeholder="SHOP BY COLLECTION"> <label style="margin-top:8px;display:block">Unstitched — bara heading (Luxury)</label> <input id="cntSec_unstitched_tabs_title" placeholder="Unstitched"> <label style="margin-top:10px;display:block">Ready To Wear — chhota upar wala text (Luxury)</label> <input id="cntSec_readytowear_tabs_eyebrow" placeholder="SHOP BY COLLECTION"> <label style="margin-top:8px;display:block">Ready To Wear — bara heading (Luxury)</label> <input id="cntSec_readytowear_tabs_title" placeholder="Ready To Wear"><label>All Products Title <input id="cntSec_all_products_title" placeholder="All Products"></label><label>All Products Subtitle <input id="cntSec_all_products_sub" placeholder="Complete Collection"></label> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>🛍️ Product Page — Texts</h4> <label>Product Details heading</label> <input id="cntPdpDetails" placeholder="PRODUCT DETAILS"> <label style="margin-top:8px;display:block">Related products heading</label> <input id="cntPdpRelated" placeholder="YOU MIGHT ALSO LIKE"> <label style="margin-top:8px;display:block">Delivery note (price ke neeche)</label> <input id="cntPdpDelivery" placeholder="• 2–4 working days"> <label class="checkline" style="margin-top:8px"><input type="checkbox" id="cntShowDisclaimer" checked> Disclaimer dikhayein (product page par)</label> </div>     <div class="settings-box" style="margin-bottom:14px"> <h4>👑 Luxury Theme — Festive Edit Tiles (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">2×2 labelled tiles — har tile aik category kholti hai. Category ka naam <strong>bilkul waisa likhein jaisa store mein hai</strong>. Image khaali ho to us category ki pehli product image lag jayegi.</p> <div id="cntLuxTilesWrap"></div> <button class="btn ghost" id="addCntLuxTilesBtn" type="button" style="margin-top:6px">＋ Tile add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>👑 Luxury Theme — Unstitched Tabs (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Luxury / Daily Wear / Embroidered naam wali categories khud pehchan li jati hain.</p> <div id="cntLuxTabsWrap"></div> <button class="btn ghost" id="addCntLuxTabsBtn" type="button" style="margin-top:6px">＋ Tab add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>👑 Luxury Theme — Ready To Wear Tabs (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Ready To Wear section ke tabs — wahi tareeqa, alag categories.</p> <div id="cntLuxRtwTabsWrap"></div> <button class="btn ghost" id="addCntLuxRtwTabsBtn" type="button" style="margin-top:6px">＋ Tab add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>👑 Luxury Theme — Editorial Banner Slider (sirf Luxury theme mein dikhta hai)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Fabric banners (Silk, Cambric...) — dots + 4s auto-slide. Khaali ho to section chhup jata hai — koi fallback nahi.</p> <div id="cntLuxBannersWrap"></div> <button class="btn ghost" id="addCntLuxBannersBtn" type="button" style="margin-top:6px">＋ Banner add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>👑 Luxury Theme — Collection Pages (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">VIEW ALL / tile / Menu click par khulne wale collection pages — har row aik category ke liye. Category ka naam <strong>bilkul waisa likhein jaisa store mein hai</strong>. Title khaali ho to collection ka naam, subtitle khaali ho to product count dikhega.</p> <div id="cntCollPagesWrap"></div> <button class="btn ghost" id="addCntCollPagesBtn" type="button" style="margin-top:6px">＋ Collection page add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>📄 Custom Pages — About / Policies / koi bhi page (har theme mein)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Apne store ke alag pages banayein — About Us, Delivery Info, Return Policy, ya kuch bhi. Har page ka apna link banta hai (<strong>?page=slug</strong>) jo share kiya ja sakta hai. Header/footer menu wale tick se page menu mein aa jata hai.</p> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Tareeqa: Title likhein → Text likhein → Header/Footer tick lagayein → upar green Save dabayein.</p> <div id="cntCustomPagesWrap"></div> <button class="btn ghost" id="addCntCustomPagesBtn" type="button" style="margin-top:6px">＋ Page add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>🪜 How to Order — Steps (number khud lagte hain: 01, 02, ...)</h4>
+    </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>  Fashion Options — Sizes &amp; Colors (product page)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Sizes/colors har product mein Product form se likhe jate hain. Yahan se poore store ke liye band kiye ja sakte hain — off ho to product page par nahi dikhenge.</p> <label class="checkline"><input type="checkbox" id="cntShowSizes" checked> Sizes dikhayein (S / M / L / XL pills)</label> <label class="checkline" style="margin-top:8px"><input type="checkbox" id="cntShowColors" checked> Colors dikhayein (rang ke swatches)</label> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>  Section Titles — Homepage sections ke headings</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Khaali chor dein to asal heading rehti hai. Sirf wohi badlein jo badalna ho.</p> <label>Shop by Category — chhota upar wala text</label> <input id="cntSec_categories_eyebrow" placeholder="Apni Pasand Chunein"> <label style="margin-top:8px;display:block">Shop by Category — bara heading</label> <input id="cntSec_categories_title" placeholder="SHOP BY CATEGORY"> <label style="margin-top:10px;display:block">Best Sellers — chhota upar wala text</label> <input id="cntSec_best_eyebrow" placeholder="SAB SE ZYADA ORDER HONE WALE PRODUCTS"> <label style="margin-top:8px;display:block">Best Sellers — bara heading</label> <input id="cntSec_best_title" placeholder="BEST SELLERS"> <label style="margin-top:10px;display:block">Hot Selling — chhota upar wala text</label> <input id="cntSec_hot_eyebrow" placeholder="Trending Now"> <label style="margin-top:8px;display:block">Hot Selling — bara heading</label> <input id="cntSec_hot_title" placeholder="Trending Products"> <label style="margin-top:10px;display:block">New Arrivals — chhota upar wala text</label> <input id="cntSec_arrivals_eyebrow" placeholder="JUST LAUNCHED"> <label style="margin-top:8px;display:block">New Arrivals — bara heading</label> <input id="cntSec_arrivals_title" placeholder="New Arrivals"> <label style="margin-top:10px;display:block">Mega Deals — chhota upar wala text</label> <input id="cntSec_deals_eyebrow" placeholder="LIMITED TIME"> <label style="margin-top:8px;display:block">Mega Deals — bara heading</label> <input id="cntSec_deals_title" placeholder="MEGA DEALS — HAR GHAR KI ZAROORAT"> <label style="margin-top:10px;display:block">Shop by Budget — chhota upar wala text</label> <input id="cntSec_budget_eyebrow" placeholder="Har Budget Ke Liye"> <label style="margin-top:8px;display:block">Shop by Budget — bara heading</label> <input id="cntSec_budget_title" placeholder="SHOP BY BUDGET"> <label style="margin-top:10px;display:block">How to Order — chhota upar wala text</label> <input id="cntSec_howto_eyebrow" placeholder="Asaan Tareeqa"> <label style="margin-top:8px;display:block">How to Order — bara heading</label> <input id="cntSec_howto_title" placeholder="HOW TO ORDER"> <label style="margin-top:10px;display:block">FAQ — chhota upar wala text</label> <input id="cntSec_faq_eyebrow" placeholder="Aksar Sawalat"> <label style="margin-top:8px;display:block">FAQ — bara heading</label> <input id="cntSec_faq_title" placeholder="FAQ"> <label style="margin-top:10px;display:block">Happy Customers — chhota upar wala text</label> <input id="cntSec_reviews_eyebrow" placeholder="Customer Love"> <label style="margin-top:8px;display:block">Happy Customers — bara heading</label> <input id="cntSec_reviews_title" placeholder="HAPPY CUSTOMERS"> <label style="margin-top:10px;display:block">Festive Edit — chhota upar wala text (Luxury)</label> <input id="cntSec_festive_eyebrow" placeholder="THE FESTIVE EDIT"> <label style="margin-top:8px;display:block">Festive Edit — bara heading (Luxury)</label> <input id="cntSec_festive_title" placeholder="Festive Collection"> <label style="margin-top:10px;display:block">Unstitched — chhota upar wala text (Luxury)</label> <input id="cntSec_unstitched_tabs_eyebrow" placeholder="SHOP BY COLLECTION"> <label style="margin-top:8px;display:block">Unstitched — bara heading (Luxury)</label> <input id="cntSec_unstitched_tabs_title" placeholder="Unstitched"> <label style="margin-top:10px;display:block">Ready To Wear — chhota upar wala text (Luxury)</label> <input id="cntSec_readytowear_tabs_eyebrow" placeholder="SHOP BY COLLECTION"> <label style="margin-top:8px;display:block">Ready To Wear — bara heading (Luxury)</label> <input id="cntSec_readytowear_tabs_title" placeholder="Ready To Wear"><label>All Products Title <input id="cntSec_all_products_title" placeholder="All Products"></label><label>All Products Subtitle <input id="cntSec_all_products_sub" placeholder="Complete Collection"></label> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>  Product Page — Texts</h4> <label>Product Details heading</label> <input id="cntPdpDetails" placeholder="PRODUCT DETAILS"> <label style="margin-top:8px;display:block">Related products heading</label> <input id="cntPdpRelated" placeholder="YOU MIGHT ALSO LIKE"> <label style="margin-top:8px;display:block">Delivery note (price ke neeche)</label> <input id="cntPdpDelivery" placeholder="• 2–4 working days"> <label class="checkline" style="margin-top:8px"><input type="checkbox" id="cntShowDisclaimer" checked> Disclaimer dikhayein (product page par)</label> </div>     <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>  Luxury Theme — Festive Edit Tiles (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">2×2 labelled tiles — har tile aik category kholti hai. Category ka naam <strong>bilkul waisa likhein jaisa store mein hai</strong>. Image khaali ho to us category ki pehli product image lag jayegi.</p> <div id="cntLuxTilesWrap"></div> <button class="btn ghost" id="addCntLuxTilesBtn" type="button" style="margin-top:6px">＋ Tile add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>  Luxury Theme — Unstitched Tabs (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Luxury / Daily Wear / Embroidered naam wali categories khud pehchan li jati hain.</p> <div id="cntLuxTabsWrap"></div> <button class="btn ghost" id="addCntLuxTabsBtn" type="button" style="margin-top:6px">＋ Tab add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>  Luxury Theme — Ready To Wear Tabs (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Ready To Wear section ke tabs — wahi tareeqa, alag categories.</p> <div id="cntLuxRtwTabsWrap"></div> <button class="btn ghost" id="addCntLuxRtwTabsBtn" type="button" style="margin-top:6px">＋ Tab add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>  Luxury Theme — Editorial Banner Slider (sirf Luxury theme mein dikhta hai)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Fabric banners (Silk, Cambric...) — dots + 4s auto-slide. Khaali ho to section chhup jata hai — koi fallback nahi.</p> <div id="cntLuxBannersWrap"></div> <button class="btn ghost" id="addCntLuxBannersBtn" type="button" style="margin-top:6px">＋ Banner add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>  Luxury Theme — Collection Pages (sirf Luxury theme mein dikhte hain)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">VIEW ALL / tile / Menu click par khulne wale collection pages — har row aik category ke liye. Category ka naam <strong>bilkul waisa likhein jaisa store mein hai</strong>. Title khaali ho to collection ka naam, subtitle khaali ho to product count dikhega.</p> <div id="cntCollPagesWrap"></div> <button class="btn ghost" id="addCntCollPagesBtn" type="button" style="margin-top:6px">＋ Collection page add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>  Custom Pages — About / Policies / koi bhi page (har theme mein)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Apne store ke alag pages banayein — About Us, Delivery Info, Return Policy, ya kuch bhi. Har page ka apna link banta hai (<strong>?page=slug</strong>) jo share kiya ja sakta hai. Header/footer menu wale tick se page menu mein aa jata hai.</p> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Tareeqa: Title likhein → Text likhein → Header/Footer tick lagayein → upar green Save dabayein.</p> <div id="cntCustomPagesWrap"></div> <button class="btn ghost" id="addCntCustomPagesBtn" type="button" style="margin-top:6px">＋ Page add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>  How to Order — Steps (number khud lagte hain: 01, 02, ...)</h4>
       <div id="cntHowWrap"></div>
       <button class="btn ghost" id="addCntHowBtn" type="button" style="margin-top:6px">＋ Step add karein</button>
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>❓ FAQ — Sawal / Jawab</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>  FAQ — Sawal / Jawab</h4>
       <div id="cntFaqWrap"></div>
       <button class="btn ghost" id="addCntFaqBtn" type="button" style="margin-top:6px">＋ FAQ add karein</button>
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>⭐ Happy Customers — Reviews</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>  Happy Customers — Reviews</h4>
       <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Product ka naam <strong>bilkul waisa likhein jaisa store mein hai</strong> — to us ki photo khud lag jayegi; na mile to generic icon dikhega.</p>
       <div id="cntReviewsWrap"></div>
       <button class="btn ghost" id="addCntReviewsBtn" type="button" style="margin-top:6px">＋ Review add karein</button>
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>💰 Shop by Budget — Tiles (aakhri tile "top" budget wali = HIGHEST RATED jaisi hoti hai)</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>  Shop by Budget — Tiles (aakhri tile "top" budget wali = HIGHEST RATED jaisi hoti hai)</h4>
       <div id="cntBudgetWrap"></div>
       <button class="btn ghost" id="addCntBudgetBtn" type="button" style="margin-top:6px">＋ Tile add karein</button>
     </div>
 
     <div class="settings-box" style="margin-bottom:14px">
-      <h4>🛡️ Trust Strip — Store Benefits (upar wali patti)</h4>
+      <h4><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>  Trust Strip — Store Benefits (upar wali patti)</h4>
       <div id="cntTrustWrap"></div>
       <button class="btn ghost" id="addCntTrustBtn" type="button" style="margin-top:6px">＋ Benefit add karein</button>
     </div>
 
-    <div class="settings-box" style="margin-bottom:14px"> <h4>🎬 Instagram Reels — "See it in action" (Playful Pop) / "Spotted" (Luxury)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Video ke liye <strong>direct MP4 link</strong> dein (Instagram reel ka link poster ke tor par nahi chalega — us ke liye video file ka link chahiye). Poster = video ki thumbnail photo. <strong>Note:</strong> Instagram se khud-ba-khud reels khenchna (auto-fetch) sirf us waqt mumkin hai jab store owner apna Meta/Instagram access token connect kare — is liye yahan links add karna hi aam client ke liye doable tareeqa hai.</p> <label>Instagram handle (@ ke baghair, khaali ho to Follow button nahi dikhega)</label> <input id="cntInstaHandle" placeholder="funbug.pk"> <label class="checkline" style="margin-top:8px"><input type="checkbox" id="cntShowReels" checked> Reels section dikhayein (Playful Pop + Luxury mein)</label> <div id="cntReelsWrap" style="margin-top:10px"></div> <button class="btn ghost" id="addCntReelsBtn" type="button" style="margin-top:6px">＋ Reel add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4>📝 Blog &amp; Guides (sirf Playful Pop theme mein dikhta hai)</h4> <label class="checkline"><input type="checkbox" id="cntShowBlog" checked> Blog section dikhayein (Playful Pop theme mein) — uncheck = backend se disable</label> <div id="cntBlogWrap" style="margin-top:10px"></div> <button class="btn ghost" id="addCntBlogBtn" type="button" style="margin-top:6px">＋ Blog post add karein</button> </div> <button class="btn js-save" id="saveContentBtn" style="margin-top:2px">💾 Save Content</button>
+    <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>  Instagram Reels — "See it in action" (Playful Pop) / "Spotted" (Luxury)</h4> <p style="color:var(--muted);font-size:13.5px;margin-bottom:10px">Video ke liye <strong>direct MP4 link</strong> dein (Instagram reel ka link poster ke tor par nahi chalega — us ke liye video file ka link chahiye). Poster = video ki thumbnail photo. <strong>Note:</strong> Instagram se khud-ba-khud reels khenchna (auto-fetch) sirf us waqt mumkin hai jab store owner apna Meta/Instagram access token connect kare — is liye yahan links add karna hi aam client ke liye doable tareeqa hai.</p> <label>Instagram handle (@ ke baghair, khaali ho to Follow button nahi dikhega)</label> <input id="cntInstaHandle" placeholder="funbug.pk"> <label class="checkline" style="margin-top:8px"><input type="checkbox" id="cntShowReels" checked> Reels section dikhayein (Playful Pop + Luxury mein)</label> <div id="cntReelsWrap" style="margin-top:10px"></div> <button class="btn ghost" id="addCntReelsBtn" type="button" style="margin-top:6px">＋ Reel add karein</button> </div> <div class="settings-box" style="margin-bottom:14px"> <h4><svg class="ic" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>  Blog &amp; Guides (sirf Playful Pop theme mein dikhta hai)</h4> <label class="checkline"><input type="checkbox" id="cntShowBlog" checked> Blog section dikhayein (Playful Pop theme mein) — uncheck = backend se disable</label> <div id="cntBlogWrap" style="margin-top:10px"></div> <button class="btn ghost" id="addCntBlogBtn" type="button" style="margin-top:6px">＋ Blog post add karein</button> </div> <button class="btn js-save" id="saveContentBtn" style="margin-top:2px"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Save Content</button>
     <p class="msg" id="contentMsg"></p>
   </div>
 </div>
@@ -903,7 +958,7 @@
     </div>
     <p class="msg" id="oeMsg"></p>
     <div style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
-      <button class="btn" id="oeSaveBtn">💾 Order Save karein</button>
+      <button class="btn" id="oeSaveBtn"><svg class="ic" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>  Order Save karein</button>
       <button class="btn ghost" id="oeCancelBtn" type="button">Cancel</button>
     </div>
   </div>
@@ -912,7 +967,7 @@
 <!-- ORDER DETAILS MODAL (read-only) -->
 <div class="modal-ov hidden" id="orderDetailsModal">
   <div class="modal-card2">
-    <h3>🛍️ Order Details – <span id="odTitle"></span></h3>
+    <h3><svg class="ic" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>  Order Details – <span id="odTitle"></span></h3>
     <p style="color:var(--muted);font-size:13.5px">Order ki poori detail – yeh sirf dekhne ke liye hai; badalne ke liye Edit karein.</p>
     <div id="odBody"></div>
     <div style="display:flex;gap:9px;margin-top:14px;flex-wrap:wrap">
@@ -924,9 +979,14 @@
 
 <div id="toastWrap" aria-live="polite"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- M-3: supabase-js pinned 2.119.0 + SRI. FE-P4: CDN fail ho to local copy
+     (js/supabase.min.js, wahi 2.119.0 file, 220,148 B) synchronously load hoti hai. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.min.js" integrity="sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb" crossorigin="anonymous"></script>
+<script>if(!window.supabase){document.write('<script src="js/supabase.min.js"><\/script>');}</script>
 <script src="themes.js"></script>
 <script src="themes-v4.js"></script>
+<!-- FE-P4: CDN + local copy dono fail hon to user-visible error (p-x7k94f.js tab bhi load nahi hoga). -->
+<script>if(!window.supabase){var d=document.createElement("div");d.setAttribute("role","alert");d.style.cssText="background:#fee2e2;border:2px solid #ef4444;color:#991b1b;border-radius:10px;padding:14px;margin:16px;font-weight:700";d.textContent="Supabase library load nahi hui (CDN aur local copy dono fail) — page reload karein ya internet check karein.";document.body.appendChild(d);}</script>
   <script src="p-x7k94f.js"></script>
 </body>
 </html>
