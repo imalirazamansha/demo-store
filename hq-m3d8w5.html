@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<!-- M-3 / DEC-19: CSP meta (GitHub Pages custom headers nahi bhej sakta, is
+     liye meta hi hai — partial defense-in-depth; customCode ko yeh nahi
+     rokta, kyunke customCode by-design arbitrary JS hai). NOTE: default-src
+     'self' Google Fonts stylesheet (fonts.googleapis.com) ko bhi rokta hai —
+     fonts system fonts par gir jayengi; yeh DEC-19 directives ka jaan-bujh
+     kar liya gaya trade-off hai. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://connect.facebook.net 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; media-src https: data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://connect.facebook.net https://*.facebook.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; upgrade-insecure-requests">
+<!-- DEC-19: frame-buster (admin/HQ only) — meta CSP frame-ancestors ko kuch browsers ignore karte hain. -->
+<script>if (window.top !== window.self) window.top.location = window.location;</script>
 <title>ShopNest Platform — Super Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -147,6 +156,8 @@
   <div class="tabs">
     <button id="tabStores" class="active">🏪 Stores</button>
     <button id="tabBilling">💰 Billing</button>
+    <button id="tabAudit">📋 Audit Log</button>
+    <button id="tabAdmins">👑 Platform Admins</button>
     <button class="btn small ghost" id="refreshBtn" style="margin-left:auto">↻ Refresh</button>
   </div>
 
@@ -167,6 +178,8 @@
       <div class="acard"><strong id="psRevenue">–</strong><span>💵 Kul revenue (Cancelled ke ilawa)</span></div>
       <div class="acard"><strong id="psVisits7">–</strong><span>👥 Visits — pichle 7 din</span></div>
     </div>
+    <!-- FE-P2: totals 1000 orders tak bounded read se ginay gaye hain (PostgREST ~1000-row limit). Server-side aggregate RPC (platform_stats, DEC-20) abhi nahi hai — jab tak woh na aaye, 1000+ orders par revenue KAM dikhega. -->
+    <p class="hint hidden" id="psLimitNote" style="margin:-6px 0 12px">⚠️ Orders 1000 se zyada hain — upar wale totals sirf taaza tareen 1000 orders se ginay gaye hain (PostgREST limit). Asal totals ke liye server-side aggregate RPC (platform_stats) chahiye.</p>
 
     <div class="card">
       <h3 style="margin-bottom:6px">➕ Nayi Store Banayein</h3>
@@ -181,6 +194,12 @@
       </div>
       <label class="radioline"><input type="radio" name="csMode" value="blank" checked> 🆕 Blank store — khaali catalog, owner khud products dalega</label>
       <label class="radioline"><input type="radio" name="csMode" value="template"> 📋 Template copy — kisi mojooda store ki settings/products copy karein</label>
+      <!-- HQ-A-07 / DEC-12 checklist-enforced runbook: Auth user pehle
+           Dashboard mein banana LAZMI hai — frontend Auth users list nahi
+           parh sakta (anon key se Auth Admin API nahi milti) aur server-side
+           pre-creation check RPC abhi nahi hai. Bina tick ke Store nahi banegi. -->
+      <label class="checkline" style="max-width:560px;margin-top:10px"><input type="checkbox" id="csAuthUserCheck"> ✅ Auth user Dashboard mein bana liya hai — Supabase Dashboard → Authentication → Users mein is owner email ka user maujood hai</label>
+      <p class="hint" style="margin:4px 0 0 4px">Runbook: Dashboard → Authentication → Users → Add user → owner email + password (ya magic-link invite) → phir checkbox tick karein. Bina Auth user ke owner ko magic link kabhi nahi aayega aur store "active" hone ke bawajood login nahi ho sakega.</p>
       <div id="csTemplateOpts" class="hidden" style="margin:6px 0 4px 26px">
         <div class="addform" style="margin-bottom:8px">
           <div><label>Template store</label><select id="csSourceStore"></select></div>
@@ -196,6 +215,22 @@
     <div class="card">
       <h3 style="margin-bottom:12px">Saari Stores</h3>
       <div id="storesWrap"><p class="empty-note">Loading…</p></div>
+    </div>
+
+    <!-- HQ-A-05: Deleted stores — Restore (DEC-28a) -->
+    <div class="card">
+      <h3 style="margin-bottom:6px">🗑 Deleted Stores — Restore</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Soft-deleted stores yahan se wapas Active ki ja sakti hain (data database mein mehfooz rehta hai).</p>
+      <div id="deletedStoresWrap"><p class="empty-note">Loading…</p></div>
+    </div>
+
+    <!-- HQ-A-04: Orphan stores — cleanup (DEC-11 interim) -->
+    <div class="card">
+      <h3 style="margin-bottom:6px">⚠️ Orphan Stores — Cleanup</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Orphan = store jis ka team mein koi owner row nahi (adhoori creation ya fail hua setup). Aisi store mein koi owner login nahi kar sakta. Scan karke per-row Cleanup dabayein — soft-delete hoga, slug dobara istemal ho sakega, data DB mein rahega (Deleted stores se restore ho sakega).</p>
+      <button class="btn small" id="orphanScanBtn">🔍 Orphan stores scan karein</button>
+      <p class="msg" id="orphanMsg"></p>
+      <div id="orphanWrap" style="margin-top:12px"><p class="empty-note">Abhi scan nahi hua — button dabayein.</p></div>
     </div>
   </div>
 
@@ -213,9 +248,53 @@
       <div id="billingWrap"><p class="empty-note">Loading…</p></div>
     </div>
   </div>
+
+  <!-- HQ-A-06: AUDIT LOG — read-only (DEC-28b) -->
+  <div id="auditPanel" class="hidden">
+    <div class="card">
+      <h3 style="margin-bottom:6px">📋 Audit Log — Read-only</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Platform audit (actor, action, store, waqt). Details ke sirf keys dikhaye jate hain — values nahi (audit mein kabhi customer PII aa sakta hai). 50 entries per page.</p>
+      <div class="addform">
+        <div><label>Store</label><select id="auditStoreFilter"><option value="">Saari stores</option></select></div>
+        <div><label>Action (likh kar filter karein)</label><input id="auditActionFilter" placeholder="e.g. store_created"></div>
+      </div>
+      <button class="btn small" id="auditLoadBtn">🔍 Load karein</button>
+      <span class="hint" id="auditPageInfo" style="margin-left:10px"></span>
+      <div id="auditWrap" style="margin-top:12px"><p class="empty-note">Audit tab kholte hi load hoga.</p></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn small ghost" id="auditPrevBtn">← Pichla page</button>
+        <button class="btn small ghost" id="auditNextBtn">Agla page →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HQ-A-06: PLATFORM ADMINS — read-only list (DEC-28b) -->
+  <div id="adminsPanel" class="hidden">
+    <div class="card">
+      <h3 style="margin-bottom:6px">👑 Platform Admins — Read-only</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Sirf list hai — yahan se admin add/remove nahi hota. Platform admin login ke liye MFA (AAL2) zaroori hai (B2).</p>
+      <div id="adminsWrap"><p class="empty-note">Loading…</p></div>
+    </div>
+  </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- M-3 / DEC-19: supabase-js pinned 2.119.0 + SRI + crossorigin. FE-P4:
+     CDN fail ho to local copy (js/supabase.min.js — 2.119.0, SHA-256
+     71e670ca67ad5df7fe3d919f119f30267b44df80df27ac3ac63254a0ba2319df)
+     synchronous fallback; dono fail hon to user-visible error. -->
+<script>
+function __sbLoadLocal(){ document.write('<script src="js/supabase.min.js"><\/script>'); }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.min.js" integrity="sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb" crossorigin="anonymous" onerror="__sbLoadLocal()"></script>
+<script>
+if (!window.supabase) {
+  var _sbErr = document.createElement("div");
+  _sbErr.id = "sbLoadError";
+  _sbErr.style.cssText = "background:#fee2e2;color:#991b1b;border:2px solid #ef4444;border-radius:12px;padding:16px 18px;margin:20px;font:700 15px/1.6 system-ui,sans-serif";
+  _sbErr.textContent = "❌ Supabase library load nahi ho saki (CDN aur local copy dono fail). Internet check karke page reload karein — agar masla rahe to platform owner se rabta karein.";
+  document.body.prepend(_sbErr);
+}
+</script>
 <script src="themes.js"></script>
   <script src="themes-v4.js"></script>
 <script src="hq-m3d8w5.js"></script>
