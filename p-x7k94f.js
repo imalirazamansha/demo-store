@@ -174,6 +174,7 @@ const ADMIN_DEFAULT_SETTINGS = {
     { title: "EASY EXCHANGE", sub: "On damaged items" }
   ],
   whatsapp_number: "",
+  delivery_fee_flat: null, /* [FLAT-FEE] null = unset (per-product-once fallback); number, 0 = FREE, = flat fee per order */
   /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* V3.9: fashion options + editable section/PDP text */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* V3.10: Luxury theme content (Festive tiles, Collection tabs, Editorial banner) */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* V3.11: Ready To Wear tabs + Editorial slider banners */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages --- */ customPages: [], /* --- V5 Phase 5: Meta + custom code (har theme) --- */ meta: { pixelId: "", capiEnabled: false, testEventCode: "", hasCapiToken: false, capiTokenLast4: "" }, customCode: { head: "", body: "" }, sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
   policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
   profile: { logo_url: "", email: "", phone: "", address: "" },
@@ -901,10 +902,18 @@ function oeReadItems(){
       : { name: item.name, price: item.price, qty: item.qty, delivery_fee: item.delivery_fee }; if (item.size) out.size = item.size; if (item.color) out.color = item.color; return out;
   }).filter(i => i.name || i.price > 0 || i.qty > 0);
 }
+/* [FLAT-FEE] Same rule as the storefront: flat fee from SETTINGS_STATE, else once per distinct product. */
+function flatDeliveryFeeAdmin(){ const f = (typeof SETTINGS_STATE !== "undefined" && SETTINGS_STATE) ? SETTINGS_STATE.delivery_fee_flat : null; return (typeof f === "number" && isFinite(f) && f >= 0) ? Math.floor(f) : null; }
+function orderDeliveryFee(items){
+  const flat = flatDeliveryFeeAdmin();
+  if (flat !== null) return items.length ? flat : 0;
+  const seen = new Set();
+  return items.reduce((s, i) => { const id = (i.id !== undefined && i.id !== null) ? String(i.id) : null; if (id !== null) { if (seen.has(id)) return s; seen.add(id); } return s + (Number(i.delivery_fee) || 0); }, 0);
+}
 function oeComputed(){
   const items = oeReadItems();
   const sub = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const del = items.reduce((s, i) => s + (Number(i.delivery_fee) || 0), 0);
+  const del = orderDeliveryFee(items);
   const disc = Math.max(0, parseInt($("#oeDiscount").value) || 0);
   return { items, sub, del, disc, total: Math.max(0, sub + del - disc) };
 }
@@ -1036,7 +1045,7 @@ function openOrderDetails(id){
   const lines = orderLines(o);
   const meta = orderMeta(o);
   const sub = lines.reduce((s, l) => s + (Number(l.price) || 0) * (Number(l.qty) || 0), 0);
-  const del = lines.reduce((s, l) => s + (Number(l.delivery_fee) || 0), 0);
+  const del = orderDeliveryFee(lines);
   const disc = meta.discount || 0;
   const computed = Math.max(0, sub + del - disc);
   const storedTotal = Number(o.total) || 0;
@@ -2225,6 +2234,8 @@ function mergeAdminSettings(raw){
   if (Array.isArray(raw.budgetTiles)) out.budgetTiles = raw.budgetTiles.filter(x => x && typeof x === "object").map(x => ({ label: cs(x.label), amount: cs(x.amount), note: cs(x.note), budget: cs(x.budget) }));
   if (Array.isArray(raw.trustItems)) out.trustItems = raw.trustItems.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), sub: cs(x.sub) })); /* V3.6: Instagram reels + blog */ if (typeof raw.instaHandle === "string") out.instaHandle = raw.instaHandle.trim(); if (Array.isArray(raw.instaReels)) out.instaReels = raw.instaReels.filter(x => x && typeof x === "object").map(x => ({ user: cs(x.user), avatar: cs(x.avatar), video: cs(x.video), poster: cs(x.poster), title: cs(x.title) })); if (Array.isArray(raw.blogPosts)) out.blogPosts = raw.blogPosts.filter(x => x && typeof x === "object").map(x => ({ title: cs(x.title), excerpt: cs(x.excerpt), img: cs(x.img), link: cs(x.link) })); if (typeof raw.showReels === "boolean") out.showReels = raw.showReels; if (typeof raw.showBlog === "boolean") out.showBlog = raw.showBlog; /* V3.9: fashion toggles + section/PDP text. */ if (typeof raw.showSizes === "boolean") out.showSizes = raw.showSizes; if (typeof raw.showColors === "boolean") out.showColors = raw.showColors; if (typeof raw.showDisclaimer === "boolean") out.showDisclaimer = raw.showDisclaimer; if (raw.sectionText && typeof raw.sectionText === "object"){ SECTION_TEXT_KEYS_ADMIN.forEach(k => { const v = raw.sectionText[k]; if (v && typeof v === "object") out.sectionText[k] = { eyebrow: String(v.eyebrow || ""), title: String(v.title || "") }; }); } if (raw.pdpText && typeof raw.pdpText === "object"){ ["details", "related", "delivery"].forEach(k => { if (typeof raw.pdpText[k] === "string") out.pdpText[k] = raw.pdpText[k]; }); } const luxCs = v => String(v || ""); if (Array.isArray(raw.luxuryTiles)) out.luxuryTiles = raw.luxuryTiles.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat), img: luxCs(x.img) })).filter(x => x.label || x.cat || x.img).slice(0, 4); if (Array.isArray(raw.luxuryTabs)) out.luxuryTabs = raw.luxuryTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (raw.luxuryBanner && typeof raw.luxuryBanner === "object"){ ["img", "eyebrow", "title", "button", "cat"].forEach(k => { if (typeof raw.luxuryBanner[k] === "string") out.luxuryBanner[k] = raw.luxuryBanner[k]; }); } if (Array.isArray(raw.luxuryRtwTabs)) out.luxuryRtwTabs = raw.luxuryRtwTabs.filter(x => x && typeof x === "object").map(x => ({ label: luxCs(x.label), cat: luxCs(x.cat) })).filter(x => x.label || x.cat).slice(0, 4); if (Array.isArray(raw.collectionPages)) out.collectionPages = raw.collectionPages.filter(x => x && typeof x === "object").map(x => ({ cat: luxCs(x.cat), title: luxCs(x.title), subtitle: luxCs(x.subtitle), img: luxCs(x.img) })).filter(x => x.cat).slice(0, 12); if (Array.isArray(raw.customPages)) out.customPages = raw.customPages.filter(x => x && typeof x === "object").map(x => ({ slug: String(x.slug || "").trim().toLowerCase(), title: luxCs(x.title), body: String(x.body || "").slice(0, 20000), seoTitle: luxCs(x.seoTitle), showInHeader: x.showInHeader === true, showInFooter: x.showInFooter === true })).filter(x => x.slug).slice(0, 20); /* V5 Phase 5: Meta + custom code — whitelist rebuild; capiToken yahan KABHI nahi (wo store_meta_secrets mein hai, Part B). */ if (raw.meta && typeof raw.meta === "object"){ out.meta = { pixelId: String(raw.meta.pixelId || "").replace(/[^0-9]/g, "").slice(0, 20), capiEnabled: raw.meta.capiEnabled === true, testEventCode: String(raw.meta.testEventCode || "").slice(0, 64), hasCapiToken: raw.meta.hasCapiToken === true, capiTokenLast4: String(raw.meta.capiTokenLast4 || "").slice(-4) }; } if (raw.customCode && typeof raw.customCode === "object"){ out.customCode = { head: String(raw.customCode.head || "").slice(0, 50000), body: String(raw.customCode.body || "").slice(0, 50000) }; }
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
+  /* [FLAT-FEE] Store-level flat delivery fee: plain non-negative integer, else unset. */
+  if (typeof raw.delivery_fee_flat === "number" && isFinite(raw.delivery_fee_flat)) out.delivery_fee_flat = Math.max(0, Math.floor(raw.delivery_fee_flat));
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
   if (typeof raw.seo_description === "string") out.seo_description = raw.seo_description;
@@ -2559,6 +2570,7 @@ function readSectionsText(){
 function fillSettings(s){
   $("#setStoreName").value = s.store_name;
   $("#setWhatsapp").value = s.whatsapp_number;
+  const dff = $("#setDeliveryFeeFlat"); if (dff) dff.value = (s.delivery_fee_flat === null || s.delivery_fee_flat === undefined) ? "" : String(s.delivery_fee_flat);
   /* V3 Part B: SEO */
   if ($("#setSeoTitle")) $("#setSeoTitle").value = s.seo_title || "";
   if ($("#setSeoDesc")) $("#setSeoDesc").value = s.seo_description || "";
@@ -3477,6 +3489,10 @@ async function persistAllSettings(){
     data.about_heading = ((contentFilled && $("#cntAboutHeading")) ? $("#cntAboutHeading").value.trim() : $("#setAboutHeading").value.trim()) || ADMIN_DEFAULT_SETTINGS.about_heading;
     data.about_text = ((contentFilled && $("#cntAboutText")) ? $("#cntAboutText").value.trim() : $("#setAboutText").value.trim()) || ADMIN_DEFAULT_SETTINGS.about_text;
     data.whatsapp_number = $("#setWhatsapp").value.trim();
+    /* [FLAT-FEE] Flat delivery fee: khaali = unset (per-product-once fallback); 0 = FREE. Invalid input => unset (safe). */
+    const dffRaw = $("#setDeliveryFeeFlat") ? $("#setDeliveryFeeFlat").value.trim() : "";
+    const dffNum = parseInt(dffRaw, 10);
+    data.delivery_fee_flat = (dffRaw === "" || !Number.isFinite(dffNum)) ? null : Math.max(0, dffNum);
     /* V3 Part B: SEO */
     data.seo_title = $("#setSeoTitle") ? $("#setSeoTitle").value.trim() : "";
     data.seo_description = $("#setSeoDesc") ? $("#setSeoDesc").value.trim() : "";
