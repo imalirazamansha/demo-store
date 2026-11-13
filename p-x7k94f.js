@@ -175,6 +175,7 @@ const ADMIN_DEFAULT_SETTINGS = {
   ],
   whatsapp_number: "",
   delivery_fee_flat: null, /* [FLAT-FEE] null = unset (per-product-once fallback); number, 0 = FREE, = flat fee per order */
+  free_delivery_min: null, /* [FREE-DELIVERY] null = no threshold; number = subtotal >= this => delivery FREE */
   /* V3.6: Instagram reels + blog */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* V3.9: fashion options + editable section/PDP text */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* V3.10: Luxury theme content (Festive tiles, Collection tabs, Editorial banner) */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* V3.11: Ready To Wear tabs + Editorial slider banners */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages --- */ customPages: [], /* --- V5 Phase 5: Meta + custom code (har theme) --- */ meta: { pixelId: "", capiEnabled: false, testEventCode: "", hasCapiToken: false, capiTokenLast4: "" }, customCode: { head: "", body: "" }, sections: { best: true, hot: true, arrivals: true, deals: true, budget: true, about: true, howto: true, faq: true, reviews: true, promos: true },
   policies: { shipping: "", refund: "", privacy: "", terms: "", contact: "" },
   profile: { logo_url: "", email: "", phone: "", address: "" },
@@ -904,9 +905,17 @@ function oeReadItems(){
 }
 /* [FLAT-FEE] Same rule as the storefront: flat fee from SETTINGS_STATE, else once per distinct product. */
 function flatDeliveryFeeAdmin(){ const f = (typeof SETTINGS_STATE !== "undefined" && SETTINGS_STATE) ? SETTINGS_STATE.delivery_fee_flat : null; return (typeof f === "number" && isFinite(f) && f >= 0) ? Math.floor(f) : null; }
+/* [FREE-DELIVERY] Free-delivery threshold from SETTINGS_STATE: subtotal >= threshold => FREE. */
+function freeDeliveryMinAdmin(){ const f = (typeof SETTINGS_STATE !== "undefined" && SETTINGS_STATE) ? SETTINGS_STATE.free_delivery_min : null; return (typeof f === "number" && isFinite(f) && f >= 0) ? Math.floor(f) : null; }
 function orderDeliveryFee(items){
+  if (!items.length) return 0;
+  const min = freeDeliveryMinAdmin();
+  if (min !== null) {
+    const sub = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
+    if (sub >= min) return 0;
+  }
   const flat = flatDeliveryFeeAdmin();
-  if (flat !== null) return items.length ? flat : 0;
+  if (flat !== null) return flat;
   const seen = new Set();
   return items.reduce((s, i) => { const id = (i.id !== undefined && i.id !== null) ? String(i.id) : null; if (id !== null) { if (seen.has(id)) return s; seen.add(id); } return s + (Number(i.delivery_fee) || 0); }, 0);
 }
@@ -2236,6 +2245,8 @@ function mergeAdminSettings(raw){
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* [FLAT-FEE] Store-level flat delivery fee: plain non-negative integer, else unset. */
   if (typeof raw.delivery_fee_flat === "number" && isFinite(raw.delivery_fee_flat)) out.delivery_fee_flat = Math.max(0, Math.floor(raw.delivery_fee_flat));
+  /* [FREE-DELIVERY] Free-delivery threshold: plain non-negative integer, else unset. */
+  if (typeof raw.free_delivery_min === "number" && isFinite(raw.free_delivery_min)) out.free_delivery_min = Math.max(0, Math.floor(raw.free_delivery_min));
   /* V3 Part B: SEO fields */
   if (typeof raw.seo_title === "string") out.seo_title = raw.seo_title;
   if (typeof raw.seo_description === "string") out.seo_description = raw.seo_description;
@@ -2571,6 +2582,7 @@ function fillSettings(s){
   $("#setStoreName").value = s.store_name;
   $("#setWhatsapp").value = s.whatsapp_number;
   const dff = $("#setDeliveryFeeFlat"); if (dff) dff.value = (s.delivery_fee_flat === null || s.delivery_fee_flat === undefined) ? "" : String(s.delivery_fee_flat);
+  const fdm = $("#setFreeDeliveryMin"); if (fdm) fdm.value = (s.free_delivery_min === null || s.free_delivery_min === undefined) ? "" : String(s.free_delivery_min);
   /* V3 Part B: SEO */
   if ($("#setSeoTitle")) $("#setSeoTitle").value = s.seo_title || "";
   if ($("#setSeoDesc")) $("#setSeoDesc").value = s.seo_description || "";
@@ -3493,6 +3505,10 @@ async function persistAllSettings(){
     const dffRaw = $("#setDeliveryFeeFlat") ? $("#setDeliveryFeeFlat").value.trim() : "";
     const dffNum = parseInt(dffRaw, 10);
     data.delivery_fee_flat = (dffRaw === "" || !Number.isFinite(dffNum)) ? null : Math.max(0, dffNum);
+    /* [FREE-DELIVERY] Free-delivery threshold: khaali = band (no threshold). Invalid input => unset (safe). */
+    const fdmRaw = $("#setFreeDeliveryMin") ? $("#setFreeDeliveryMin").value.trim() : "";
+    const fdmNum = parseInt(fdmRaw, 10);
+    data.free_delivery_min = (fdmRaw === "" || !Number.isFinite(fdmNum)) ? null : Math.max(0, fdmNum);
     /* V3 Part B: SEO */
     data.seo_title = $("#setSeoTitle") ? $("#setSeoTitle").value.trim() : "";
     data.seo_description = $("#setSeoDesc") ? $("#setSeoDesc").value.trim() : "";
