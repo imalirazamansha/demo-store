@@ -172,6 +172,7 @@ const DEFAULT_SETTINGS = {
   ],
   whatsapp_number: "",
   delivery_fee_flat: null, /* [FLAT-FEE] null = unset (per-product-once fallback); number, 0 = FREE, = flat fee per order */
+  free_delivery_min: null, /* [FREE-DELIVERY] null = no threshold; number = subtotal >= this => delivery FREE */
   /* --- V3.6 Playful Pop layout: Instagram reels + blog (Content tab se) --- */ instaHandle: "", instaReels: [], blogPosts: [], showReels: true, showBlog: true, /* --- V3.9 Fashion options + editable section/PDP text --- */ showSizes: true, showColors: true, showDisclaimer: true, sectionText: {}, pdpText: { details: "", related: "", delivery: "" }, /* --- V3.10 Luxury theme content (Festive tiles, Collection tabs, Editorial banner) --- */ luxuryTiles: [], luxuryTabs: [], luxuryBanner: { img: "", eyebrow: "", title: "", button: "", cat: "" }, /* --- V3.11 Luxury: Ready To Wear tabs + Editorial slider --- */ luxuryRtwTabs: [], luxuryBanners: [], collectionPages: [], /* --- V5 Phase 4: custom pages (har theme, menu + SEO) --- */ customPages: [], /* --- V5 Phase 5: Meta (Pixel + CAPI) + custom code (har theme) --- */ meta: { pixelId: "", capiEnabled: false, testEventCode: "", hasCapiToken: false, capiTokenLast4: "" }, customCode: { head: "", body: "" }, /* --- V2 keys (Part A admin contract) --- */
   font_family: { name: "", stack: "", google: "" },
   theme_color: "",
@@ -256,10 +257,19 @@ function descHtml(text){
    set (number, 0 = FREE) => whole order pays exactly that; unset => each
    DISTINCT product's fee once (DEC-09), regardless of sizes/quantity. */
 function flatDeliveryFee(){ const f = SETTINGS && SETTINGS.delivery_fee_flat; return (typeof f === "number" && isFinite(f) && f >= 0) ? Math.floor(f) : null; }
+/* [FREE-DELIVERY] Free-delivery threshold (SETTINGS.free_delivery_min):
+   set (number) => subtotal >= threshold => delivery FREE (0), overriding flat fee. */
+function freeDeliveryMin(){ const f = SETTINGS && SETTINGS.free_delivery_min; return (typeof f === "number" && isFinite(f) && f >= 0) ? Math.floor(f) : null; }
 function feeOf(p){ return Math.max(0, Number(p && p.delivery_fee) || 0); }
 function deliveryTotal(entries){
+  if (!entries.length) return 0;
+  const min = freeDeliveryMin();
+  if (min !== null) {
+    const sub = entries.reduce((sum, [k, q]) => { const p = findP(parseCartKey(k).id); return p ? sum + Number(p.price) * (q || 0) : sum; }, 0);
+    if (sub >= min) return 0;
+  }
   const flat = flatDeliveryFee();
-  if (flat !== null) return entries.length ? flat : 0;
+  if (flat !== null) return flat;
   const seen = new Set();
   return entries.reduce((sum, [k]) => { const id = parseCartKey(k).id; if (seen.has(id)) return sum; seen.add(id); return sum + feeOf(findP(id)); }, 0);
 }
@@ -407,6 +417,8 @@ function mergeSettings(raw){
   if (typeof raw.whatsapp_number === "string") out.whatsapp_number = raw.whatsapp_number.trim();
   /* [FLAT-FEE] Store-level flat delivery fee: plain non-negative integer, else unset. */
   if (typeof raw.delivery_fee_flat === "number" && isFinite(raw.delivery_fee_flat)) out.delivery_fee_flat = Math.max(0, Math.floor(raw.delivery_fee_flat));
+  /* [FREE-DELIVERY] Free-delivery threshold: plain non-negative integer, else unset. */
+  if (typeof raw.free_delivery_min === "number" && isFinite(raw.free_delivery_min)) out.free_delivery_min = Math.max(0, Math.floor(raw.free_delivery_min));
   /* Deep merge: sections toggles */
   if (raw.sections && typeof raw.sections === "object")
     Object.keys(out.sections).forEach(k => { if (typeof raw.sections[k] === "boolean") out.sections[k] = raw.sections[k]; });
