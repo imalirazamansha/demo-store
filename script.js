@@ -1264,8 +1264,6 @@ function watchReveals(){
     if (revealObs) revealObs.observe(el); else el.classList.add("in");
   });
 }
-/* Static homepage sections ko bhi reveal mein shamil karein. */
-$$("#homeView > section, #homeView > main").forEach(s => s.classList.add("reveal"));
 
 /* ---------- FAQ (V3.3: SETTINGS.faqs se, admin Content tab) ---------- */
 function renderFaq(){
